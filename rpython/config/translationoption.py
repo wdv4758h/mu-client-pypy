@@ -48,9 +48,17 @@ translation_optiondescription = OptionDescription(
     ChoiceOption("type_system", "Type system to use when RTyping",
                  ["lltype"], cmdline=None, default="lltype"),
     ChoiceOption("backend", "Backend to use for code generation",
-                 ["c"], default="c",
+                 ["c", "mu"], default="c",
                  requires={
                      "c":      [("translation.type_system", "lltype")],
+                     "mu":     [("translation.type_system", "lltype"),
+                                ("translation.backendopt.raisingop2direct_call", True),
+                                ("translation.backendopt.remove_asserts", True),
+                                ("translation.backendopt.really_remove_asserts", True),
+                                ("translation.backendopt.inline", True),
+                                ("translation.backendopt.mallocs", True),
+                                # ("translation.backendopt.clever_malloc_removal", True),
+                                ("translation.gc", "none")]
                      },
                  cmdline="-b --backend"),
 
