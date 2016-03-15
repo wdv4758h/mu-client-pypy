@@ -12,6 +12,7 @@ from rpython.tool.udir import udir
 from rpython.rlib.debug import debug_start, debug_print, debug_stop
 from rpython.rlib.entrypoint import secondary_entrypoints,\
      annotated_jit_entrypoints
+from rpython.translator.mu.preps import prepare
 
 import py
 from rpython.tool.ansi_print import ansi_log
@@ -538,11 +539,18 @@ class TranslationDriver(SimpleTaskEngine):
 
         log.llinterpret.event("result -> %s" % v)
 
-    @taskdef([RTYPE], "Specialise types and ops for Mu")
+    @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
     def task_mutype_mu(self):
         # self.mutyper = MuTyper(self.translator.graphs, self.gsymtbl)
         # self.mutyper.specialise()
         self.log.info("Task mutype_mu.")
+        bk = self.translator.annotator.bookkeeper
+        entry_graph = bk.getdesc(self.entry_point).getuniquegraph()
+        self.translator.graphs = prepare(self.translator.graphs, entry_graph)
+
+        from rpython.translator.mu.tools.textgraph import print_graph
+        for g in self.translator.graphs:
+            print_graph(g)
 
     @taskdef(["mutype_mu"], "MuIR Code Generation")
     def task_compile_mu(self):
