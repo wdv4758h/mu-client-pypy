@@ -27,7 +27,7 @@ class MuType(LowLevelType, MuEntity):
 
 # ----------------------------------------------------------
 class MuPrimitive(MuType):
-    def __init__(self, abbrv, constr, default):
+    def __init__(self, type_name, abbrv, constr, default):
         """
         :param abbrv: abbreviation string
         :param constr: constructor string
@@ -37,6 +37,10 @@ class MuPrimitive(MuType):
         MuType.__init__(self, abbrv)
         self._default = default
         self._constr = constr
+        self._type_name = type_name
+
+    def __str__(self):
+        return self._type_name
 
     def _defl(self, parent=None, parentindex=None):
         return self._default
@@ -64,7 +68,7 @@ class MuPrimitive(MuType):
 
 def _mu_int_type(n):
     assert n in (1, 8, 16, 32, 64, 128), "Invalid integer length: %d" % n
-    return MuPrimitive("i%d" % n, "int<%d>" % n, 0)
+    return MuPrimitive("int%d_t" % n, "i%d" % n, "int<%d>" % n, 0)
 
 
 int1_t = _mu_int_type(1)
@@ -74,9 +78,9 @@ int32_t = _mu_int_type(32)
 int64_t = _mu_int_type(64)
 int128_t = _mu_int_type(128)
 
-float_t = MuPrimitive("flt", "float", 0.0)
-double_t = MuPrimitive("dbl", "double", 0.0)
-void_t = MuPrimitive("void", "void", None)
+float_t = MuPrimitive("float_t", "flt", "float", 0.0)
+double_t = MuPrimitive("double_t", "dbl", "double", 0.0)
+void_t = MuPrimitive("void_t", "void", "void", None)
 
 bool_t = int1_t
 char_t = int8_t
@@ -160,8 +164,8 @@ class MuStruct(MuContainerType):
             *fields: a list of (str, MuType) tuples.
             **kwds: for extras.
         """
-        self.__name__ = MuStruct.type_prefix + name
-        MuType.__init__(self, self.__name__)
+        self._name = name
+        MuType.__init__(self, MuStruct.type_prefix + name)
 
         flds = {}
         names = []
@@ -204,7 +208,7 @@ class MuStruct(MuContainerType):
         # return "%s %s { %s }" % (self.__class__.__name__,
         #                         self._name, self._str_fields())
         # -- short version --
-        return "%s %s { %s }" % (self.__class__.__name__, self.__name__,
+        return "%s %s { %s }" % (self.__class__.__name__, self._name,
                                  ', '.join(self._names))
 
     @property
@@ -281,6 +285,8 @@ class MuHybrid(MuContainerType):
     """
     MuHybrid is the only variable sized type.
     """
+    type_prefix = "hyb"
+
     def __init__(self, name, *fields):
         """
         Args:
@@ -292,8 +298,8 @@ class MuHybrid(MuContainerType):
         if len(fields) == 0:
             raise TypeError("Variable part cannot be empty")
 
-        self.__name__ = name
-        self.mu_name = MuType.__init__(self, name)
+        self._name = name
+        MuType.__init__(self, MuHybrid.type_prefix + name)
 
         flds = {}
         names = []
@@ -342,7 +348,7 @@ class MuHybrid(MuContainerType):
         # return "%s %s { %s }" % (self.__class__.__name__,
         #                         self._name, self._str_fields())
         # -- short version --
-        return "%s %s { %s | %s }" % (self.__class__.__name__, self.__name__,
+        return "%s %s { %s | %s }" % (self.__class__.__name__, self._name,
                                       ', '.join(self._names[:-1]),
                                       self._varfld)
     @property
@@ -448,13 +454,15 @@ class MuArray(MuContainerType):
     """
     Fixed size array type.
     """
+    type_prefix = "arr"
+
     def __init__(self, OF, length):
         if isinstance(OF, MuHybrid):
             raise TypeError("cannot create an array of hybrids")
         if length < 0:
             raise ValueError("negative array length")
 
-        MuType.__init__(self, "%d%s" % (length, "arr" + OF.mu_name._name))
+        MuType.__init__(self, (MuArray.type_prefix + "%d%s") % (length, OF.mu_name._name))
 
         self.OF = OF
         self.length = length
@@ -464,7 +472,7 @@ class MuArray(MuContainerType):
     _str_fields = saferecursive(_str_fields, '...')
 
     def __str__(self):
-        return "%s of %d %s " % (self.__class__.__name__,
+        return "%s of %d %s" % (self.__class__.__name__,
                                  self.length,
                                  self._str_fields(),)
 
@@ -565,7 +573,7 @@ class MuFuncSig(MuType):
                 raise TypeError("function result cannot be MuHybrid type")
             name += rtn.mu_name._name
 
-        MuType.__init__(self, MuName(name))
+        MuType.__init__(self, name)
         self.ARGS = tuple(arg_ts)
         self.RTNS = tuple(rtn_ts)
 
@@ -573,10 +581,21 @@ class MuFuncSig(MuType):
     def mu_constructor(self):
         args = ', '.join(map(lambda a: repr(a.mu_name), self.ARGS))
         if len(self.RTNS) == 1:
-            rtns = '%s' % self.RTNS[0]
+            rtns = repr(self.RTNS[0].mu_name)
         else:
-            rtns = '( %s )' % ', '.join(map(lambda a: repr(a.mu_name), self.RTNS))
-        return "( %s ) -> %s" % (args, rtns)
+            rtns = '(%s)' % ', '.join(map(lambda a: repr(a.mu_name), self.RTNS))
+        return "(%s) -> %s" % (args, rtns)
+
+    @property
+    def _mu_constructor_expanded(self):
+        def _inner():
+            args = ', '.join(map(lambda a: a._mu_constructor_expanded, self.ARGS))
+            if len(self.RTNS) == 1:
+                rtns = self.RTNS[0]._mu_constructor_expanded
+            else:
+                rtns = '( %s )' % ', '.join(map(lambda a: a._mu_constructor_expanded, self.RTNS))
+            return "( %s ) -> %s" % (args, rtns)
+        return saferecursive(_inner, '...')()
 
     def __str__(self):
         args = ', '.join(map(str, self.ARGS))
