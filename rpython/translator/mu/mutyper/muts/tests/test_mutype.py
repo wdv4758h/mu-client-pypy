@@ -1,10 +1,10 @@
-from rpython.translator.mu.mutyper.muts.mutype import (
+from ..mutype import (
     int8_t, int64_t, float_t, char_t,
     MuStruct, _mustruct,
     MuHybrid, _muhybrid,
     MuArray, _muarray
 )
-from rpython.translator.mu.mutyper.muts.muentity import MuName
+from ..muentity import MuName
 
 
 def test_int():

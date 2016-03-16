@@ -1,4 +1,4 @@
-from rpython.translator.mu.mutyper.muts.muentity import MuName, SCOPE_GLOBAL
+from ..muentity import MuName, SCOPE_GLOBAL
 from rpython.rtyper.test.test_llinterp import gengraph
 from rpython.flowspace.model import FunctionGraph
 
