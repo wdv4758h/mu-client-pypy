@@ -3,7 +3,7 @@ Preparations before the MuTyper process
 """
 import py
 from rpython.tool.ansi_print import ansi_log
-from rpython.translator.mu.mutyper.muts.name import Name
+from rpython.translator.mu.mutyper.muts.muentity import MuName
 
 log = py.log.Producer("preps")
 py.log.setconsumer("preps", ansi_log)
@@ -66,15 +66,15 @@ def prepare(graphs, entry_graph):
         # Generate name
         name = g.name if '.' in g.name else g.name.split('__')[0]
         line_no = g.startline
-        g.muname = Name("%s_%s" % (line_no, name))
+        g.muname = MuName("%s_%s" % (line_no, name))
 
         # TODO: g.musig = MuFuncSig(...)
 
         for idx, blk in enumerate(list(g.iterblocks())):
-            blk.muname = Name("blk%d" % idx, g)
+            blk.muname = MuName("blk%d" % idx, g)
             for var in blk.getvariables():
-                var.muname = Name(var.name, blk)
+                var.muname = MuName(var.name, blk)
             for cst in blk.getconstants():
-                cst.muname = Name("cst", blk)
+                cst.muname = MuName("cst", blk)
 
     return graphs
