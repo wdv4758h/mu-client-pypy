@@ -1,4 +1,4 @@
-from ..muentity import MuName, SCOPE_GLOBAL
+from ..muentity import MuName, SCOPE_GLOBAL, MuEntity
 from rpython.rtyper.test.test_llinterp import gengraph
 from rpython.flowspace.model import FunctionGraph
 
@@ -26,3 +26,9 @@ def test_muname():
 
     v = g.startblock.getvariables()[0]
     assert repr(v.mu_name) == '@f.blk0.x_0'
+
+
+def test_muentity():
+    e = MuEntity(MuName("gbl_entity"))
+    assert e.mu_name == MuName("gbl_entity")
+    assert e.__name__ == "@gbl_entity"

@@ -2,7 +2,8 @@ from ..mutype import (
     int8_t, int64_t, float_t, char_t,
     MuStruct, _mustruct,
     MuHybrid, _muhybrid,
-    MuArray, _muarray
+    MuArray, _muarray,
+    MuFuncRef, MuFuncSig
 )
 from ..muentity import MuName
 
@@ -20,8 +21,10 @@ def test_structs():
     assert S.radius == float_t
     assert S.origin == P
 
+    assert str(S) == "MuStruct Circle { radius, origin }"
     assert S.mu_constructor == "struct<%s %s>" % (repr(float_t.mu_name), repr(P.mu_name))
     assert S._mu_constructor_expanded == "struct<float struct<float float>>"
+    assert repr(S) == S._mu_constructor_expanded
 
     S2 = MuStruct('Circle', ('radius', float_t), ('origin', P))
     assert hash(S) == hash(S2)  # equal types should have the same hash
@@ -43,8 +46,10 @@ def test_hybrids():
     assert H.chars == char_t
     assert H.length == int64_t
 
+    assert str(H) == "MuHybrid String { hash, length | chars }"
     assert H.mu_constructor == "hybrid<%s %s %s>" % (int64_t.mu_name, int64_t.mu_name, int8_t.mu_name)
     assert H._mu_constructor_expanded == "hybrid<int<64> int<64> int<8>>"
+    assert repr(H) == H._mu_constructor_expanded
 
     H2 = MuHybrid("String", ('hash', int64_t), ('length', int64_t), ('chars', char_t))
     assert hash(H) == hash(H2)
@@ -65,6 +70,7 @@ def test_arrays():
     assert A.OF == int64_t
     assert A.length == 10
 
+    assert str(A) == "MuArray (%d) { %s } " % (10, "int<64>")
     assert A.mu_constructor == "array<%s %d>" % (int64_t.mu_name, 10)
     assert A._mu_constructor_expanded == "array<int<64> 10>"
 
@@ -77,3 +83,9 @@ def test_arrays():
     assert a.items == [0] * 10
     a.setitem(9, 1234)
     assert a.getitem(9) == 1234
+
+
+def test_funcsig():
+    Sig = MuFuncSig((int64_t, float_t), (MuStruct("packed", ('i', int64_t), ('f', float_t)),))
+
+    assert repr(Sig) == "sig_i64flt_stti64flt"

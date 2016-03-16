@@ -22,7 +22,7 @@ class MuType(LowLevelType, MuEntity):
         raise NotImplementedError
 
     def __repr__(self):
-        return self.mu_constructor
+        return self._mu_constructor_expanded
 
 
 # ----------------------------------------------------------
@@ -204,7 +204,7 @@ class MuStruct(MuContainerType):
         # return "%s %s { %s }" % (self.__class__.__name__,
         #                         self._name, self._str_fields())
         # -- short version --
-        return "%s %s { %s }" % (self.__class__.__name__, self._name,
+        return "%s %s { %s }" % (self.__class__.__name__, self.__name__,
                                  ', '.join(self._names))
 
     @property
@@ -342,7 +342,7 @@ class MuHybrid(MuContainerType):
         # return "%s %s { %s }" % (self.__class__.__name__,
         #                         self._name, self._str_fields())
         # -- short version --
-        return "%s %s { %s | %s }" % (self.__class__.__name__, self._name,
+        return "%s %s { %s | %s }" % (self.__class__.__name__, self.__name__,
                                       ', '.join(self._names[:-1]),
                                       self._varfld)
     @property
@@ -468,12 +468,6 @@ class MuArray(MuContainerType):
                                  self.length,
                                  self._str_fields(),)
 
-    def _short_name(self):
-        return "%s %d %s" % (self.__class__.__name__,
-                             self.length,
-                             self.OF._short_name(),)
-    _short_name = saferecursive(_short_name, '...')
-
     def _container_example(self):
         return _muarray(self)
 
@@ -538,20 +532,20 @@ class _muarray(_muparentable):
 
 
 # ----------------------------------------------------------
-class RefType(MuType):
+class MuRefType(MuType):
     def _defl(self, parent=None, parentindex=None):
         return NULL
 
 
-class _genref(object):  # value of general reference types
+class _mugenref(object):  # value of general reference types
     pass
 
 
-NULL = _genref()    # NULL is a value of general reference type
+NULL = _mugenref()    # NULL is a value of general reference type
 
 
 # ----------------------------------------------------------
-class FuncSig(MuEntity):
+class MuFuncSig(MuType):
     __name__ = 'funcsig'
 
     def __init__(self, arg_ts, rtn_ts):
@@ -560,15 +554,29 @@ class FuncSig(MuEntity):
             arg_ts: parameter types
             rtn_ts: return types
         """
+        name = "sig_"
         for arg in arg_ts:
             assert isinstance(arg, MuType)
-        self.ARGS = tuple(arg_ts)
-
+            name += arg.mu_name._name
+        name += "_"
         for rtn in rtn_ts:
             assert isinstance(rtn, MuType)
             if isinstance(rtn, MuHybrid):
                 raise TypeError("function result cannot be MuHybrid type")
+            name += rtn.mu_name._name
+
+        MuType.__init__(self, MuName(name))
+        self.ARGS = tuple(arg_ts)
         self.RTNS = tuple(rtn_ts)
+
+    @property
+    def mu_constructor(self):
+        args = ', '.join(map(lambda a: repr(a.mu_name), self.ARGS))
+        if len(self.RTNS) == 1:
+            rtns = '%s' % self.RTNS[0]
+        else:
+            rtns = '( %s )' % ', '.join(map(lambda a: repr(a.mu_name), self.RTNS))
+        return "( %s ) -> %s" % (args, rtns)
 
     def __str__(self):
         args = ', '.join(map(str, self.ARGS))
@@ -592,7 +600,7 @@ class FuncSig(MuEntity):
         return [arg for arg in self.ARGS if arg is not void_t]
 
 
-class FuncRef(RefType):
+class MuFuncRef(MuRefType):
     def __init__(self, Sig):
         self.Sig = Sig
 
@@ -603,12 +611,26 @@ class FuncRef(RefType):
         return ">fn %s" % self.Sig
 
 
-class _funcref(_genref):
-    # TODO: think about how to define this.
-    pass
+class _mufuncref(_mugenref):
+    def __init__(self, TYPE, **attrs):
+        """
+        Function reference value type
+        :param TYPE: FuncRef
+        :param attrs: optional attributes, depending on how it's used.
+                    An example can be found in rpython/rtyper/lltypesystem/rffi.py:143
+        """
+        attrs.setdefault('_TYPE', TYPE)
+        attrs.setdefault('_name', '?')
+        attrs.setdefault('_callable', None)
+        self.__dict__.update(attrs)
+        if '_callable' in attrs and \
+                hasattr(attrs['_callable'], '_compilation_info'):
+            self.__dict__['compilation_info'] = attrs['_callable']._compilation_info
+
+        # TODO: define rest basing on _func type in lltype.py
 
 
-class Ref(RefType):
+class Ref(MuRefType):
     _cache = WeakValueDictionary()  # cache Refs
 
     def __new__(cls, TO, use_cache=True):
@@ -616,9 +638,9 @@ class Ref(RefType):
             obj = MuType.__new__(cls)
         else:
             try:
-                return RefType._cache[TO]
+                return MuRefType._cache[TO]
             except KeyError:
-                obj = RefType._cache[TO] = MuType.__new__(cls)
+                obj = MuRefType._cache[TO] = MuType.__new__(cls)
             except TypeError:
                 obj = MuType.__new__(cls)
         return obj
