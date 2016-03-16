@@ -23,6 +23,9 @@ def test_structs():
     assert S.mu_constructor == "struct<%s %s>" % (repr(float_t.mu_name), repr(P.mu_name))
     assert S._mu_constructor_expanded == "struct<float struct<float float>>"
 
+    S2 = MuStruct('Circle', ('radius', float_t), ('origin', P))
+    assert hash(S) == hash(S2)  # equal types should have the same hash
+
     S._container_example()
 
     s = _mustruct(S)
@@ -43,6 +46,9 @@ def test_hybrids():
     assert H.mu_constructor == "hybrid<%s %s %s>" % (int64_t.mu_name, int64_t.mu_name, int8_t.mu_name)
     assert H._mu_constructor_expanded == "hybrid<int<64> int<64> int<8>>"
 
+    H2 = MuHybrid("String", ('hash', int64_t), ('length', int64_t), ('chars', char_t))
+    assert hash(H) == hash(H2)
+
     H._container_example()
 
     h = _muhybrid(H, 3)
@@ -61,6 +67,9 @@ def test_arrays():
 
     assert A.mu_constructor == "array<%s %d>" % (int64_t.mu_name, 10)
     assert A._mu_constructor_expanded == "array<int<64> 10>"
+
+    A2 = MuArray(int64_t, 10)
+    assert hash(A) == hash(A2)
 
     A._container_example()
 

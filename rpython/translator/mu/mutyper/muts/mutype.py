@@ -5,7 +5,7 @@ import weakref
 from types import NoneType
 
 from rpython.rlib.objectmodel import Symbolic
-from rpython.rtyper.lltypesystem.lltype import LowLevelType, safe_equal, saferecursive, WeakValueDictionary
+from rpython.rtyper.lltypesystem.lltype import LowLevelType, saferecursive, WeakValueDictionary, frozendict
 from .muentity import MuEntity, MuName
 
 
@@ -87,7 +87,7 @@ unichar_t = int16_t
 class MuContainerType(MuType):
     def __getattr__(self, item):
         raise AttributeError('%s %s has no field %r' %
-                             (self.__class__.__name__, self._name, item))
+                             (self.__class__.__name__, self.mu_name, item))
 
     def _container_example(self):
         raise NotImplementedError
@@ -179,7 +179,7 @@ class MuStruct(MuContainerType):
                 raise TypeError("%s: cannot inline MuHybrid type %s" %
                                 (self._name, typ))
 
-        self._flds = flds
+        self._flds = frozendict(flds)
         self._names = tuple(names)
 
     def _is_atomic(self):
@@ -311,7 +311,7 @@ class MuHybrid(MuContainerType):
                 raise TypeError("%s: cannot inline MuHybrid type %s" %
                                 (self._name, typ))
 
-        self._flds = flds
+        self._flds = frozendict(flds)
         self._names = tuple(names)
         self._varfld = names[-1]
         if self._flds[self._varfld] == void_t:
@@ -454,6 +454,8 @@ class MuArray(MuContainerType):
         if length < 0:
             raise ValueError("negative array length")
 
+        MuType.__init__(self, "%d%s" % (length, "arr" + OF.mu_name._name))
+
         self.OF = OF
         self.length = length
 
@@ -537,20 +539,6 @@ class _muarray(_muparentable):
 
 # ----------------------------------------------------------
 class RefType(MuType):
-    _cache = WeakValueDictionary()  # cache RefTypes
-
-    def __new__(cls, TO, use_cache=True):
-        if not use_cache:
-            obj = MuType.__new__(cls)
-        else:
-            try:
-                return RefType._cache[TO]
-            except KeyError:
-                obj = RefType._cache[TO] = MuType.__new__(cls)
-            except TypeError:
-                obj = MuType.__new__(cls)
-        return obj
-
     def _defl(self, parent=None, parentindex=None):
         return NULL
 
@@ -563,7 +551,7 @@ NULL = _genref()    # NULL is a value of general reference type
 
 
 # ----------------------------------------------------------
-class FuncSig(MuType):
+class FuncSig(MuEntity):
     __name__ = 'funcsig'
 
     def __init__(self, arg_ts, rtn_ts):
@@ -619,6 +607,21 @@ class _funcref(_genref):
     # TODO: think about how to define this.
     pass
 
+
+class Ref(RefType):
+    _cache = WeakValueDictionary()  # cache Refs
+
+    def __new__(cls, TO, use_cache=True):
+        if not use_cache:
+            obj = MuType.__new__(cls)
+        else:
+            try:
+                return RefType._cache[TO]
+            except KeyError:
+                obj = RefType._cache[TO] = MuType.__new__(cls)
+            except TypeError:
+                obj = MuType.__new__(cls)
+        return obj
 
 # ----------------------------------------------------------
 def mu_typeOf(val):
