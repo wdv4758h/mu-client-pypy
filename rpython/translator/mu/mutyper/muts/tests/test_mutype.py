@@ -99,3 +99,14 @@ def test_funcsig():
     assert Sig.mu_constructor == "(@i64, @flt) -> @sttpacked"
     assert Sig._mu_constructor_expanded == "( int<64>, float ) -> struct<int<64> float>"
     assert repr(Sig.mu_name) == "@sig_i64flt_sttpacked"
+
+
+def test_funcref():
+    Sig = MuFuncSig((float_t, float_t), (float_t,))
+    assert repr(Sig.mu_name) == "@sig_fltflt_flt"
+
+    R = MuFuncRef(Sig)
+    assert str(R) == "MuFuncRef ( float_t, float_t ) -> float_t"
+    assert repr(R.mu_name) == "@fnrsig_fltflt_flt"
+    assert R.mu_constructor == "funcref<@sig_fltflt_flt>"
+    assert R._mu_constructor_expanded == "funcref<( float, float ) -> float>"

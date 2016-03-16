@@ -554,7 +554,7 @@ NULL = _mugenref()    # NULL is a value of general reference type
 
 # ----------------------------------------------------------
 class MuFuncSig(MuType):
-    __name__ = 'funcsig'
+    type_prefix = "sig"
 
     def __init__(self, arg_ts, rtn_ts):
         """
@@ -620,14 +620,24 @@ class MuFuncSig(MuType):
 
 
 class MuFuncRef(MuRefType):
+    type_prefix = "fnr"
+
     def __init__(self, Sig):
+        MuType.__init__(self, MuFuncRef.type_prefix + Sig.mu_name._name)
         self.Sig = Sig
 
     def __str__(self):
-        return "FuncRef %s" % self.Sig
+        return "MuFuncRef %s" % self.Sig
 
-    def _short_name(self):
-        return ">fn %s" % self.Sig
+    @property
+    def mu_constructor(self):
+        return "funcref<%s>" % self.Sig.mu_name
+
+    @property
+    def _mu_constructor_expanded(self):
+        def _inner():
+            return "funcref<%s>" % self.Sig._mu_constructor_expanded
+        return saferecursive(_inner, "...")()
 
 
 class _mufuncref(_mugenref):
