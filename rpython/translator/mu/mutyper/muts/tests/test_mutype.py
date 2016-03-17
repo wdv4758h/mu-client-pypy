@@ -3,7 +3,8 @@ from ..mutype import (
     MuStruct, _mustruct,
     MuHybrid, _muhybrid,
     MuArray, _muarray,
-    MuFuncRef, MuFuncSig
+    MuFuncSig, MuFuncRef, _mufuncref,
+    MuRef, MuIRef, _muref, _muiref
 )
 from ..muentity import MuName
 
@@ -100,6 +101,11 @@ def test_funcsig():
     assert Sig._mu_constructor_expanded == "( int<64>, float ) -> struct<int<64> float>"
     assert repr(Sig.mu_name) == "@sig_i64flt_sttpacked"
 
+    Sig2 = MuFuncSig((int64_t, float_t), (MuStruct("packed", ('i', int64_t), ('f', float_t)),))
+
+    assert Sig == Sig2
+    assert hash(Sig) == hash(Sig2)
+
 
 def test_funcref():
     Sig = MuFuncSig((float_t, float_t), (float_t,))
@@ -110,3 +116,43 @@ def test_funcref():
     assert repr(R.mu_name) == "@fnrsig_fltflt_flt"
     assert R.mu_constructor == "funcref<@sig_fltflt_flt>"
     assert R._mu_constructor_expanded == "funcref<( float, float ) -> float>"
+
+    R2 = MuFuncRef(Sig)
+
+    assert R == R2
+    assert hash(R) == hash(R2)
+
+
+def test_refs():
+    P = MuStruct('Point', ('x', float_t), ('y', float_t))
+    S = MuStruct('Circle', ('radius', float_t), ('origin', P))
+    R = MuRef(S)
+
+    assert str(R) == "@ %s" % S
+    assert repr(R.mu_name) == "@refsttCircle"
+    assert R.mu_constructor == "ref<@sttCircle>"
+    assert R._mu_constructor_expanded == "ref<%s>" % S._mu_constructor_expanded
+
+    R2 = MuRef(S)
+    assert R == R2
+    assert hash(R) == hash(R2)
+
+    IR = MuIRef(S)
+    assert str(IR) == "~ %s" % S
+    assert repr(IR.mu_name) == "@irfsttCircle"
+    assert IR.mu_constructor == "iref<@sttCircle>"
+    assert IR._mu_constructor_expanded == "iref<%s>" % S._mu_constructor_expanded
+
+    IR2 = MuIRef(S)
+    assert IR == IR2
+    assert hash(IR) == hash(IR2)
+
+    s = _mustruct(S)
+    s.radius = 2.0
+    s.origin.x = 5.0
+    s.origin.y = 6.0
+
+    r = _muref(R, s)
+    ir = _muiref(IR, s, None, None)
+
+    assert r._getiref() == ir

@@ -546,10 +546,25 @@ class MuRefType(MuType):
 
 
 class _mugenref(object):  # value of general reference types
-    pass
+    __slots__ = ("_T", "_TYPE")
+
+    def __init__(self, T):
+        self.__class__._T.__set__(self, T)
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            raise TypeError("comparing pointer with %r object" % (
+                type(other).__name__,))
+        if self._TYPE != other._TYPE:
+            raise TypeError("comparing %r and %r" % (self._TYPE, other._TYPE))
+
+        return self._obj == other._obj
+
+    def __hash__(self):
+        raise TypeError("reference objects are not hashable")
 
 
-NULL = _mugenref()    # NULL is a value of general reference type
+NULL = _mugenref(void_t)    # NULL is a value of general reference type
 
 
 # ----------------------------------------------------------
@@ -641,38 +656,122 @@ class MuFuncRef(MuRefType):
 
 
 class _mufuncref(_mugenref):
+    # TODO: This needs to be reviewed.
     def __init__(self, TYPE, **attrs):
         """
-        Function reference value type
-        :param TYPE: FuncRef
-        :param attrs: optional attributes, depending on how it's used.
-                    An example can be found in rpython/rtyper/lltypesystem/rffi.py:143
+        An actual function reference
+        :param TYPE: MuFuncRef
         """
-        attrs.setdefault('_TYPE', TYPE)
-        attrs.setdefault('_name', '?')
-        attrs.setdefault('_callable', None)
-        self.__dict__.update(attrs)
-        if '_callable' in attrs and \
-                hasattr(attrs['_callable'], '_compilation_info'):
-            self.__dict__['compilation_info'] = attrs['_callable']._compilation_info
-
-        # TODO: define rest basing on _func type in lltype.py
+        self._TYPE = TYPE
+        for attr in attrs:
+            setattr(self, attr, attrs[attr])
 
 
-class Ref(MuRefType):
-    _cache = WeakValueDictionary()  # cache Refs
+class MuRef(MuRefType):
+    type_prefix = "ref"
+    type_str_sym = "@"
+    type_constr_name = "ref"
 
-    def __new__(cls, TO, use_cache=True):
-        if not use_cache:
-            obj = MuType.__new__(cls)
-        else:
-            try:
-                return MuRefType._cache[TO]
-            except KeyError:
-                obj = MuRefType._cache[TO] = MuType.__new__(cls)
-            except TypeError:
-                obj = MuType.__new__(cls)
-        return obj
+    def __init__(self, TO):
+        MuType.__init__(self, self.__class__.type_prefix + TO.mu_name._name)
+        self.TO = TO
+
+    def __str__(self):
+        return "%s %s" % (self.__class__.type_str_sym, self.TO)
+
+    @property
+    def mu_constructor(self):
+        return "%s<%s>" % (self.__class__.type_constr_name, self.TO.mu_name)
+
+    @property
+    def _mu_constructor_expanded(self):
+        def _inner():
+            return "%s<%s>" % (self.__class__.type_constr_name, self.TO._mu_constructor_expanded)
+        return saferecursive(_inner, "...")()
+
+
+class _muref(_mugenref):
+    __slots__ = ("_obj",)
+
+    def __init__(self, TYPE, obj):
+        _muref._TYPE.__set__(TYPE)
+        _mugenref.__init__(self, TYPE.TO)
+        _muref._obj.__set__(obj)
+
+    def _getiref(self):
+        return _muiref(MuIRef(self._T), self._obj)
+
+
+class MuIRef(MuRef):
+    type_prefix = "irf"
+    type_str_sym = "~"
+    type_constr_name = "iref"
+
+
+class _muiref(_muref, _muparentable):
+    def __init__(self, TYPE, obj, parent, parentindex):
+        _muref.__init__(self, TYPE, obj)
+
+        self._setparent(parent, parentindex)
+
+    def __getattr__(self, field_name):
+        if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
+            if field_name in self._T._flds:
+                o = self._obj._getattr(field_name)
+                return self._expose(field_name, o)
+        raise AttributeError("%s instance has no field %s" % (self._T, field_name))
+
+    def __setattr__(self, field_name, val):
+        if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
+            if field_name in self._T._flds:
+                T1 = self._T._flds[field_name]
+                T2 = typeOf(val)
+                if T1 == T2:
+                    setattr(self._obj, field_name, val)
+                else:
+                    raise TypeError(
+                        "%r instance field %r:\nexpects %r\n    got %r" %
+                        (self._T, field_name, T1, T2))
+                return
+        raise AttributeError("%r instance has no field %r" %
+                             (self._T, field_name))
+
+    def __getitem__(self, i): # ! can only return basic or ptr !
+        if isinstance(self._T, (Array, FixedSizeArray)):
+            start, stop = self._obj.getbounds()
+            if not (start <= i < stop):
+                if isinstance(i, slice):
+                    raise TypeError("array slicing not supported")
+                raise IndexError("array index out of bounds")
+            o = self._obj.getitem(i)
+            return self._expose(i, o)
+        raise TypeError("%r instance is not an array" % (self._T,))
+
+    def __setitem__(self, i, val):
+        if isinstance(self._T, (Array, FixedSizeArray)):
+            T1 = self._T.OF
+            if isinstance(T1, ContainerType):
+                raise TypeError("cannot directly assign to container array "
+                                "items")
+            T2 = typeOf(val)
+            if T2 != T1:
+                from rpython.rtyper.lltypesystem import rffi
+                if T1 is rffi.VOIDP and isinstance(T2, Ptr):
+                    # Any pointer is convertible to void*
+                    val = rffi.cast(rffi.VOIDP, val)
+                else:
+                    raise TypeError("%r items:\n"
+                                    "expect %r\n"
+                                    "   got %r" % (self._T, T1, T2))
+            start, stop = self._obj.getbounds()
+            if not (start <= i < stop):
+                if isinstance(i, slice):
+                    raise TypeError("array slicing not supported")
+                raise IndexError("array index out of bounds")
+            self._obj.setitem(i, val)
+            return
+        raise TypeError("%r instance is not an array" % (self._T,))
+
 
 # ----------------------------------------------------------
 def mu_typeOf(val):
