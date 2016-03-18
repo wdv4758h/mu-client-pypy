@@ -53,11 +53,11 @@ class MuPrimitive(MuType):
 
     def _example(self, parent=None, parentindex=None):
         return self._default
-    
+
     @property
     def mu_constructor(self):
         return self._constr
-    
+
     @property
     def _mu_constructor_expanded(self):
         return self.mu_constructor
@@ -105,7 +105,10 @@ class _muobject(object):
 
 
 class _mucontainer(_muobject):
-    __slots__ = ()
+    __slots__ = ("_TYPE")
+
+    def __init__(self, TYPE):
+        self._TYPE = TYPE
 
     def _parentstructure(self):
         return None
@@ -114,40 +117,23 @@ class _mucontainer(_muobject):
         return id(self)
 
 
-class _muparentable(_mucontainer):
-    _kind = "?"
+class _muparentable(object):        # parentable may not be _mucontainers (eg. list for array and hybrid)
+    __slots__ = ("_parent", "_parentindex")
 
-    __slots__ = ('_TYPE',
-                 '_parent_type', '_parent_index', '_keepparent',
-                 '_wrparent',
-                 '__weakref__')
-
-    def __init__(self, TYPE):
-        self._wrparent = None
-        self._TYPE = TYPE
+    def __init__(self, parent, parentindex):
+        self._setparent(parent, parentindex)
 
     def _setparent(self, parent, parentindex):
         """
         Set the parent information.
         Args:
             parent: parent object
-            parentindex: base offset or field name
+            parentindex: base parentindex or field name
 
         Returns: None
         """
-        self._wrparent = weakref.ref(parent)
-        self._parent_type = mu_typeOf(parent)
-        self._parent_index = parentindex
-
-    def _parent(self):
-        if self._wrparent is not None:
-            parent = self._wrparent()
-            if parent is None:
-                raise RuntimeError("accessing sub%s %r,\n"
-                                   "but already garbage collected parent %r"
-                                   % (self._kind, self, self._parent_type))
-            return parent
-        return None
+        self._parent = parent
+        self._parentindex = parentindex
 
 
 # ----------------------------------------------------------
@@ -214,7 +200,7 @@ class MuStruct(MuContainerType):
     @property
     def mu_constructor(self):
         return "struct<%s>" % ' '.join([str(self._flds[name].mu_name) for name in self._names])
-    
+
     @property
     def _mu_constructor_expanded(self):
         def _inner():
@@ -235,7 +221,7 @@ def _struct_with_slots(flds):
     return _mustruct1
 
 
-class _mustruct(_muparentable):
+class _mustruct(_muparentable, _mucontainer):
     _kind = "structure"
 
     __slots__ = ()
@@ -247,12 +233,12 @@ class _mustruct(_muparentable):
     def __init__(self, TYPE, parent=None, parentindex=None):
         assert isinstance(TYPE, MuStruct)
 
-        _muparentable.__init__(self, TYPE)
+        _mucontainer.__init__(self, TYPE)
+        _muparentable.__init__(self, parent, parentindex)
+
         for fld, typ in TYPE._flds.items():
             value = typ._allocate(parent=self, parentindex=fld)
             setattr(self, fld, value)
-        if parent is not None:
-            self._setparent(parent, parentindex)
 
     def _str_fields(self):
         fields = []
@@ -372,7 +358,7 @@ def _hybrid_with_slots(flds):
     return _hybrid1
 
 
-class _muhybrid(_muparentable):
+class _muhybrid(_muparentable, _mucontainer):
     _kind = "hybrid"
 
     __slots__ = ('_hash_cache_', '_compilation_info')
@@ -385,7 +371,9 @@ class _muhybrid(_muparentable):
         assert isinstance(TYPE, MuHybrid)
         assert n >= 0
 
-        _muparentable.__init__(self, TYPE)
+        _mucontainer.__init__(self, TYPE)
+        _muparentable.__init__(self, parent, parentindex)
+
         for fld, typ in TYPE._flds.items():
             if fld == TYPE._varfld:
                 # NOTE: use list for now.
@@ -396,9 +384,6 @@ class _muhybrid(_muparentable):
                 value = typ._allocate(parent=self, parentindex=fld)
 
             setattr(self, fld, value)
-
-        if parent is not None:
-            self._setparent(parent, parentindex)
 
     def _str_item(self, item):
         if isinstance(self._TYPE.OF, MuStruct):
@@ -490,7 +475,7 @@ class MuArray(MuContainerType):
         return saferecursive(_inner, "...")()
 
 
-class _muarray(_muparentable):
+class _muarray(_muparentable, _mucontainer):
     _kind = "array"
 
     __slots__ = ('items')
@@ -498,12 +483,12 @@ class _muarray(_muparentable):
     def __init__(self, TYPE, parent=None, parentindex=None):
         assert isinstance(TYPE, MuArray)
 
-        _muparentable.__init__(self, TYPE)
+        _mucontainer.__init__(self, TYPE)
+        _muparentable.__init__(self, parent, parentindex)
+
         n = TYPE.length
         self.items = [TYPE.OF._allocate(parent=self, parentindex=j)
                       for j in range(n)]
-        if parent is not None:
-            self._setparent(parent, parentindex)
 
     def _str_item(self, item):
         if isinstance(self._TYPE.OF, MuStruct):
@@ -546,25 +531,27 @@ class MuRefType(MuType):
 
 
 class _mugenref(object):  # value of general reference types
-    __slots__ = ("_T",)
+    # def __init__(self, T):
+    #     self._T = T
 
-    def __init__(self, T):
-        self.__class__._T.__set__(self, T)
-
-    def __eq__(self, other):
-        if type(self) is not type(other):
-            raise TypeError("comparing pointer with %r object" % (
-                type(other).__name__,))
-        if self._TYPE != other._TYPE:
-            raise TypeError("comparing %r and %r" % (self._TYPE, other._TYPE))
-
-        return self._obj == other._obj
+    # def __eq__(self, other):
+    #     if self._T is None and other._T is None:
+    #         return True
+    #
+    #     if type(self) is not type(other):
+    #         raise TypeError("comparing %s with %r object" % (
+    #             type(self).__name__, type(other).__name__,))
+    #
+    #     if self._TYPE != other._TYPE:
+    #         raise TypeError("comparing %r and %r" % (self._TYPE, other._TYPE))
+    #
+    #     return self._obj == other._obj
 
     def __hash__(self):
         raise TypeError("reference objects are not hashable")
 
 
-NULL = _mugenref(void_t)    # NULL is a value of general reference type
+NULL = _mugenref()    # NULL is a value of general reference type
 
 
 # ----------------------------------------------------------
@@ -690,16 +677,20 @@ class MuRef(MuRefType):
         return saferecursive(_inner, "...")()
 
 
-class _muref(_mugenref):
-    __slots__ = ("_TYPE", "_obj")
+class _muref(_mugenref, _mucontainer):
+    __slots__ = ("_T")
 
     def __init__(self, TYPE, obj):
-        _muref._TYPE.__set__(TYPE)
-        _mugenref.__init__(self, TYPE.TO)
-        _muref._obj.__set__(obj)
+        _mucontainer.__init__(self, TYPE)
+        self._T = TYPE.TO
+        self._obj0 = obj
+
+    @property       # read only!
+    def _obj(self):
+        return self._getiref()
 
     def _getiref(self):
-        return _muiref(MuIRef(self._T), self._obj)
+        return _muiref(MuIRef(self._T), self._obj0, self, None)
 
 
 class MuIRef(MuRef):
@@ -708,58 +699,116 @@ class MuIRef(MuRef):
     type_constr_name = "iref"
 
 
-class _muiref(_muref):
-    __slots__ = ('_parent', '_offset')
+class _muiref(_muref, _muparentable):
+    def __init__(self, TYPE, obj, parent, parentindex):
+        assert isinstance(parent, _muref) or isinstance(parent, _muparentable), "parent must be _muref/_muparentable type."
 
-    def _set_parent(self, _parent):
-        _muiref._parent.__set__(self, _parent)
-
-    def _set_offset(self, _offset):
-        _muiref._offset.__set__(self, _offset)
-
-    def __init__(self, TYPE, obj, parent, offset):
         _muref.__init__(self, TYPE, obj)
-        self._set_T(TYPE.TO)
-        self._set_parent(parent)
-        self._set_offset(offset)
+        _muparentable.__init__(self, parent, parentindex)
 
     def __nonzero__(self):
         raise RuntimeError("do not test an interior pointer for nullity")
 
-    def _get_obj(self):
+    # def _get_obj(self):
+    #     ob = self._parent
+    #     o = self._parentindex
+    #     if not isinstance(ob, _muiref) and self._parentindex is None:
+    #         return
+    #     if isinstance(o, str):
+    #         return ob._getattr(o)
+    #     elif isinstance(o, int):
+    #         return ob[o]
+    #     else:
+    #         raise TypeError("Unknown parentindex %s of type %s." % (o, type(o)))
+    # _obj = property(_get_obj)
+
+    def _expose(self, parentindex, val):
+        """
+        Expose the internal reference to a field/item of the referenced container type.
+
+        :param parentindex: field name (str) or item index (int)
+        :param val:
+        :return:
+        """
+        T = mu_typeOf(val)
+        return _muiref(MuIRef(T), val, self, parentindex)
+
+    def _store(self, val):
+        # Simulating STORE to this iref
         ob = self._parent
-        o = self._offset
-        if ob is None:
-            raise RuntimeError
-        if isinstance(o, str):
-            return ob._getattr(o)
-        elif isinstance(o, int):
-            return ob[o]
-        else:
-            raise TypeError("Unknown offset %s of type %s." % (o, type(o)))
+        TYPE_PARENT = self._parent._TYPE
+        o = self._parentindex
+        T = mu_typeOf(val)
+        if T != self._T:
+            raise TypeError("Storing %r type to %r" % T, self._T)
 
-        for o in self._offset:
-            if isinstance(o, str):
-                ob = ob._getattr(o)
-            else:
-                ob = ob.getitem(o)
-        return ob
-    _obj = property(_get_obj)
+        if isinstance(TYPE_PARENT, MuStruct) or isinstance(TYPE_PARENT, MuHybrid):
+            setattr(ob, o, val)
+        elif isinstance(TYPE_PARENT, list):
+            ob[o] = val
 
-    def _get_TYPE(self):
-        ob = self._parent
-        if ob is None:
-            raise RuntimeError
-        return InteriorPtr(typeOf(ob), self._T, self._offset)
-##     _TYPE = property(_get_TYPE)
+    def _load(self):
+        return self._obj
 
-    def _expose(self, offset, val):
-        """XXX A nice docstring here"""
-        T = typeOf(val)
-        if isinstance(T, ContainerType):
-            assert T._gckind == 'raw'
-            val = _interior_ptr(T, self._parent, self._offset + [offset])
-        return val
+    # _obj = property(_load, _store)
+
+    def __getattr__(self, field_name):  # similar to GETFIELDIREF/GETVARPARTIREF
+        if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
+            if field_name in self._T._flds:
+                o = self._obj._getattr(field_name)
+                return self._expose(field_name, o)
+        raise AttributeError("%r instance has no field %r" % (self._T, field_name))
+
+    def __setattr__(self, field_name, val):     # simiar to STORE to an IRef
+        if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
+            if field_name in self._T._flds:
+                T1 = self._T._flds[field_name]
+                T2 = mu_typeOf(val)
+                if T1 == T2:
+                    setattr(self._obj, field_name, val)
+                    return
+                else:
+                    raise TypeError(
+                        "%r instance field %r:\nexpects %r\n    got %r" %
+                        (self._T, field_name, T1, T2))
+        raise AttributeError("%r instance has no field %r" %
+                             (self._T, field_name))
+
+    def __getitem__(self, i):   # similar to GET
+        if isinstance(self._T, (Array, FixedSizeArray)):
+            start, stop = self._obj.getbounds()
+            if not (start <= i < stop):
+                if isinstance(i, slice):
+                    raise TypeError("array slicing not supported")
+                raise IndexError("array index out of bounds")
+            o = self._obj.getitem(i)
+            return self._expose(i, o)
+        raise TypeError("%r instance is not an array" % (self._T,))
+
+    def __setitem__(self, i, val):
+        if isinstance(self._T, (Array, FixedSizeArray)):
+            T1 = self._T.OF
+            if isinstance(T1, ContainerType):
+                raise TypeError("cannot directly assign to container array "
+                                "items")
+            T2 = typeOf(val)
+            if T2 != T1:
+                from rpython.rtyper.lltypesystem import rffi
+                if T1 is rffi.VOIDP and isinstance(T2, Ptr):
+                    # Any pointer is convertible to void*
+                    val = rffi.cast(rffi.VOIDP, val)
+                else:
+                    raise TypeError("%r items:\n"
+                                    "expect %r\n"
+                                    "   got %r" % (self._T, T1, T2))
+            start, stop = self._obj.getbounds()
+            if not (start <= i < stop):
+                if isinstance(i, slice):
+                    raise TypeError("array slicing not supported")
+                raise IndexError("array index out of bounds")
+            self._obj.setitem(i, val)
+            return
+        raise TypeError("%r instance is not an array" % (self._T,))
 
 
 # ----------------------------------------------------------

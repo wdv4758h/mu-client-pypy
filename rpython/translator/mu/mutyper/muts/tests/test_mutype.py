@@ -1,5 +1,5 @@
 from ..mutype import (
-    int8_t, int64_t, float_t, char_t,
+    int8_t, int64_t, double_t, char_t,
     MuStruct, _mustruct,
     MuHybrid, _muhybrid,
     MuArray, _muarray,
@@ -19,19 +19,19 @@ def test_primitives():
 
 
 def test_structs():
-    P = MuStruct('Point', ('x', float_t), ('y', float_t))
-    S = MuStruct('Circle', ('radius', float_t), ('origin', P))
+    P = MuStruct('Point', ('x', double_t), ('y', double_t))
+    S = MuStruct('Circle', ('radius', double_t), ('origin', P))
 
-    assert S.radius == float_t
+    assert S.radius == double_t
     assert S.origin == P
 
     assert S.mu_name == MuName("sttCircle")
     assert str(S) == "MuStruct Circle { radius, origin }"
-    assert S.mu_constructor == "struct<%s %s>" % (repr(float_t.mu_name), repr(P.mu_name))
-    assert S._mu_constructor_expanded == "struct<float struct<float float>>"
+    assert S.mu_constructor == "struct<%s %s>" % (repr(double_t.mu_name), repr(P.mu_name))
+    assert S._mu_constructor_expanded == "struct<double struct<double double>>"
     assert repr(S) == S._mu_constructor_expanded
 
-    S2 = MuStruct('Circle', ('radius', float_t), ('origin', P))
+    S2 = MuStruct('Circle', ('radius', double_t), ('origin', P))
     assert hash(S) == hash(S2)  # equal types should have the same hash
 
     S._container_example()
@@ -95,28 +95,28 @@ def test_arrays():
 
 
 def test_funcsig():
-    Sig = MuFuncSig((int64_t, float_t), (MuStruct("packed", ('i', int64_t), ('f', float_t)),))
+    Sig = MuFuncSig((int64_t, double_t), (MuStruct("packed", ('i', int64_t), ('f', double_t)),))
 
-    assert str(Sig) == "( int64_t, float_t ) -> MuStruct packed { i, f }"
-    assert Sig.mu_constructor == "(@i64, @flt) -> @sttpacked"
-    assert Sig._mu_constructor_expanded == "( int<64>, float ) -> struct<int<64> float>"
-    assert repr(Sig.mu_name) == "@sig_i64flt_sttpacked"
+    assert str(Sig) == "( int64_t, double_t ) -> MuStruct packed { i, f }"
+    assert Sig.mu_constructor == "(@i64, @dbl) -> @sttpacked"
+    assert Sig._mu_constructor_expanded == "( int<64>, double ) -> struct<int<64> double>"
+    assert repr(Sig.mu_name) == "@sig_i64dbl_sttpacked"
 
-    Sig2 = MuFuncSig((int64_t, float_t), (MuStruct("packed", ('i', int64_t), ('f', float_t)),))
+    Sig2 = MuFuncSig((int64_t, double_t), (MuStruct("packed", ('i', int64_t), ('f', double_t)),))
 
     assert Sig == Sig2
     assert hash(Sig) == hash(Sig2)
 
 
 def test_funcref():
-    Sig = MuFuncSig((float_t, float_t), (float_t,))
-    assert repr(Sig.mu_name) == "@sig_fltflt_flt"
+    Sig = MuFuncSig((double_t, double_t), (double_t,))
+    assert repr(Sig.mu_name) == "@sig_dbldbl_dbl"
 
     R = MuFuncRef(Sig)
-    assert str(R) == "MuFuncRef ( float_t, float_t ) -> float_t"
-    assert repr(R.mu_name) == "@fnrsig_fltflt_flt"
-    assert R.mu_constructor == "funcref<@sig_fltflt_flt>"
-    assert R._mu_constructor_expanded == "funcref<( float, float ) -> float>"
+    assert str(R) == "MuFuncRef ( double_t, double_t ) -> double_t"
+    assert repr(R.mu_name) == "@fnrsig_dbldbl_dbl"
+    assert R.mu_constructor == "funcref<@sig_dbldbl_dbl>"
+    assert R._mu_constructor_expanded == "funcref<( double, double ) -> double>"
 
     R2 = MuFuncRef(Sig)
 
@@ -125,8 +125,8 @@ def test_funcref():
 
 
 def test_refs():
-    P = MuStruct('Point', ('x', float_t), ('y', float_t))
-    S = MuStruct('Circle', ('radius', float_t), ('origin', P))
+    P = MuStruct('Point', ('x', double_t), ('y', double_t))
+    S = MuStruct('Circle', ('radius', double_t), ('origin', P))
     R = MuRef(S)
 
     assert str(R) == "@ %s" % S
@@ -154,6 +154,10 @@ def test_refs():
     s.origin.y = 6.0
 
     r = _muref(R, s)
-    ir = _muiref(IR, s, None, None)
+    ir = _muiref(IR, s, r, None)
 
     assert r._getiref() == ir
+    assert ir.radius == _muiref(MuIRef(double_t), 2.0, ir, 'radius')
+    assert ir.origin == _muiref(MuIRef(P), s.origin, ir, 'origin')
+    ir.origin.x._store(0.0)
+    assert ir.origin.x._obj == 0.0
