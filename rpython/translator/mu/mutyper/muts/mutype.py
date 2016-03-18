@@ -524,19 +524,19 @@ class _muarray(_muparentable):
             items.insert(skipped_at, '(...)')
         return 'arr [ %s ]' % (', '.join(items),)
 
-    def getlength(self):
+    def __len__(self):
         return self._TYPE.length
 
     def getbounds(self):
         stop = self.getlength()
         return 0, stop
 
-    def getitem(self, index):
-        return self.items[index]
+    def __getitem__(self, item):
+        return self.items[item]
 
-    def setitem(self, index, value):
+    def __setitem__(self, key, value):
         assert mu_typeOf(value) == self._TYPE.OF
-        self.items[index] = value
+        self.items[key] = value
 
 
 # ----------------------------------------------------------
@@ -546,7 +546,7 @@ class MuRefType(MuType):
 
 
 class _mugenref(object):  # value of general reference types
-    __slots__ = ("_T", "_TYPE")
+    __slots__ = ("_T",)
 
     def __init__(self, T):
         self.__class__._T.__set__(self, T)
@@ -691,7 +691,7 @@ class MuRef(MuRefType):
 
 
 class _muref(_mugenref):
-    __slots__ = ("_obj",)
+    __slots__ = ("_TYPE", "_obj")
 
     def __init__(self, TYPE, obj):
         _muref._TYPE.__set__(TYPE)
@@ -708,69 +708,58 @@ class MuIRef(MuRef):
     type_constr_name = "iref"
 
 
-class _muiref(_muref, _muparentable):
-    def __init__(self, TYPE, obj, parent, parentindex):
+class _muiref(_muref):
+    __slots__ = ('_parent', '_offset')
+
+    def _set_parent(self, _parent):
+        _muiref._parent.__set__(self, _parent)
+
+    def _set_offset(self, _offset):
+        _muiref._offset.__set__(self, _offset)
+
+    def __init__(self, TYPE, obj, parent, offset):
         _muref.__init__(self, TYPE, obj)
+        self._set_T(TYPE.TO)
+        self._set_parent(parent)
+        self._set_offset(offset)
 
-        self._setparent(parent, parentindex)
+    def __nonzero__(self):
+        raise RuntimeError("do not test an interior pointer for nullity")
 
-    def __getattr__(self, field_name):
-        if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
-            if field_name in self._T._flds:
-                o = self._obj._getattr(field_name)
-                return self._expose(field_name, o)
-        raise AttributeError("%s instance has no field %s" % (self._T, field_name))
+    def _get_obj(self):
+        ob = self._parent
+        o = self._offset
+        if ob is None:
+            raise RuntimeError
+        if isinstance(o, str):
+            return ob._getattr(o)
+        elif isinstance(o, int):
+            return ob[o]
+        else:
+            raise TypeError("Unknown offset %s of type %s." % (o, type(o)))
 
-    def __setattr__(self, field_name, val):
-        if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
-            if field_name in self._T._flds:
-                T1 = self._T._flds[field_name]
-                T2 = typeOf(val)
-                if T1 == T2:
-                    setattr(self._obj, field_name, val)
-                else:
-                    raise TypeError(
-                        "%r instance field %r:\nexpects %r\n    got %r" %
-                        (self._T, field_name, T1, T2))
-                return
-        raise AttributeError("%r instance has no field %r" %
-                             (self._T, field_name))
+        for o in self._offset:
+            if isinstance(o, str):
+                ob = ob._getattr(o)
+            else:
+                ob = ob.getitem(o)
+        return ob
+    _obj = property(_get_obj)
 
-    def __getitem__(self, i): # ! can only return basic or ptr !
-        if isinstance(self._T, (Array, FixedSizeArray)):
-            start, stop = self._obj.getbounds()
-            if not (start <= i < stop):
-                if isinstance(i, slice):
-                    raise TypeError("array slicing not supported")
-                raise IndexError("array index out of bounds")
-            o = self._obj.getitem(i)
-            return self._expose(i, o)
-        raise TypeError("%r instance is not an array" % (self._T,))
+    def _get_TYPE(self):
+        ob = self._parent
+        if ob is None:
+            raise RuntimeError
+        return InteriorPtr(typeOf(ob), self._T, self._offset)
+##     _TYPE = property(_get_TYPE)
 
-    def __setitem__(self, i, val):
-        if isinstance(self._T, (Array, FixedSizeArray)):
-            T1 = self._T.OF
-            if isinstance(T1, ContainerType):
-                raise TypeError("cannot directly assign to container array "
-                                "items")
-            T2 = typeOf(val)
-            if T2 != T1:
-                from rpython.rtyper.lltypesystem import rffi
-                if T1 is rffi.VOIDP and isinstance(T2, Ptr):
-                    # Any pointer is convertible to void*
-                    val = rffi.cast(rffi.VOIDP, val)
-                else:
-                    raise TypeError("%r items:\n"
-                                    "expect %r\n"
-                                    "   got %r" % (self._T, T1, T2))
-            start, stop = self._obj.getbounds()
-            if not (start <= i < stop):
-                if isinstance(i, slice):
-                    raise TypeError("array slicing not supported")
-                raise IndexError("array index out of bounds")
-            self._obj.setitem(i, val)
-            return
-        raise TypeError("%r instance is not an array" % (self._T,))
+    def _expose(self, offset, val):
+        """XXX A nice docstring here"""
+        T = typeOf(val)
+        if isinstance(T, ContainerType):
+            assert T._gckind == 'raw'
+            val = _interior_ptr(T, self._parent, self._offset + [offset])
+        return val
 
 
 # ----------------------------------------------------------

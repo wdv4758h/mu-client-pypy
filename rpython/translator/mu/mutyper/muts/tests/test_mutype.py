@@ -89,8 +89,9 @@ def test_arrays():
 
     a = _muarray(A)
     assert a.items == [0] * 10
-    a.setitem(9, 1234)
-    assert a.getitem(9) == 1234
+    assert len(a) == 10
+    a[9] = 1234
+    assert a[9] == 1234
 
 
 def test_funcsig():
