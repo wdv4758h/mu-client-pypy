@@ -161,3 +161,26 @@ def test_refs():
     assert ir.origin == _muiref(MuIRef(P), s.origin, ir, 'origin')
     ir.origin.x._store(0.0)
     assert ir.origin.x._obj == 0.0
+
+    A = MuArray(int64_t, 5)
+    a = _muarray(A)
+    ra = _muref(A, a)
+    ira = ra._obj
+    ira[0] = 1
+    ira[1] = 2
+    assert ira[0] == 1
+    assert ira[1] == 2
+    assert ira._obj == 1
+    assert (ira + 1)._obj == 1  # test SHIFTIREF
+
+    H = MuHybrid('string', ('length', int64_t), ('chars', char_t))
+    h = _muhybrid(H, 3)
+    rh = _muref(H, h)
+    irh = rh._obj
+    irh.length = 3
+    irh.chars[0] = ord('G')
+    irh.chars[1] = ord('o')
+    irh.chars[2] = ord('d')
+    assert irh.chars[0] == ord('G')
+    assert irh.chars._obj == ord('G')
+    assert (irh.chars + 1)._obj == ord('o')

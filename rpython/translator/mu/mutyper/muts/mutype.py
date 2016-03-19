@@ -108,18 +108,13 @@ class _mucontainer(_muobject):
     __slots__ = ("_TYPE")
 
     def __init__(self, TYPE):
-        self._TYPE = TYPE
-
-    def _parentstructure(self):
-        return None
+        _mucontainer._TYPE.__set__(self, TYPE)
 
     def _getid(self):
         return id(self)
 
 
 class _muparentable(object):        # parentable may not be _mucontainers (eg. list for array and hybrid)
-    __slots__ = ("_parent", "_parentindex")
-
     def __init__(self, parent, parentindex):
         self._setparent(parent, parentindex)
 
@@ -530,7 +525,7 @@ class MuRefType(MuType):
         return NULL
 
 
-class _mugenref(object):  # value of general reference types
+class _mugenref(_muobject):  # value of general reference types
     # def __init__(self, T):
     #     self._T = T
 
@@ -678,7 +673,7 @@ class MuRef(MuRefType):
 
 
 class _muref(_mugenref, _mucontainer):
-    __slots__ = ("_T")
+    __slots__ = ("_T", "_obj0")
 
     def __init__(self, TYPE, obj):
         _mucontainer.__init__(self, TYPE)
@@ -691,6 +686,12 @@ class _muref(_mugenref, _mucontainer):
 
     def _getiref(self):
         return _muiref(MuIRef(self._T), self._obj0, self, None)
+
+    def __str__(self):
+        return "@ %s" % (self._obj0)
+
+    def __eq__(self, other):
+        return self._TYPE == other._TYPE and id(self._obj0) == id(other._obj0)
 
 
 class MuIRef(MuRef):
@@ -705,6 +706,9 @@ class _muiref(_muref, _muparentable):
 
         _muref.__init__(self, TYPE, obj)
         _muparentable.__init__(self, parent, parentindex)
+
+    def __str__(self):
+        return "~ %s" % self._obj0
 
     def __nonzero__(self):
         raise RuntimeError("do not test an interior pointer for nullity")
@@ -731,7 +735,7 @@ class _muiref(_muref, _muparentable):
         :return:
         """
         T = mu_typeOf(val)
-        return _muiref(MuIRef(T), val, self, parentindex)
+        return _muiref(MuIRef(T), val, self._obj0, parentindex)
 
     def _store(self, val):
         # Simulating STORE to this iref
@@ -748,24 +752,29 @@ class _muiref(_muref, _muparentable):
             ob[o] = val
 
     def _load(self):
-        return self._obj
+        return self._obj0
 
-    # _obj = property(_load, _store)
+    _obj = property(_load, _store)
 
     def __getattr__(self, field_name):  # similar to GETFIELDIREF/GETVARPARTIREF
+        if field_name[0] == '_':
+            return self.__dict__[field_name]
         if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
             if field_name in self._T._flds:
-                o = self._obj._getattr(field_name)
+                o = self._obj0._getattr(field_name)
                 return self._expose(field_name, o)
         raise AttributeError("%r instance has no field %r" % (self._T, field_name))
 
     def __setattr__(self, field_name, val):     # simiar to STORE to an IRef
-        if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
+        if field_name[0] == '_':
+            self.__dict__[field_name] = val
+            return
+        elif isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
             if field_name in self._T._flds:
                 T1 = self._T._flds[field_name]
                 T2 = mu_typeOf(val)
                 if T1 == T2:
-                    setattr(self._obj, field_name, val)
+                    setattr(self._obj0, field_name, val)
                     return
                 else:
                     raise TypeError(
@@ -773,7 +782,7 @@ class _muiref(_muref, _muparentable):
                         (self._T, field_name, T1, T2))
         raise AttributeError("%r instance has no field %r" %
                              (self._T, field_name))
-
+    # TODO
     def __getitem__(self, i):   # similar to GET
         if isinstance(self._T, (Array, FixedSizeArray)):
             start, stop = self._obj.getbounds()
