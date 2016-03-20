@@ -156,6 +156,8 @@ def test_refs():
     r = _muref(R, s)
     ir = _muiref(IR, s, r, None)
 
+    # getattr will return iref.
+    # to access the referenced object, use _load/_store or ._obj
     assert r._getiref() == ir
     assert ir.radius == _muiref(MuIRef(double_t), 2.0, ir, 'radius')
     assert ir.origin == _muiref(MuIRef(P), s.origin, ir, 'origin')
@@ -164,23 +166,23 @@ def test_refs():
 
     A = MuArray(int64_t, 5)
     a = _muarray(A)
-    ra = _muref(A, a)
+    ra = _muref(MuRef(A), a)
     ira = ra._obj
-    ira[0] = 1
-    ira[1] = 2
-    assert ira[0] == 1
-    assert ira[1] == 2
-    assert ira._obj == 1
-    assert (ira + 1)._obj == 1  # test SHIFTIREF
+    assert ira[0] == ira
+    assert ira[1] == (ira + 1)
+    ira[0]._obj = 1
+    ira[1]._obj = 2
+    assert ira[0]._obj == 1
+    assert ira[1]._obj == 2
 
     H = MuHybrid('string', ('length', int64_t), ('chars', char_t))
     h = _muhybrid(H, 3)
-    rh = _muref(H, h)
+    rh = _muref(MuRef(H), h)
     irh = rh._obj
-    irh.length = 3
-    irh.chars[0] = ord('G')
-    irh.chars[1] = ord('o')
-    irh.chars[2] = ord('d')
-    assert irh.chars[0] == ord('G')
-    assert irh.chars._obj == ord('G')
-    assert (irh.chars + 1)._obj == ord('o')
+    irh.length._obj = 3
+    assert irh.chars[0] == irh.chars
+    assert irh.chars[1] == (irh.char + 1)
+    irh.chars[0]._obj = ord('G')
+    irh.chars[1]._obj = ord('o')
+    irh.chars[2]._obj = ord('d')
+    assert irh.chars[0]._obj == ord('G')
