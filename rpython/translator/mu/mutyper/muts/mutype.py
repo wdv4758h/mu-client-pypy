@@ -635,22 +635,23 @@ class MuFuncSig(MuType):
 
 class MuFuncRef(MuRefType):
     type_prefix = "fnr"
+    type_constr_name = "funcref"
 
     def __init__(self, Sig):
-        MuType.__init__(self, MuFuncRef.type_prefix + Sig.mu_name._name)
+        MuType.__init__(self, self.__class__.type_prefix + Sig.mu_name._name)
         self.Sig = Sig
 
     def __str__(self):
-        return "MuFuncRef %s" % self.Sig
+        return "%s %s" % (self.__class__.__name__, self.Sig)
 
     @property
     def mu_constructor(self):
-        return "funcref<%s>" % self.Sig.mu_name
+        return "%s<%s>" % (self.__class__.type_constr_name, self.Sig.mu_name)
 
     @property
     def _mu_constructor_expanded(self):
         def _inner():
-            return "funcref<%s>" % self.Sig._mu_constructor_expanded
+            return "%s<%s>" % (self.__class__.type_constr_name, self.Sig._mu_constructor_expanded)
         return saferecursive(_inner, "...")()
 
 
@@ -842,6 +843,16 @@ class _muuptr(_muiref):
                 o = self._obj0._getattr(field_name)
                 return self._expose(field_name, o)
         raise AttributeError("%r instance has no field %r" % (self._T, field_name))
+
+
+class MuUFuncPtr(MuFuncRef):
+    type_prefix = "fnp"
+    # TODO: Not a perfect definition
+
+
+class _muufuncptr(_mufuncref):
+    pass
+
 
 # ----------------------------------------------------------
 def mu_typeOf(val):
