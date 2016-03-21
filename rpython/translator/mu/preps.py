@@ -2,8 +2,8 @@
 Preparations before the MuTyper process
 """
 import py
+from rpython.mutyper.muts import MuName
 from rpython.tool.ansi_print import ansi_log
-from rpython.translator.mu.mutyper.muts.muentity import MuName
 
 log = py.log.Producer("preps")
 py.log.setconsumer("preps", ansi_log)
