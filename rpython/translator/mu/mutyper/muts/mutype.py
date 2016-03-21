@@ -704,6 +704,9 @@ class _muref(_mugenref, _mucontainer):
     def _getiref(self):
         return _muiref(MuIRef(self._T), self._obj0, self, None)
 
+    def _pin(self):
+        return _muuptr(MuUPtr(self._T), self._obj0, self, None)
+
     def __str__(self):
         return "@ %s" % (self._obj0)
 
@@ -811,6 +814,34 @@ class _muiref(_muref, _muparentable):
             raise IndexError("memory array index out of bounds")
         return _muiref(self._TYPE, obj[idx + other], obj, idx + other)
 
+
+class MuUPtr(MuIRef):
+    type_prefix = "ptr"
+    type_str_sym = "*"
+    type_constr_name = "uptr"
+
+
+class _muuptr(_muiref):
+    def __str__(self):
+        return "* %s" % self._obj0
+
+    def _expose(self, parentindex, val):
+        T = mu_typeOf(val)
+        return _muuptr(MuUPtr(T), val, self._obj0, parentindex)
+
+    def __getattr__(self, field_name):  # similar to GETFIELDIREF/GETVARPARTIREF
+        if field_name[0] == '_':
+            return self.__dict__[field_name]
+        if isinstance(self._T, MuHybrid):
+            if field_name == self._T._varfld:
+                memarr = getattr(self._obj0, field_name)
+                o = memarr[0]
+                return _muuptr(MuUPtr(memarr._OF), o, memarr, 0)
+        if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
+            if field_name in self._T._flds:
+                o = self._obj0._getattr(field_name)
+                return self._expose(field_name, o)
+        raise AttributeError("%r instance has no field %r" % (self._T, field_name))
 
 # ----------------------------------------------------------
 def mu_typeOf(val):

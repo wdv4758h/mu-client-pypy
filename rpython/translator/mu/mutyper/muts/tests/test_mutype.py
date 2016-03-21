@@ -5,7 +5,8 @@ from ..mutype import (
     MuHybrid, _muhybrid,
     MuArray, _muarray,
     MuFuncSig, MuFuncRef, _mufuncref,
-    MuRef, MuIRef, _muref, _muiref
+    MuRef, MuIRef, _muref, _muiref,
+    MuUPtr, _muuptr
 )
 from ..muentity import MuName
 
@@ -190,3 +191,13 @@ def test_refs():
     assert irh.chars[0]._obj == ord('G')
     irh.chars[1]._obj = ord('o')
     assert irh.chars[1]._obj == ord('o')
+
+    pa = ra._pin()
+    assert pa == _muuptr(MuUPtr(A), a, a, None)
+    assert pa == ira._pin()
+    assert isinstance(pa[0], _muuptr)
+    ph = rh._pin()
+    assert isinstance(ph.length, _muuptr)
+    assert isinstance(ph.chars, _muuptr)
+    ph.chars[1]._obj = ord('o')
+    assert ph.chars[1]._obj == ord('o')
