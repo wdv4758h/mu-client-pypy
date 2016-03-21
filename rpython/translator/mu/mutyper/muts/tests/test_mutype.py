@@ -1,3 +1,4 @@
+import pytest
 from ..mutype import (
     int8_t, int64_t, double_t, char_t,
     MuStruct, _mustruct,
@@ -65,7 +66,7 @@ def test_hybrids():
     h = _muhybrid(H, 3)
     h.length = 3
     assert h.length == 3
-    assert h.chars == [0] * 3
+    assert len(h.chars) == 3
     h.chars[0] = ord('a')
     assert h.chars[0] == ord('a')
 
@@ -161,6 +162,8 @@ def test_refs():
     assert r._getiref() == ir
     assert ir.radius == _muiref(MuIRef(double_t), 2.0, ir, 'radius')
     assert ir.origin == _muiref(MuIRef(P), s.origin, ir, 'origin')
+    with pytest.raises(AttributeError):
+        ir.origin.x = 0.0
     ir.origin.x._store(0.0)
     assert ir.origin.x._obj == 0.0
 
@@ -168,9 +171,8 @@ def test_refs():
     a = _muarray(A)
     ra = _muref(MuRef(A), a)
     ira = ra._obj
-    assert ira[0] == ira
-    assert ira[1] == (ira + 1)
-    ira[0]._obj = 1
+    assert ira[1] == (ira[0] + 1)   # GETELEMIREF, SHIFTIREF
+    ira[0]._obj = 1             # explicit load/store
     ira[1]._obj = 2
     assert ira[0]._obj == 1
     assert ira[1]._obj == 2
@@ -181,8 +183,8 @@ def test_refs():
     irh = rh._obj
     irh.length._obj = 3
     assert irh.chars[0] == irh.chars
-    assert irh.chars[1] == (irh.char + 1)
-    irh.chars[0]._obj = ord('G')
-    irh.chars[1]._obj = ord('o')
-    irh.chars[2]._obj = ord('d')
+    assert irh.chars[1] == (irh.chars + 1)
+    irh.chars._obj = ord('G')
     assert irh.chars[0]._obj == ord('G')
+    irh.chars[1]._obj = ord('o')
+    assert irh.chars[1]._obj == ord('o')

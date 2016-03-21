@@ -66,17 +66,21 @@ class MuPrimitive(MuType):
         return isinstance(other, MuPrimitive) and self._constr == other._constr
 
 
-def _mu_int_type(n):
-    assert n in (1, 8, 16, 32, 64, 128), "Invalid integer length: %d" % n
-    return MuPrimitive("int%d_t" % n, "i%d" % n, "int<%d>" % n, 0)
+class MuInt(MuPrimitive):
+    _valid_bits = (1, 8, 16, 32, 64, 128)
+    
+    def __init__(self, bits):
+        assert bits in MuInt._valid_bits, "Invalid integer length: %d" % bits
+        MuPrimitive.__init__(self, "int%d_t" % bits, "i%d" % bits, "int<%d>" % bits, 0)
+        self.bits = bits
 
 
-int1_t = _mu_int_type(1)
-int8_t = _mu_int_type(8)
-int16_t = _mu_int_type(16)
-int32_t = _mu_int_type(32)
-int64_t = _mu_int_type(64)
-int128_t = _mu_int_type(128)
+int1_t = MuInt(1)
+int8_t = MuInt(8)
+int16_t = MuInt(16)
+int32_t = MuInt(32)
+int64_t = MuInt(64)
+int128_t = MuInt(128)
 
 float_t = MuPrimitive("float_t", "flt", "float", 0.0)
 double_t = MuPrimitive("double_t", "dbl", "double", 0.0)
@@ -373,8 +377,7 @@ class _muhybrid(_muparentable, _mucontainer):
             if fld == TYPE._varfld:
                 # NOTE: use list for now.
                 # TODO: review this when defining iref.
-                value = [typ._allocate(parent=self, parentindex=i)
-                         for i in range(n)]
+                value = _mumemarray(typ, n, self, fld)
             else:
                 value = typ._allocate(parent=self, parentindex=fld)
 
@@ -470,24 +473,18 @@ class MuArray(MuContainerType):
         return saferecursive(_inner, "...")()
 
 
-class _muarray(_muparentable, _mucontainer):
-    _kind = "array"
+class _mumemarray(_muparentable):
+    def __init__(self, OF, n, parent=None, parentindex=None):
+        if isinstance(OF, MuHybrid):
+            raise TypeError("Hybrid type %s cannot be element type of Mu memory array." % OF)
 
-    __slots__ = ('items')
-
-    def __init__(self, TYPE, parent=None, parentindex=None):
-        assert isinstance(TYPE, MuArray)
-
-        _mucontainer.__init__(self, TYPE)
         _muparentable.__init__(self, parent, parentindex)
-
-        n = TYPE.length
-        self.items = [TYPE.OF._allocate(parent=self, parentindex=j)
-                      for j in range(n)]
+        self._OF = OF
+        self.items = [OF._allocate(parent=self, parentindex=i) for i in range(n)]
 
     def _str_item(self, item):
-        if isinstance(self._TYPE.OF, MuStruct):
-            of = self._TYPE.OF
+        if isinstance(self._OF, MuStruct):
+            of = self._OF
             return "%s {%s}" % (of._name, item._str_fields())
         else:
             return repr(item)
@@ -505,18 +502,35 @@ class _muarray(_muparentable, _mucontainer):
         return 'arr [ %s ]' % (', '.join(items),)
 
     def __len__(self):
-        return self._TYPE.length
-
-    def getbounds(self):
-        stop = self.getlength()
-        return 0, stop
+        return len(self.items)
 
     def __getitem__(self, item):
         return self.items[item]
 
     def __setitem__(self, key, value):
-        assert mu_typeOf(value) == self._TYPE.OF
+        # TODO: type check? Integer case can be tricky.
         self.items[key] = value
+
+    def __iter__(self):
+        self._iteridx = 0
+        return self
+
+    def __next__(self):
+        if self._iteridx >= len(self):
+            raise StopIteration
+        obj = self[self._iteridx]
+        self._iteridx += 1
+        return obj
+
+
+class _muarray(_mumemarray, _mucontainer):
+    _kind = "array"
+
+    def __init__(self, TYPE, parent=None, parentindex=None):
+        assert isinstance(TYPE, MuArray)
+
+        _mucontainer.__init__(self, TYPE)
+        _mumemarray.__init__(self, TYPE.OF, TYPE.length, parent, parentindex)
 
 
 # ----------------------------------------------------------
@@ -713,19 +727,6 @@ class _muiref(_muref, _muparentable):
     def __nonzero__(self):
         raise RuntimeError("do not test an interior pointer for nullity")
 
-    # def _get_obj(self):
-    #     ob = self._parent
-    #     o = self._parentindex
-    #     if not isinstance(ob, _muiref) and self._parentindex is None:
-    #         return
-    #     if isinstance(o, str):
-    #         return ob._getattr(o)
-    #     elif isinstance(o, int):
-    #         return ob[o]
-    #     else:
-    #         raise TypeError("Unknown parentindex %s of type %s." % (o, type(o)))
-    # _obj = property(_get_obj)
-
     def _expose(self, parentindex, val):
         """
         Expose the internal reference to a field/item of the referenced container type.
@@ -748,7 +749,7 @@ class _muiref(_muref, _muparentable):
 
         if isinstance(TYPE_PARENT, MuStruct) or isinstance(TYPE_PARENT, MuHybrid):
             setattr(ob, o, val)
-        elif isinstance(TYPE_PARENT, list):
+        elif isinstance(ob, _mumemarray):
             ob[o] = val
 
     def _load(self):
@@ -766,31 +767,35 @@ class _muiref(_muref, _muparentable):
         raise AttributeError("%r instance has no field %r" % (self._T, field_name))
 
     def __setattr__(self, field_name, val):     # simiar to STORE to an IRef
+        if field_name == '_obj':
+            self._store(val)
+            return
         if field_name[0] == '_':
             self.__dict__[field_name] = val
             return
-        elif isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
-            if field_name in self._T._flds:
-                T1 = self._T._flds[field_name]
-                T2 = mu_typeOf(val)
-                if T1 == T2:
-                    setattr(self._obj0, field_name, val)
-                    return
-                else:
-                    raise TypeError(
-                        "%r instance field %r:\nexpects %r\n    got %r" %
-                        (self._T, field_name, T1, T2))
-        raise AttributeError("%r instance has no field %r" %
-                             (self._T, field_name))
-    # TODO
-    def __getitem__(self, i):   # similar to GET
-        if isinstance(self._T, (Array, FixedSizeArray)):
-            start, stop = self._obj.getbounds()
-            if not (start <= i < stop):
+        # elif isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
+        #     if field_name in self._T._flds:
+        #         T1 = self._T._flds[field_name]
+        #         T2 = mu_typeOf(val)
+        #         if T1 == T2:
+        #             setattr(self._obj0, field_name, val)
+        #             return
+        #         else:
+        #             raise TypeError(
+        #                 "%r instance field %r:\nexpects %r\n    got %r" %
+        #                 (self._T, field_name, T1, T2))
+        # raise AttributeError("%r instance has no field %r" %
+        #                      (self._T, field_name))
+        else:
+            raise AttributeError("Cannot set field %s of %r; use _store() or _obj instead." % (field_name, self))
+
+    def __getitem__(self, i):   # similar to GETELEMIREF
+        if isinstance(self._obj0, _mumemarray):
+            if not i < len(self._obj0):
                 if isinstance(i, slice):
                     raise TypeError("array slicing not supported")
                 raise IndexError("array index out of bounds")
-            o = self._obj.getitem(i)
+            o = self._obj0[i]
             return self._expose(i, o)
         raise TypeError("%r instance is not an array" % (self._T,))
 
@@ -819,6 +824,15 @@ class _muiref(_muref, _muparentable):
             return
         raise TypeError("%r instance is not an array" % (self._T,))
 
+    def __add__(self, other):
+        assert isinstance(other, int)
+        obj = self._parent
+        idx = self._parentindex
+        assert isinstance(obj, _mumemarray), \
+            "can only shift irefs that points to an internal element of an continuous array memory."
+        if not 0 <= (idx + other) < len(obj):
+            raise IndexError("memory array index out of bounds")
+        return _muiref(self._TYPE, obj[idx + other], obj, idx + other)
 
 # ----------------------------------------------------------
 def mu_typeOf(val):
