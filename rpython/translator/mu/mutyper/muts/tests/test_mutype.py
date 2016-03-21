@@ -172,6 +172,8 @@ def test_refs():
     ra = _muref(MuRef(A), a)
     ira = ra._obj
     assert ira[1] == (ira[0] + 1)   # GETELEMIREF, SHIFTIREF
+    with pytest.raises(AttributeError):
+        ira[0] = 1
     ira[0]._obj = 1             # explicit load/store
     ira[1]._obj = 2
     assert ira[0]._obj == 1

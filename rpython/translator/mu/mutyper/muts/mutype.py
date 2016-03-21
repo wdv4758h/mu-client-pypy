@@ -74,6 +74,9 @@ class MuInt(MuPrimitive):
         MuPrimitive.__init__(self, "int%d_t" % bits, "i%d" % bits, "int<%d>" % bits, 0)
         self.bits = bits
 
+    def __eq__(self, other):
+        # TODO: VERY BAD HACK! NEEDS TO BE REVISED.
+        return isinstance(other, MuInt)
 
 int1_t = MuInt(1)
 int8_t = MuInt(8)
@@ -508,7 +511,7 @@ class _mumemarray(_muparentable):
         return self.items[item]
 
     def __setitem__(self, key, value):
-        # TODO: type check? Integer case can be tricky.
+        assert mu_typeOf(value) == self._OF
         self.items[key] = value
 
     def __iter__(self):
@@ -741,16 +744,17 @@ class _muiref(_muref, _muparentable):
     def _store(self, val):
         # Simulating STORE to this iref
         ob = self._parent
-        TYPE_PARENT = self._parent._TYPE
         o = self._parentindex
         T = mu_typeOf(val)
         if T != self._T:
-            raise TypeError("Storing %r type to %r" % T, self._T)
+            raise TypeError("Storing %r type to %r" % (T, self._T))
 
-        if isinstance(TYPE_PARENT, MuStruct) or isinstance(TYPE_PARENT, MuHybrid):
-            setattr(ob, o, val)
-        elif isinstance(ob, _mumemarray):
+        if isinstance(ob, _mumemarray):
             ob[o] = val
+        else:
+            TYPE_PARENT = self._parent._TYPE
+            if isinstance(TYPE_PARENT, MuStruct) or isinstance(TYPE_PARENT, MuHybrid):
+                setattr(ob, o, val)
 
     def _load(self):
         return self._obj0
@@ -760,6 +764,11 @@ class _muiref(_muref, _muparentable):
     def __getattr__(self, field_name):  # similar to GETFIELDIREF/GETVARPARTIREF
         if field_name[0] == '_':
             return self.__dict__[field_name]
+        if isinstance(self._T, MuHybrid):
+            if field_name == self._T._varfld:
+                memarr = getattr(self._obj0, field_name)
+                o = memarr[0]
+                return _muiref(MuIRef(memarr._OF), o, memarr, 0)
         if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
             if field_name in self._T._flds:
                 o = self._obj0._getattr(field_name)
@@ -790,6 +799,9 @@ class _muiref(_muref, _muparentable):
             raise AttributeError("Cannot set field %s of %r; use _store() or _obj instead." % (field_name, self))
 
     def __getitem__(self, i):   # similar to GETELEMIREF
+        if isinstance(self._parent, _mumemarray):
+            return self + i
+
         if isinstance(self._obj0, _mumemarray):
             if not i < len(self._obj0):
                 if isinstance(i, slice):
@@ -800,29 +812,7 @@ class _muiref(_muref, _muparentable):
         raise TypeError("%r instance is not an array" % (self._T,))
 
     def __setitem__(self, i, val):
-        if isinstance(self._T, (Array, FixedSizeArray)):
-            T1 = self._T.OF
-            if isinstance(T1, ContainerType):
-                raise TypeError("cannot directly assign to container array "
-                                "items")
-            T2 = typeOf(val)
-            if T2 != T1:
-                from rpython.rtyper.lltypesystem import rffi
-                if T1 is rffi.VOIDP and isinstance(T2, Ptr):
-                    # Any pointer is convertible to void*
-                    val = rffi.cast(rffi.VOIDP, val)
-                else:
-                    raise TypeError("%r items:\n"
-                                    "expect %r\n"
-                                    "   got %r" % (self._T, T1, T2))
-            start, stop = self._obj.getbounds()
-            if not (start <= i < stop):
-                if isinstance(i, slice):
-                    raise TypeError("array slicing not supported")
-                raise IndexError("array index out of bounds")
-            self._obj.setitem(i, val)
-            return
-        raise TypeError("%r instance is not an array" % (self._T,))
+        raise AttributeError("cannot set item to %r; use _store() or _obj instead." % self)
 
     def __add__(self, other):
         assert isinstance(other, int)
@@ -833,6 +823,7 @@ class _muiref(_muref, _muparentable):
         if not 0 <= (idx + other) < len(obj):
             raise IndexError("memory array index out of bounds")
         return _muiref(self._TYPE, obj[idx + other], obj, idx + other)
+
 
 # ----------------------------------------------------------
 def mu_typeOf(val):
