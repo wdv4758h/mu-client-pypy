@@ -782,19 +782,6 @@ class _muiref(_muref, _muparentable):
         if field_name[0] == '_':
             self.__dict__[field_name] = val
             return
-        # elif isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
-        #     if field_name in self._T._flds:
-        #         T1 = self._T._flds[field_name]
-        #         T2 = mu_typeOf(val)
-        #         if T1 == T2:
-        #             setattr(self._obj0, field_name, val)
-        #             return
-        #         else:
-        #             raise TypeError(
-        #                 "%r instance field %r:\nexpects %r\n    got %r" %
-        #                 (self._T, field_name, T1, T2))
-        # raise AttributeError("%r instance has no field %r" %
-        #                      (self._T, field_name))
         else:
             raise AttributeError("Cannot set field %s of %r; use _store() or _obj instead." % (field_name, self))
 
