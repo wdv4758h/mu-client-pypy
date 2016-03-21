@@ -6,7 +6,8 @@ from ..mutype import (
     MuArray, _muarray,
     MuFuncSig, MuFuncRef, _mufuncref,
     MuRef, MuIRef, _muref, _muiref,
-    MuUPtr, _muuptr
+    MuUPtr, _muuptr,
+    new, newhybrid
 )
 from ..muentity import MuName
 
@@ -201,3 +202,19 @@ def test_refs():
     assert isinstance(ph.chars, _muuptr)
     ph.chars[1]._obj = ord('o')
     assert ph.chars[1]._obj == ord('o')
+
+
+def test_memalloc():
+    A = MuArray(int64_t, 5)
+    ra = new(A)
+    assert isinstance(ra, _muref)
+    assert ra._T == A
+
+    ri = new(int64_t)
+    assert ri._T == int64_t
+
+    H = MuHybrid('string', ('length', int64_t), ('chars', char_t))
+    with pytest.raises(TypeError):
+        new(H)
+    rh = newhybrid(H, 10)
+    assert rh._getiref().chars._obj == 0

@@ -882,3 +882,20 @@ def mu_typeOf(val):
         # here, it is very likely that you are accessing an interior pointer
         # in an illegal way!
         raise TypeError("mu_typeOf(%r object)" % (tp.__name__,))
+
+
+def new(T):
+    if isinstance(T, MuStruct):
+        obj = _mustruct(T)
+    elif isinstance(T, MuArray):
+        obj = _muarray(T)
+    elif isinstance(T, MuPrimitive):
+        obj = T._allocate()
+    else:
+        raise TypeError("Unable to allocate memory for %r" % T)
+    return _muref(MuRef(T), obj)
+
+
+def newhybrid(T, n):
+    assert isinstance(T, MuHybrid)
+    return _muref(MuRef(T), _muhybrid(T, n))
