@@ -62,9 +62,9 @@ def _llstt2mu(llt):
     try:
         return _sttcache[llt]
     except KeyError:
-        stt = object.__new__(mu.MuStruct)
+        stt = mu.MuStruct(llt._name)
         _sttcache[llt] = stt
-        mu.MuStruct.__init__(stt, llt._name, *[(n, ll2mu_ty(llt._flds[n])) for n in llt._names])
+        stt._setfields(*[(n, ll2mu_ty(llt._flds[n])) for n in llt._names])
         return stt
 
 

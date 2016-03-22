@@ -19,3 +19,11 @@ def test_ll2mu():
     assert PS.TO == S
 
     OBJ = ll2mu_ty(OBJECT)
+    assert OBJ.typeptr.TO.instantiate.Sig.ARGS[0].TO == OBJ
+
+    A = ll2mu_ty(ll.Array(ll.Char))
+    assert isinstance(A, mu.MuHybrid)
+
+    FA = ll2mu_ty(ll.FixedSizeArray(ll.Char, 10))
+    assert isinstance(FA, mu.MuArray)
+    assert FA.length == 10

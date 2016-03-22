@@ -154,7 +154,10 @@ class MuStruct(MuContainerType):
         """
         self._name = name
         MuType.__init__(self, MuStruct.type_prefix + name)
+        if fields:
+            self._setfields(fields)
 
+    def _setfields(self, *fields):
         flds = {}
         names = []
         for name, typ in fields:
