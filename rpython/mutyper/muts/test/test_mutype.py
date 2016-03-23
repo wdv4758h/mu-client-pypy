@@ -1,6 +1,6 @@
 import pytest
 from ..mutype import (
-    int8_t, int64_t, double_t, char_t, _muprimitive,
+    int1_t, int8_t, int16_t, int32_t, int64_t, double_t, char_t, _muprimitive, muint_type,
     MuStruct, _mustruct,
     MuHybrid, _muhybrid,
     MuArray, _muarray,
@@ -22,7 +22,14 @@ def test_primitives():
 
     i = _muprimitive(int8_t, 255)
     assert i == _muprimitive(int8_t, 255)
-    assert not i != _muprimitive(int64_t, 255)
+    assert i != _muprimitive(int64_t, 255)
+
+
+def test_muint_type():
+    assert muint_type(1) == int1_t
+    assert muint_type(-1) == int8_t
+    assert muint_type(0xFF) == int8_t
+    assert muint_type(256) == int16_t
 
 
 def test_structs():

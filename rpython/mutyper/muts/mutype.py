@@ -86,8 +86,10 @@ class MuInt(MuPrimitive):
         self.bits = bits
 
     def __eq__(self, other):
-        # TODO: VERY BAD HACK! NEEDS TO BE REVISED.
-        return isinstance(other, MuInt)
+        return isinstance(other, MuInt) and self.bits == other.bits
+
+    def can_extend(self, other):
+        return self.bits <= other.bits
 
 int1_t = MuInt(1)
 int8_t = MuInt(8)
@@ -536,7 +538,14 @@ class _mumemarray(_muparentable):
         return self.items[item]
 
     def __setitem__(self, key, value):
-        assert mu_typeOf(value) == self._OF
+        try:
+            assert mu_typeOf(value) == self._OF
+        except AssertionError:
+            mut = mu_typeOf(value)
+            try:
+                assert mut.can_extend(self._OF)
+            except AttributeError:
+                raise TypeError("Cannot set item '%r' of type '%r' to '%r'." % (value, mut, self._OF))
         self.items[key] = value
 
     def __iter__(self):
@@ -743,7 +752,7 @@ class _muiref(_muref, _muparentable):
     def __nonzero__(self):
         raise RuntimeError("do not test an interior pointer for nullity")
 
-    def _expose(self, parentindex, val):
+    def _expose(self, parentindex, val, T):
         """
         Expose the internal reference to a field/item of the referenced container type.
 
@@ -751,7 +760,6 @@ class _muiref(_muref, _muparentable):
         :param val:
         :return:
         """
-        T = mu_typeOf(val)
         return _muiref(MuIRef(T), val, self._obj0, parentindex)
 
     def _store(self, val):
@@ -760,7 +768,10 @@ class _muiref(_muref, _muparentable):
         o = self._parentindex
         T = mu_typeOf(val)
         if T != self._T:
-            raise TypeError("Storing %r type to %r" % (T, self._T))
+            try:
+                assert T.can_extend(self._T)
+            except AttributeError, AssertionError:
+                raise TypeError("Storing %r type to %r" % (T, self._T))
 
         if isinstance(ob, _mumemarray):
             ob[o] = val
@@ -785,7 +796,7 @@ class _muiref(_muref, _muparentable):
         if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
             if field_name in self._T._flds:
                 o = self._obj0._getattr(field_name)
-                return self._expose(field_name, o)
+                return self._expose(field_name, o, self._T._flds[field_name])
         raise AttributeError("%r instance has no field %r" % (self._T, field_name))
 
     def __setattr__(self, field_name, val):     # simiar to STORE to an IRef
@@ -808,7 +819,7 @@ class _muiref(_muref, _muparentable):
                     raise TypeError("array slicing not supported")
                 raise IndexError("array index out of bounds")
             o = self._obj0[i]
-            return self._expose(i, o)
+            return self._expose(i, o, self._obj0._OF)
         raise TypeError("%r instance is not an array" % (self._T,))
 
     def __setitem__(self, i, val):
@@ -838,8 +849,7 @@ class _muuptr(_muiref):
     def __str__(self):
         return "* %s" % self._obj0
 
-    def _expose(self, parentindex, val):
-        T = mu_typeOf(val)
+    def _expose(self, parentindex, val, T):
         return _muuptr(MuUPtr(T), val, self._obj0, parentindex)
 
     def __getattr__(self, field_name):  # similar to GETFIELDIREF/GETVARPARTIREF
@@ -853,7 +863,7 @@ class _muuptr(_muiref):
         if isinstance(self._T, MuStruct) or isinstance(self._T, MuHybrid):
             if field_name in self._T._flds:
                 o = self._obj0._getattr(field_name)
-                return self._expose(field_name, o)
+                return self._expose(field_name, o, self._T._flds[field_name])
         raise AttributeError("%r instance has no field %r" % (self._T, field_name))
 
 
@@ -875,13 +885,11 @@ def mu_typeOf(val):
         if tp is NoneType:
             return void_t   # maybe
         if tp is int:
-            return int64_t
-        if tp is long:
-            return int128_t
+            return muint_type(val)
         if tp is bool:
             return bool_t
         if tp is float:
-            return double_t
+            return double_t     # just use doubles
         if tp is str:
             assert len(val) == 1
             return char_t
@@ -911,3 +919,18 @@ def new(T):
 def newhybrid(T, n):
     assert isinstance(T, MuHybrid)
     return _muref(MuRef(T), _muhybrid(T, n))
+
+
+def muint_type(intval):
+    """
+    :param intval: Python int value
+    :return: the minimum bits required to represent intval.
+    """
+    if intval in (0, 1):
+        return int1_t
+
+    for int_t in _MU_INTS[1:]:
+        maxuint = (1 << int_t.bits) - 1
+        maxsint = (1 << (int_t.bits - 1)) - 1
+        if -maxsint - 1 <= intval <= maxuint:
+            return int_t
