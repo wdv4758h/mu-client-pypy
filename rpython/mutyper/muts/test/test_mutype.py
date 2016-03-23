@@ -18,10 +18,11 @@ def test_primitives():
     assert int8_t.mu_constructor == "int<8>"
     assert int8_t._mu_constructor_expanded == int8_t.mu_constructor
     assert repr(int8_t) == int8_t.mu_constructor
-    assert int8_t._defl() == 0
+    assert int8_t._defl() == int8_t(0)
 
     i = _muprimitive(int8_t, 255)
     assert i == _muprimitive(int8_t, 255)
+    assert i == int8_t(255)
     assert i != _muprimitive(int64_t, 255)
 
 
@@ -51,11 +52,13 @@ def test_structs():
     S._container_example()
 
     s = _mustruct(S)
-    assert s.radius == 0.0
-    s.radius = 2.0
-    assert s.radius == 2.0
-    s.origin.x = 5.0
-    assert s.origin.x == 5.0
+    assert s.radius == double_t(0.0)
+    with pytest.raises(TypeError):
+        s.radius = 2.0
+    s.radius = double_t(2.0)
+    assert s.radius == double_t(2.0)
+    s.origin.x = double_t(5.0)
+    assert s.origin.x == double_t(5.0)
 
 
 def test_hybrids():
@@ -75,13 +78,16 @@ def test_hybrids():
     assert hash(H) == hash(H2)
 
     H._container_example()
-
-    h = _muhybrid(H, 3)
-    h.length = 3
-    assert h.length == 3
+    with pytest.raises(TypeError):
+        h = _muhybrid(H, 3)
+    h = _muhybrid(H, int64_t(3))
+    with pytest.raises(TypeError):
+        h.length = 3
+    h.length = int64_t(3)
+    assert h.length == int64_t(3)
     assert len(h.chars) == 3
-    h.chars[0] = ord('a')
-    assert h.chars[0] == ord('a')
+    h.chars[0] = int8_t(ord('a'))
+    assert h.chars[0] == int8_t(ord('a'))
 
 
 def test_arrays():
@@ -102,10 +108,12 @@ def test_arrays():
     A._container_example()
 
     a = _muarray(A)
-    assert a.items == [0] * 10
+    assert a.items == [int64_t(0)] * 10
     assert len(a) == 10
-    a[9] = 1234
-    assert a[9] == 1234
+    with pytest.raises(TypeError):
+        a[9] = 1234
+    a[9] = int64_t(1234)
+    assert a[9] == int64_t(1234)
 
 
 def test_funcsig():
@@ -163,9 +171,9 @@ def test_refs():
     assert hash(IR) == hash(IR2)
 
     s = _mustruct(S)
-    s.radius = 2.0
-    s.origin.x = 5.0
-    s.origin.y = 6.0
+    s.radius = double_t(2.0)
+    s.origin.x = double_t(5.0)
+    s.origin.y = double_t(6.0)
 
     r = _muref(R, s)
     ir = _muiref(IR, s, r, None)
@@ -173,12 +181,14 @@ def test_refs():
     # getattr will return iref.
     # to access the referenced object, use _load/_store or ._obj
     assert r._getiref() == ir
-    assert ir.radius == _muiref(MuIRef(double_t), 2.0, ir, 'radius')
-    assert ir.origin == _muiref(MuIRef(P), s.origin, ir, 'origin')
+    assert ir.radius == _muiref(MuIRef(double_t), double_t(2.0), ir._obj, 'radius')
+    assert ir.origin == _muiref(MuIRef(P), s.origin, ir._obj, 'origin')
     with pytest.raises(AttributeError):
-        ir.origin.x = 0.0
-    ir.origin.x._store(0.0)
-    assert ir.origin.x._obj == 0.0
+        ir.origin.x = double_t(0.0)
+    with pytest.raises(TypeError):
+        ir.origin.x._store(0.0)
+    ir.origin.x._store(double_t(0.0))
+    assert ir.origin.x._obj == double_t(0.0)
 
     A = MuArray(int64_t, 5)
     a = _muarray(A)
@@ -186,33 +196,35 @@ def test_refs():
     ira = ra._obj
     assert ira[1] == (ira[0] + 1)   # GETELEMIREF, SHIFTIREF
     with pytest.raises(AttributeError):
-        ira[0] = 1
-    ira[0]._obj = 1             # explicit load/store
-    ira[1]._obj = 2
-    assert ira[0]._obj == 1
-    assert ira[1]._obj == 2
+        ira[0] = int64_t(1)
+    ira[0]._obj = int64_t(1)             # explicit load/store
+    ira[1]._obj = int64_t(2)
+    assert ira[0]._obj == int64_t(1)
+    assert ira[1]._obj == int64_t(2)
 
     H = MuHybrid('string', ('length', int64_t), ('chars', char_t))
-    h = _muhybrid(H, 3)
+    with pytest.raises(TypeError):
+        h = _muhybrid(H, 3)
+    h = _muhybrid(H, int64_t(3))
     rh = _muref(MuRef(H), h)
     irh = rh._obj
-    irh.length._obj = 3
+    irh.length._obj = int64_t(3)
     assert irh.chars[0] == irh.chars
     assert irh.chars[1] == (irh.chars + 1)
-    irh.chars._obj = ord('G')
-    assert irh.chars[0]._obj == ord('G')
-    irh.chars[1]._obj = ord('o')
-    assert irh.chars[1]._obj == ord('o')
+    irh.chars._obj = int8_t(ord('G'))
+    assert irh.chars[0]._obj == int8_t(ord('G'))
+    irh.chars[1]._obj = int8_t(ord('o'))
+    assert irh.chars[1]._obj == int8_t(ord('o'))
 
     pa = ra._pin()
-    assert pa == _muuptr(MuUPtr(A), a, a, None)
+    assert pa == _muuptr(MuUPtr(A), a, ra, None)
     assert pa == ira._pin()
     assert isinstance(pa[0], _muuptr)
     ph = rh._pin()
     assert isinstance(ph.length, _muuptr)
     assert isinstance(ph.chars, _muuptr)
-    ph.chars[1]._obj = ord('o')
-    assert ph.chars[1]._obj == ord('o')
+    ph.chars[1]._obj = int8_t(ord('o'))
+    assert ph.chars[1]._obj == int8_t(ord('o'))
 
 
 def test_memalloc():
@@ -227,5 +239,5 @@ def test_memalloc():
     H = MuHybrid('string', ('length', int64_t), ('chars', char_t))
     with pytest.raises(TypeError):
         new(H)
-    rh = newhybrid(H, 10)
-    assert rh._getiref().chars._obj == 0
+    rh = newhybrid(H, int64_t(10))
+    assert rh._getiref().chars._obj == int8_t(0)

@@ -54,16 +54,16 @@ class MuPrimitive(MuType):
         return self._type_name
 
     def _defl(self, parent=None, parentindex=None):
-        return self._default
+        return self(self._default)
 
     def _allocate(self, initialization=None, parent=None, parentindex=None):
-        return self._default
+        return self._defl()
 
     def _is_atomic(self):
         return True
 
     def _example(self, parent=None, parentindex=None):
-        return self._default
+        return self._defl()
 
     @property
     def mu_constructor(self):
@@ -75,6 +75,12 @@ class MuPrimitive(MuType):
 
     def __eq__(self, other):
         return isinstance(other, MuPrimitive) and self._constr == other._constr
+
+    def __call__(self, val):
+        """
+        Factory method that creates a _muprimitive value instance of the desired type.
+        """
+        return _muprimitive(self, val)
 
 
 class MuInt(MuPrimitive):
@@ -115,6 +121,7 @@ class _muprimitive(_muobject):
         assert TYPE in _MU_INTS or TYPE in _MU_FLOATS
         if TYPE in _MU_INTS:
             assert isinstance(val, int)
+            assert muint_type(val).bits <= TYPE.bits
 
         _muobject.__init__(self, TYPE)
         self.val = val
@@ -269,6 +276,13 @@ class _mustruct(_muparentable, _mucontainer):
             value = typ._allocate(parent=self, parentindex=fld)
             setattr(self, fld, value)
 
+    def __setattr__(self, key, value):
+        if hasattr(self, key) and key in self._TYPE._flds:
+            if not isinstance(value, _muobject):
+                raise TypeError("Can only assign Mu values")
+
+        object.__setattr__(self, key, value)
+
     def _str_fields(self):
         fields = []
         names = self._TYPE._names
@@ -378,7 +392,7 @@ class MuHybrid(MuContainerType):
         return saferecursive(_inner, '...')()
 
     def _container_example(self):
-        return _muhybrid(self, 5)
+        return _muhybrid(self, int64_t(5))
 
 
 def _hybrid_with_slots(flds):
@@ -398,7 +412,9 @@ class _muhybrid(_muparentable, _mucontainer):
 
     def __init__(self, TYPE, n, parent=None, parentindex=None):
         assert isinstance(TYPE, MuHybrid)
-        assert n >= 0
+        if not isinstance(n, _muprimitive):
+            raise TypeError("Length of hybrid value instance needs to be a Mu value type.")
+        assert n.val >= 0
 
         _mucontainer.__init__(self, TYPE)
         _muparentable.__init__(self, parent, parentindex)
@@ -407,11 +423,18 @@ class _muhybrid(_muparentable, _mucontainer):
             if fld == TYPE._varfld:
                 # NOTE: use list for now.
                 # TODO: review this when defining iref.
-                value = _mumemarray(typ, n, self, fld)
+                value = _mumemarray(typ, n.val, self, fld)
             else:
                 value = typ._allocate(parent=self, parentindex=fld)
 
             setattr(self, fld, value)
+
+    def __setattr__(self, key, value):
+        if hasattr(self, key) and key in self._TYPE._flds:
+            if not isinstance(value, _muobject):
+                raise TypeError("Can only assign Mu values.")
+
+        object.__setattr__(self, key, value)
 
     def _str_item(self, item):
         if isinstance(self._TYPE.OF, MuStruct):
@@ -538,10 +561,12 @@ class _mumemarray(_muparentable):
         return self.items[item]
 
     def __setitem__(self, key, value):
+        if not isinstance(value, _muobject):
+            raise TypeError("Can only assign Mu values")
         try:
-            assert mu_typeOf(value) == self._OF
+            assert value._TYPE == self._OF
         except AssertionError:
-            mut = mu_typeOf(value)
+            mut = value._TYPE
             try:
                 assert mut.can_extend(self._OF)
             except AttributeError:
@@ -730,7 +755,7 @@ class _muref(_mugenref, _mucontainer):
         return "@ %s" % (self._obj0)
 
     def __eq__(self, other):
-        return self._TYPE == other._TYPE and id(self._obj0) == id(other._obj0)
+        return id(self._obj0) == id(other._obj0)
 
 
 class MuIRef(MuRef):
@@ -772,6 +797,9 @@ class _muiref(_muref, _muparentable):
                 assert T.can_extend(self._T)
             except AttributeError, AssertionError:
                 raise TypeError("Storing %r type to %r" % (T, self._T))
+
+        if not isinstance(val, _muobject):
+                raise TypeError("Can only assign Mu values")
 
         if isinstance(ob, _mumemarray):
             ob[o] = val
@@ -834,6 +862,13 @@ class _muiref(_muref, _muparentable):
         if not 0 <= (idx + other) < len(obj):
             raise IndexError("memory array index out of bounds")
         return _muiref(self._TYPE, obj[idx + other], obj, idx + other)
+
+    def __eq__(self, other):
+        return isinstance(other, _muiref) and \
+               self._parent == other._parent and self._parentindex == other._parentindex
+
+    def _pin(self):
+        return self._parent._pin()
 
 
 NULL = _mugenref(MuRef(void_t))    # NULL is a value of general reference type
