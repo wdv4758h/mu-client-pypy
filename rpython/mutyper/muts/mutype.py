@@ -605,8 +605,8 @@ class _mugenref(_muobject):  # value of general reference types
     def __init__(self, TYPE):
         _muobject.__init__(self, TYPE)
 
-    def __hash__(self):
-        raise TypeError("reference objects are not hashable")
+    # def __hash__(self):
+    #     raise TypeError("reference objects are not hashable")
 
 
 # ----------------------------------------------------------

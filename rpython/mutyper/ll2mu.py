@@ -172,7 +172,7 @@ def _llval_stt2mu(llv):
 def _llval_varstt2mu(llv):
     mut = ll2mu_ty(llv._TYPE)
     arr = getattr(llv, llv._TYPE._arrayfld)
-    hyb = mu._muhybrid(mut, arr.getlength())
+    hyb = mu._muhybrid(mut, mut.length(arr.getlength()))
 
     for fld in llv._TYPE._names[:-1]:
         setattr(hyb, fld, ll2mu_val(getattr(llv, fld), getattr(llv._TYPE, fld)))

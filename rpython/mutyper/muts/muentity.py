@@ -71,3 +71,28 @@ class MuEntity(object):
 
     def __str__(self):
         return str(self.mu_name)
+
+
+class MuGlobalCell(MuEntity):
+    prefix = "gcl"
+
+    def __init__(self, mu_type):
+        name = MuGlobalCell.prefix + mu_type.mu_name._name
+        MuEntity.__init__(self, MuName(name))
+        self._T = mu_type
+        self.value = mu_type._defl()
+
+    def __repr__(self):
+        return "MuGlobalCell <%s> { %r }" % (self._T, self.value)
+
+    def _store(self, mu_val):
+        if mu_val._TYPE != self._T:
+            raise TypeError("Cannot store '%r' of type '%r' to global cell that holds '%r' type" %
+                            (mu_val, mu_val._TYPE, self._T))
+
+        self.value = mu_val
+
+    def _load(self):
+        return self.value
+
+    _obj = property(_load, _store)
