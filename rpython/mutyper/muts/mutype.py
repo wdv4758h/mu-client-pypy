@@ -104,31 +104,29 @@ bool_t = int1_t
 char_t = int8_t
 unichar_t = int16_t
 
+_MU_INTS = (int1_t, int8_t, int16_t, int32_t, int64_t, int128_t)
+_MU_FLOATS = (float_t, double_t)
 
-class _muint(_muobject):
+
+class _muprimitive(_muobject):
     def __init__(self, TYPE, val):
-        assert TYPE in (int1_t, int8_t, int32_t, int64_t, int128_t)
-        assert isinstance(val, int)
+        assert TYPE in _MU_INTS or TYPE in _MU_FLOATS
+        if TYPE in _MU_INTS:
+            assert isinstance(val, int)
 
         _muobject.__init__(self, TYPE)
         self.val = val
 
-    def __str__(self):
-        return str(self.val)
-
-
-class _mufloat(_muobject):
-    def __init__(self, TYPE, val):
-        assert TYPE in (float_t, double_t)
-        assert isinstance(val, float)
-
-        _muobject.__init__(self, TYPE)
-        self.val = val
+    def __eq__(self, other):
+        return self._TYPE == other._TYPE and self.val == other.val
 
     def __str__(self):
         if self._TYPE == float_t:
             return "%sf" % self.val
-        return "%sd" % self.val
+        elif self._TYPE == double_t:
+            return "%sd" % self.val
+        else:
+            return str(int(self.val))
 
 
 # ----------------------------------------------------------
