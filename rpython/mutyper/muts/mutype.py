@@ -25,6 +25,17 @@ class MuType(LowLevelType, MuEntity):
         return self._mu_constructor_expanded
 
 
+class _muobject(object):
+    __slots__ = ("_TYPE")
+
+    def __init__(self, TYPE):
+        # _muobject._TYPE.__set__(self, TYPE)
+        self._TYPE = TYPE
+
+    def _getid(self):
+        return id(self)
+
+
 # ----------------------------------------------------------
 class MuPrimitive(MuType):
     def __init__(self, type_name, abbrv, constr, default):
@@ -94,6 +105,32 @@ char_t = int8_t
 unichar_t = int16_t
 
 
+class _muint(_muobject):
+    def __init__(self, TYPE, val):
+        assert TYPE in (int1_t, int8_t, int32_t, int64_t, int128_t)
+        assert isinstance(val, int)
+
+        _muobject.__init__(self, TYPE)
+        self.val = val
+
+    def __str__(self):
+        return str(self.val)
+
+
+class _mufloat(_muobject):
+    def __init__(self, TYPE, val):
+        assert TYPE in (float_t, double_t)
+        assert isinstance(val, float)
+
+        _muobject.__init__(self, TYPE)
+        self.val = val
+
+    def __str__(self):
+        if self._TYPE == float_t:
+            return "%sf" % self.val
+        return "%sd" % self.val
+
+
 # ----------------------------------------------------------
 class MuContainerType(MuType):
     def __getattr__(self, item):
@@ -104,21 +141,8 @@ class MuContainerType(MuType):
         raise NotImplementedError
 
 
-class _muobject(object):
-    __slots__ = ()
-
-    def __repr__(self):
-        return "<%s>" % self
-
-
 class _mucontainer(_muobject):
-    __slots__ = ("_TYPE")
-
-    def __init__(self, TYPE):
-        _mucontainer._TYPE.__set__(self, TYPE)
-
-    def _getid(self):
-        return id(self)
+    pass
 
 
 class _muparentable(object):        # parentable may not be _mucontainers (eg. list for array and hybrid)
@@ -157,7 +181,7 @@ class MuStruct(MuContainerType):
         if fields:
             self._setfields(fields)
 
-    def _setfields(self, *fields):
+    def _setfields(self, fields):
         flds = {}
         names = []
         for name, typ in fields:
@@ -546,27 +570,11 @@ class MuRefType(MuType):
 
 
 class _mugenref(_muobject):  # value of general reference types
-    # def __init__(self, T):
-    #     self._T = T
-
-    # def __eq__(self, other):
-    #     if self._T is None and other._T is None:
-    #         return True
-    #
-    #     if type(self) is not type(other):
-    #         raise TypeError("comparing %s with %r object" % (
-    #             type(self).__name__, type(other).__name__,))
-    #
-    #     if self._TYPE != other._TYPE:
-    #         raise TypeError("comparing %r and %r" % (self._TYPE, other._TYPE))
-    #
-    #     return self._obj == other._obj
+    def __init__(self, TYPE):
+        _muobject.__init__(self, TYPE)
 
     def __hash__(self):
         raise TypeError("reference objects are not hashable")
-
-
-NULL = _mugenref()    # NULL is a value of general reference type
 
 
 # ----------------------------------------------------------
@@ -817,6 +825,9 @@ class _muiref(_muref, _muparentable):
         if not 0 <= (idx + other) < len(obj):
             raise IndexError("memory array index out of bounds")
         return _muiref(self._TYPE, obj[idx + other], obj, idx + other)
+
+
+NULL = _mugenref(MuRef(void_t))    # NULL is a value of general reference type
 
 
 class MuUPtr(MuIRef):

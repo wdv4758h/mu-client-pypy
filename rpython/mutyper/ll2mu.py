@@ -8,6 +8,7 @@ log = py.log.Producer("ll2mu")
 py.log.setconsumer("ll2mu", ansi_log)
 
 
+# ----------------------------------------------------------
 def ll2mu_ty(llt):
     if isinstance(llt, ll.Primitive):
         return _llprim2mu(llt)
@@ -89,3 +90,6 @@ def _llfuncptr2mu(llt):
     rtn_t = (ll2mu_ty(llfnc_t.RESULT), )
     sig = mu.MuFuncSig(rtn_t, arg_ts)
     return mu.MuFuncRef(sig)
+
+
+# ----------------------------------------------------------
