@@ -2,6 +2,7 @@
 Defines the Mu instruction set
 """
 from rpython.flowspace.model import Block, Variable
+from rpython.mutyper.muts.muentity import MuName
 
 
 # ----------------------------------------------------------------
@@ -47,27 +48,48 @@ class EXCEPT(object):
 
 
 class MuOperation(object):
-    def __init__(self, name, strfnc):
-        self.opname = name
-        self.strfnc = strfnc
-    
-    def __call__(self, args, result=None, exc=EXCEPT(), ka=KEEPALIVE()):
+    def __init__(self, args, result=None, exc=EXCEPT(), ka=KEEPALIVE()):
         self.args = args
-        self.result = result if result else Variable('rtn')
+        if result:
+            self.result = result
+        else:
+            self.result = Variable('rtn')
+            cls = self.__class__
+            self.result.mu_type = cls.__dict__['_fnc_rtntype'](args)
+            self.result.mu_name = MuName(self.result.name, args[0].mu_name.scope)
         self.exc = exc
         self.ka = ka
         
     def __str__(self):
-        return self.strfnc()
+        cls = self.__class__
+        return cls.__dict__['_fnc_str'](self)
 
     def __repr__(self):
         return str(self)
 
 
+def _newop(opname, rtn_t_fnc, str_fnc):
+    """
+    Dynamically build an operation class
+    :param opname: name of the operation
+    :param rtn_t_fnc: function that computes the return type
+    :param str_fnc: function that generates Mu code
+    :return: created class instance
+    """
+
+    return type(opname, (MuOperation,),
+                {'__init__': MuOperation.__init__,
+                 '_fnc_rtntype': rtn_t_fnc,
+                 '_fnc_str': str_fnc})
+
+
 # ----------------------------------------------------------------
 # Binary Operations
-_binop_strfnc = lambda op: "%s = %s <%s> %s %s %s" % (op.result, op.opname, op.args[0].mu_type,
-                                          op.args[0], op.args[1], op.exc)
-
-ADD = MuOperation("ADD", _binop_strfnc)
-# TODO: the rest of the definitions
+for opname in "ADD SUB MUL SDIV SREM UDIV UREM SHL LSHR ASHR AND OR XOR FADD FSUB FMUL FDIV FREM".split(' '):
+    globals()[opname] = _newop(opname,
+                               lambda args: args[0].mu_type,
+                               lambda op: "%s = %s <%s> %s %s %s" % (op.result.mu_name,
+                                                                     op.__class__.__name__,
+                                                                     op.args[0].mu_type.mu_name,
+                                                                     op.args[0].mu_name, op.args[1].mu_name,
+                                                                     op.exc))
