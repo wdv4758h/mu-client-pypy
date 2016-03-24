@@ -25,6 +25,9 @@ class FunctionGraph(object):
         self.exceptblock.exits = ()
         self.tag = None
 
+        self.mu_name = None
+        self.mu_type = None
+
     def getargs(self):
         return self.startblock.inputargs
 

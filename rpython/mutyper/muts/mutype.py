@@ -368,6 +368,9 @@ class MuHybrid(MuContainerType):
         except KeyError:
             return MuContainerType.__getattr__(self, name)
 
+    def __getitem__(self, idx):
+        return self._flds[self._names[idx]]
+
     def _str_fields(self):
         fix_part = ', '.join(['%s: %s' % (name, self._flds[name])
                               for name in self._names[:-1]])
