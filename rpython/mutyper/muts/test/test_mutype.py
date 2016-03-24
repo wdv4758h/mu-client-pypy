@@ -38,6 +38,7 @@ def test_structs():
     S = MuStruct('Circle', ('radius', double_t), ('origin', P))
 
     assert S.radius == double_t
+    assert S[0] == double_t
     assert S.origin == P
 
     assert S.mu_name == MuName("sttCircle")
