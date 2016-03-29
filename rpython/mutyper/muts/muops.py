@@ -49,16 +49,23 @@ class EXCEPT(object):
 
 
 class MuOperation(object):
-    def __init__(self, args, result=None, exc=EXCEPT(), ka=KEEPALIVE()):
-        if result:
-            self.result = result
-        else:
-            self.result = Variable('rtn')
-            cls = self.__class__
-            self.result.mu_type = cls.__dict__['_fnc_rtntype'](args)
-            self.result.mu_name = MuName(self.result.name, args[0].mu_name.scope)
-        self.exc = exc
-        self.ka = ka
+    def __init__(self, *args, **kwargs):
+        cls = self.__class__
+
+        if 'result' not in kwargs:
+            res = Variable('rtn')
+            res.mu_type = cls.__dict__['_fnc_rtntype'](args)
+            res.mu_name = MuName(res.name, args[0].mu_name.scope)
+            kwargs['result'] = res
+
+        if 'exc' not in kwargs:
+            kwargs['exc'] = EXCEPT()
+        if 'ka' not in kwargs:
+            kwargs['ka'] = KEEPALIVE()
+
+        for key, val in kwargs.items():
+            setattr(self, key, val)
+
         self._args = args
 
         # also sets the argument names to attributes,
@@ -158,9 +165,10 @@ SWITCH = _newop("SWITCH", "opnd default cases",
 # Inter-function Control Flow
 CALL = _newop("CALL", "callee args",
               lambda (callee, args): callee.mu_type.Sig.RTNS[0],
-              lambda op: "<%s> (%s) %s %s" % (op.callee.mu_type.Sig.mu_name,
-                                              ' '.join([str(arg.mu_name) for arg in op.args]),
-                                              op.exc, op.ka))
+              lambda op: "<%s> %s (%s) %s %s" % (op.callee.mu_type.Sig.mu_name,
+                                                 op.callee.mu_name,
+                                                 ' '.join([str(arg.mu_name) for arg in op.args]),
+                                                 op.exc, op.ka))
 
 TAILCALL = _newop("TAILCALL", "callee args",
                   lambda args: void_t,
@@ -283,7 +291,7 @@ NATIVE_PIN = _newcomminst("uvm.native.pin", "opnd",
                           lambda (opnd, ): MuUPtr(opnd.mu_type.TO),
                           lambda op: "<%s> (%s)" % (op.opnd.mu_type.mu_name, op.opnd.mu_name))
 NATIVE_UNPIN = _newcomminst("uvm.native.unpin", "opnd",
-                            lambda args: void_t, NATIVE_PIN.__class__.__dict__['_fnc_str'])
+                            lambda args: void_t, NATIVE_PIN.__dict__['_fnc_str'])
 
 NATIVE_EXPOSE = _newcomminst("uvm.native.expose", "func cookie",
                              lambda (func, cookie): MuUFuncPtr(func.mu_type.Sig),
