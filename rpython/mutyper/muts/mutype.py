@@ -35,6 +35,9 @@ class _muobject(object):
     def _getid(self):
         return id(self)
 
+    def __repr__(self):
+        return "<%s>" % self
+
 
 # ----------------------------------------------------------
 class MuPrimitive(MuType):
@@ -136,6 +139,9 @@ class _muprimitive(_muobject):
             return "%sd" % self.val
         else:
             return str(int(self.val))
+
+    def __repr__(self):
+        return "%s" % self
 
 
 # ----------------------------------------------------------
@@ -714,6 +720,9 @@ class _mufuncref(_mugenref):
         self._TYPE = TYPE
         for attr in attrs:
             setattr(self, attr, attrs[attr])
+
+    def __str__(self):
+        return "# %s" % self.fncname
 
 
 class MuRef(MuRefType):

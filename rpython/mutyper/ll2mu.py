@@ -20,15 +20,15 @@ def ll2mu_ty(llt):
     :return: MuType
     """
     if isinstance(llt, ll.Primitive):
-        return _lltype_prim2mu(llt)
+        return _lltype2mu_prim(llt)
     elif isinstance(llt, ll.FixedSizeArray):
-        return _lltype_arrfix2mu(llt)
+        return _lltype2mu_arrfix(llt)
     elif isinstance(llt, ll.Struct):
-        return _lltype_stt2mu(llt)
+        return _lltype2mu_stt(llt)
     elif isinstance(llt, ll.Array):
-        return _lltype_arr2mu(llt)
+        return _lltype2mu_arr(llt)
     elif isinstance(llt, ll.Ptr):
-        return _lltype_ptr2mu(llt)
+        return _lltype2mu_ptr(llt)
     elif isinstance(llt, ll.OpaqueType):
         log.warning("mapping type %r -> void" % llt)
         return mu.void_t
@@ -37,7 +37,7 @@ def ll2mu_ty(llt):
 # ll2mu_ty = ll.saferecursive(_ll2mu_ty, None)
 
 
-def _lltype_prim2mu(llt):
+def _lltype2mu_prim(llt):
     type_map = {
         ll.Signed:             mu.int32_t,
         ll.Unsigned:           mu.int32_t,
@@ -62,15 +62,15 @@ def _lltype_prim2mu(llt):
         raise NotImplementedError("Don't know how to specialise %s using MuTS." % llt)
 
 
-def _lltype_arrfix2mu(llt):
+def _lltype2mu_arrfix(llt):
     return mu.MuArray(ll2mu_ty(llt.OF), llt.length)
 
 _sttcache = {}
 
 
-def _lltype_stt2mu(llt):
+def _lltype2mu_stt(llt):
     if llt._is_varsize():
-        return _lltype_varstt2mu(llt)
+        return _lltype2mu_varstt(llt)
     try:
         return _sttcache[llt]
     except KeyError:
@@ -80,7 +80,7 @@ def _lltype_stt2mu(llt):
         return stt
 
 
-def _lltype_varstt2mu(llt):
+def _lltype2mu_varstt(llt):
     var_t = ll2mu_ty(llt._flds[llt._arrayfld].OF)
     if 'length' not in llt._names:
         names = list(llt._names)
@@ -93,17 +93,17 @@ def _lltype_varstt2mu(llt):
     return mu.MuHybrid(llt._name, *([(n, ll2mu_ty(flds[n])) for n in names[:-1]] + [(llt._arrayfld, var_t)]))
 
 
-def _lltype_arr2mu(llt):
+def _lltype2mu_arr(llt):
     return mu.MuHybrid("%s" % llt.OF._name, ('length', mu.int64_t), ('items', ll2mu_ty(llt.OF)))
 
 
-def _lltype_ptr2mu(llt):
+def _lltype2mu_ptr(llt):
     if isinstance(llt.TO, ll.FuncType):
-        return _lltype_funcptr2mu(llt)
+        return _lltype2mu_funcptr(llt)
     return mu.MuRef(ll2mu_ty(llt.TO))
 
 
-def _lltype_funcptr2mu(llt):
+def _lltype2mu_funcptr(llt):
     llfnc_t = llt.TO
     arg_ts = tuple([ll2mu_ty(arg) for arg in llfnc_t.ARGS if arg != ll.Void])
     rtn_t = (ll2mu_ty(llfnc_t.RESULT), )
@@ -122,26 +122,26 @@ def ll2mu_val(llv, llt=None):
     if isinstance(llv, (int, float)):
         if not isinstance(llt, ll.Primitive):
             raise TypeError("Wrong type information '%r' for specialising %r" % (llt, llv))
-        return _llval_prim2mu(llv, llt)
+        return _llval2mu_prim(llv, llt)
 
     elif isinstance(llv, ll._fixedsizearray):
-        return _llval_arrfix2mu(llv)
+        return _llval2mu_arrfix(llv)
 
     elif isinstance(llv, ll._struct):
-        return _llval_stt2mu(llv)
+        return _llval2mu_stt(llv)
 
     elif isinstance(llv, ll._array):
-        return _llval_arr2mu(llv)
+        return _llval2mu_arr(llv)
 
     elif isinstance(llv, ll._ptr):
-        return _llval_ptr2mu(llv)
+        return _llval2mu_ptr(llv)
     elif llt == ll.Char and len(llv) == 1:
-        return _llval_prim2mu(ord(llv), llt)
+        return _llval2mu_prim(ord(llv), llt)
     else:
         raise NotImplementedError("Don't know how to specialise value type %r." % llv)
 
 
-def _llval_prim2mu(llv, llt):
+def _llval2mu_prim(llv, llt):
     mut = ll2mu_ty(llt)
     if isinstance(llv, TotalOrderSymbolic):
         llv = llv.compute_fn()
@@ -151,7 +151,7 @@ def _llval_prim2mu(llv, llt):
     return mu._muprimitive(mut, llv)
 
 
-def _llval_arrfix2mu(llv):
+def _llval2mu_arrfix(llv):
     mut = ll2mu_ty(llv._TYPE)
     arr = mu._muarray(mut)
     for i in range(llv.getlength()):
@@ -160,9 +160,9 @@ def _llval_arrfix2mu(llv):
     return arr
 
 
-def _llval_stt2mu(llv):
+def _llval2mu_stt(llv):
     if llv._TYPE._arrayfld:
-        return _llval_varstt2mu(llv)
+        return _llval2mu_varstt(llv)
 
     mut = ll2mu_ty(llv._TYPE)
     stt = mu._mustruct(mut)
@@ -172,7 +172,7 @@ def _llval_stt2mu(llv):
     return stt
 
 
-def _llval_varstt2mu(llv):
+def _llval2mu_varstt(llv):
     mut = ll2mu_ty(llv._TYPE)
     arr = getattr(llv, llv._TYPE._arrayfld)
     hyb = mu._muhybrid(mut, mut.length(arr.getlength()))
@@ -188,7 +188,7 @@ def _llval_varstt2mu(llv):
     return hyb
 
 
-def _llval_arr2mu(llv):
+def _llval2mu_arr(llv):
     mut = ll2mu_ty(llv._TYPE)
     hyb = mu._muhybrid(mut, llv.getlength())
 
@@ -199,14 +199,14 @@ def _llval_arr2mu(llv):
     return hyb
 
 
-def _llval_ptr2mu(llv):
+def _llval2mu_ptr(llv):
     if isinstance(llv._TYPE.TO, ll.FuncType):
-        return _llval_funcptr2mu(llv)
+        return _llval2mu_funcptr(llv)
     mut = ll2mu_ty(llv._TYPE)
     return mu._muref(mut, ll2mu_val(llv._obj))
 
 
-def _llval_funcptr2mu(llv):
+def _llval2mu_funcptr(llv):
     mut = ll2mu_ty(llv._TYPE)
     return mu._mufuncref(mut,
                          graph=getattr(llv._obj, 'graph', None),
@@ -216,4 +216,8 @@ def _llval_funcptr2mu(llv):
 
 # ----------------------------------------------------------
 def ll2mu_op(llop):
-    pass
+    try:
+        globals()['_llop2mu_' + llop.opname](llop)
+    except KeyError:
+        raise NotImplementedError("Has not implemented specialisation for operation '%s'" % llop.opname)
+
