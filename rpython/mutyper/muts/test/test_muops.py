@@ -1,5 +1,5 @@
 from rpython.mutyper.muts.muops import *
-from ..muts.mutype import *
+from rpython.mutyper.muts.mutype import *
 
 
 def test_binaryops():
