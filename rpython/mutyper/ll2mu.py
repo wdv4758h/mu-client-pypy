@@ -2,6 +2,7 @@ from rpython.rtyper.lltypesystem import lltype as ll
 from .muts import mutype as mu
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
+from rpython.rlib.rarithmetic import _inttypes
 
 import py
 from rpython.tool.ansi_print import ansi_log
@@ -56,6 +57,8 @@ def _lltype_prim2mu(llt):
     try:
         return type_map[llt]
     except KeyError:
+        if llt._type in _inttypes.values():
+            return mu.MuInt(llt._type.BITS)
         raise NotImplementedError("Don't know how to specialise %s using MuTS." % llt)
 
 
@@ -197,5 +200,20 @@ def _llval_arr2mu(llv):
 
 
 def _llval_ptr2mu(llv):
+    if isinstance(llv._TYPE.TO, ll.FuncType):
+        return _llval_funcptr2mu(llv)
     mut = ll2mu_ty(llv._TYPE)
     return mu._muref(mut, ll2mu_val(llv._obj))
+
+
+def _llval_funcptr2mu(llv):
+    mut = ll2mu_ty(llv._TYPE)
+    return mu._mufuncref(mut,
+                         graph=getattr(llv._obj, 'graph', None),
+                         fncname=getattr(llv._obj, '_name', ''),
+                         compilation_info=getattr(llv._obj, 'compilation_info', None))
+
+
+# ----------------------------------------------------------
+def ll2mu_op(llop):
+    pass
