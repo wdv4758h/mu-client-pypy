@@ -285,4 +285,13 @@ NATIVE_PIN = _newcomminst("uvm.native.pin", "opnd",
 NATIVE_UNPIN = _newcomminst("uvm.native.unpin", "opnd",
                             lambda args: void_t, NATIVE_PIN.__class__.__dict__['_fnc_str'])
 
+NATIVE_EXPOSE = _newcomminst("uvm.native.expose", "func cookie",
+                             lambda (func, cookie): MuUFuncPtr(func.mu_type.Sig),
+                             lambda op: "<[%s]> (%s, %s)" % (op.func.mu_type.Sig.mu_name,
+                                                             op.func.mu_name, op.cookie.mu_name))
+
+NATIVE_UNEXPOSE = _newcomminst("uvm.native.unexpose", "value",
+                               lambda (value, ): void_t,
+                               lambda op: "(%s)" % op.value.mu_name)
+
 # TODO: a few more?
