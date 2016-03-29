@@ -47,5 +47,44 @@ def test_call():
     assert callee.value == g
     muop = CALL(callee.value, [v], result=r)
     assert muop.result.mu_type == int64_t
-    assert repr(muop) == "%v7 = CALL <@sig_i64_i64> @fac (%v6)  "
+    assert repr(muop) == "%%%s = CALL <@sig_i64_i64> @fac (%%%s)  " % (r, v)
 
+
+def test_indirect_call():
+    def fac(n):
+        if n in (0, 1):
+            return 1
+        return n * fac(n - 1)
+
+    def summ(n):
+        if n in (0, 1):
+            return 1
+        return n + fac(n - 1)
+
+    def f(idx, n):
+        fncs = [fac, summ]
+        return fncs[idx](n)
+
+    _, _, g = gengraph(f, [int, int])
+
+    g.mu_name = MuName(g.name)
+    g.mu_type = MuFuncRef(MuFuncSig([ll2mu_ty(arg.concretetype) for arg in g.startblock.inputargs],
+                                    [ll2mu_ty(g.returnblock.inputargs[0].concretetype)]))
+    blk = g.startblock
+    blk.mu_name = MuName('blk0', g)
+
+    op = g.startblock.operations[4]
+    r = op.result
+    r.mu_name = MuName(r.name, blk)
+    r.mu_type = ll2mu_ty(r.concretetype)
+
+    fnc = op.args[0]
+    fnc.mu_name = MuName(fnc.name, blk)
+    fnc.mu_type = ll2mu_ty(fnc.concretetype)
+
+    arg = op.args[1]
+    arg.mu_name = MuName(arg.name, blk)
+    arg.mu_type = ll2mu_ty(arg.concretetype)
+
+    muop = CALL(fnc, [arg], result=r)
+    assert repr(muop) == "%%%s = CALL <@sig_i64_i64> %%%s (%%%s)  " % (r, fnc, arg)
