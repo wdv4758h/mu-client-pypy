@@ -1,4 +1,4 @@
-from ..muops import *
+from rpython.mutyper.muts.muops import *
 from ..muts.mutype import *
 
 

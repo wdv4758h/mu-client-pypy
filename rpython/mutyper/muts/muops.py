@@ -276,4 +276,13 @@ def _newcomminst(inst_name, arg_names, rtn_t_fnc, str_fnc):
                  '_fnc_str': lambda op: "COMMINST %s %s" % (op.__class__.__dict__['inst_mu_name'], str_fnc(op)),
                  '_arg_names': arg_names.split(' ')})
 
-# TODO: some necessary common instructions
+THREAD_EXIT = _newcomminst("uvm.thread_exit", "", lambda args: void_t, lambda op: "")
+
+# Object pinning
+NATIVE_PIN = _newcomminst("uvm.native.pin", "opnd",
+                          lambda (opnd, ): MuUPtr(opnd.mu_type.TO),
+                          lambda op: "<%s> (%s)" % (op.opnd.mu_type.mu_name, op.opnd.mu_name))
+NATIVE_UNPIN = _newcomminst("uvm.native.unpin", "opnd",
+                            lambda args: void_t, NATIVE_PIN.__class__.__dict__['_fnc_str'])
+
+# TODO: a few more?
