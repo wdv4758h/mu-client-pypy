@@ -6,6 +6,7 @@ from rpython.rtyper.lltypesystem.rstr import STR
 from rpython.rtyper.rclass import OBJECT
 from rpython.rtyper.test.test_llinterp import gengraph
 from rpython.flowspace.model import SpaceOperation, Variable, Constant
+from ..tools.textgraph import print_graph
 
 
 def test_ll2mu_ty():
@@ -108,7 +109,7 @@ def test_ll2muop_maps():
         assert key in LL_OPERATIONS
 
 
-def test_ll2muop():
+def test_ll2muop_1():
     def fac(n):
         if n in (0, 1):
             return 1
@@ -152,3 +153,37 @@ def test_ll2muop():
     assert muop.op1 == op.args[0]
     assert muop.op2 == op.args[1]
     assert muop.result == op.result
+
+
+def _search_op(g, opname, searched=list()):
+    searched.append(g)
+    for _, op in g.iterblockops():
+        if op.opname == opname:
+            yield op
+        elif op.opname == 'direct_call':
+            graph = op.args[0].value._obj.graph
+            if graph not in searched:
+                try:
+                    rtn = _search_op(graph, opname, searched).next()
+                    yield rtn
+                except StopIteration:
+                    pass
+
+
+def test_ll2muop_2():
+    def f(s):
+        d = {'abc': 23, 'efv': 87}
+        if s in d:
+            return d[s]
+        return 0
+
+    _, _, g = gengraph(f, [str])
+    opgen = _search_op(g, 'getinteriorfield')
+    op = opgen.next()
+
+    typer = MuTyper()
+    op.result = typer.proc_arg(op.result, g.startblock)
+    typer.proc_arglist(op.args, g.startblock)
+
+    muops = ll2mu_op(op)
+    assert map(lambda op: op.opname, muops) == ['GETIREF']

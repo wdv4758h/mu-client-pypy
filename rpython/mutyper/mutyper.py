@@ -70,7 +70,7 @@ class MuTyper:
                 return ldgcell
             elif isinstance(arg.value, llt.LowLevelType):
                 arg.value = ll2mu_ty(arg.value)
-            else:
+            elif not isinstance(arg.value, str):
                 arg.value = ll2mu_val(arg.value, arg.concretetype)
         else:
             arg.mu_name = MuName(arg.name, blk)
