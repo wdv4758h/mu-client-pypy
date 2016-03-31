@@ -214,6 +214,9 @@ class MuStruct(MuContainerType):
         self._flds = frozendict(flds)
         self._names = tuple(names)
 
+    def _index_of(self, fld):
+        return self._names.index(fld)
+
     def _is_atomic(self):
         for typ in self._flds.values():
             if not typ._is_atomic():
@@ -361,6 +364,9 @@ class MuHybrid(MuContainerType):
         if self._flds[self._varfld] == void_t:
             raise TypeError("%s: variable part cannot by Void type" %
                             self._name)
+
+    def _index_of(self, fld):
+        return self._names[:-1].index(fld)
 
     def _is_atomic(self):
         for typ in self._flds.values():

@@ -218,18 +218,22 @@ def _llval2mu_funcptr(llv):
 
 # ----------------------------------------------------------
 def ll2mu_op(llop):
+    _ll2mu_op(llop.opname, llop.args, llop.result)
+
+
+def _ll2mu_op(opname, args, result=None):
     try:
-        return globals()['_llop2mu_' + llop.opname](*llop.args, res=llop.result, llopname=llop.opname)
+        return globals()['_llop2mu_' + opname](*args, res=result, llopname=opname)
     except KeyError:
         # try if it's an integer operation that can be redirected.
         contains = lambda s, subs: reduce(lambda a, b: a or b, map(lambda e: e in s, subs), False)
-        if contains(llop.opname, ('uint', 'char', 'long')):
-            opname = "int_%s" % llop.opname.split('_')[1]
+        if contains(opname, ('uint', 'char', 'long')):
+            opname = "int_%s" % opname.split('_')[1]
             try:
-                return globals()['_llop2mu_' + opname](*llop.args, res=llop.result, llopname=llop.opname)
+                return globals()['_llop2mu_' + opname](*args, res=result, llopname=opname)
             except KeyError:
                 pass    # raise error on next line
-        raise NotImplementedError("Has not implemented specialisation for operation '%s'" % llop.opname)
+        raise NotImplementedError("Has not implemented specialisation for operation '%s'" % opname)
 
 
 def _newprimconst(mut, primval):
@@ -238,76 +242,68 @@ def _newprimconst(mut, primval):
     return c
 
 
+class _MuOpList(list):
+    def append(self, op):
+        list.append(self, op)
+        return op.result
+
+    def extend(self, oplist):
+        if len(oplist) > 0:
+            list.extend(self, oplist)
+            return self[-1].result
+        return None
+
+
 # ----------------
 # primitive ops
-def _llop2mu_int_is_true(x, res=None, llopname=None):
+def _llop2mu_int_is_true(x, res=None, llopname='int_is_true'):
     return [muops.NE(x, _newprimconst(x.mu_type, 0), result=res)]
 
 
-def _llop2mu_int_neg(x, res=None, llopname=None):
+def _llop2mu_int_neg(x, res=None, llopname='int_neg'):
     return [muops.SUB(_newprimconst(x.mu_type, 0), x, result=res)]
 
 
-def _llop2mu_int_abs(x, res=None, llopname=None):
-    ops = []
-
+def _llop2mu_int_abs(x, res=None, llopname='int_abs'):
+    ops = _MuOpList()
     # -x = 0 - x
-    ops += _llop2mu_int_neg(x)
-    neg_x = ops[-1].result
-
+    neg_x = ops.extend(_ll2mu_op('int_neg', [x]))
     # x > 0?
-    ops += globals()['_llop2mu_int_gt'](x, _newprimconst(x.mu_type, 0))
-    cmp_res = ops[-1].result
-
+    cmp_res = ops.extend(_ll2mu_op('int_gt', [x, _newprimconst(x.mu_type, 0)]))
     # True -> x, False -> -x
     ops.append(muops.SELECT(cmp_res, x, neg_x, result=res))
-
     return ops
 
 
-def _llop2mu_int_invert(x, res=None, llopname=None):
+def _llop2mu_int_invert(x, res=None, llopname='int_invert'):
     # 2's complement
     # x' = (-x) - 1
-    ops = []
-
-    ops += _llop2mu_int_neg(x)
-    neg_x = ops[-1].result
-
+    ops = _MuOpList()
+    neg_x = ops.extend(_ll2mu_op('int_neg', [x]))
     one = _newprimconst(x.mut, 1)
-
-    ops += globals()['_llop2mu_int_sub'](neg_x, one, res)
+    ops.extend(_ll2mu_op('_int_sub', (neg_x, one), res))
     return ops
 
 
-def _llop2mu_int_between(a, x, b, res=None, llopname=None):
-    ops = []
-
-    ops += globals()['_llop2mu_int_le'](a, x)
-    le_res = ops[-1].result
-
-    ops += globals()['_llop2mu_int_lt'](x, b)
-    lt_res = ops[-1].result
-
-    ops += globals()['_llop2mu_int_and'](le_res, lt_res, res)
+def _llop2mu_int_between(a, x, b, res=None, llopname='int_between'):
+    ops = _MuOpList()
+    le_res = ops.extend(_ll2mu_op('int_le', (a, x)))
+    lt_res = ops.extend(_ll2mu_op('int_lt',(x, b)))
+    ops.extend(_ll2mu_op('int_and', (le_res, lt_res), res))
     return ops
 
 
-def _llop2mu_int_force_ge_zero(x, res=None, llopname=None):
+def _llop2mu_int_force_ge_zero(x, res=None, llopname='int_force_ge_zero'):
     return _llop2mu_int_abs(x, res)
 
 
-def _llop2mu_float_abs(x, res=None, llopname=None):
-    ops = []
-
+def _llop2mu_float_abs(x, res=None, llopname='float_abs'):
+    ops = _MuOpList()
     # -x = 0 - x
-    ops += globals()['_llop2mu_float_neg'](x)
-    neg_x = ops[-1].result
+    neg_x = ops.extend(_ll2mu_op('float_neg', [x]))
     f_0 = ops[-1].args[0]
-
     # x > 0 ?
-    ops += globals()['_llop2mu_float_gt'](x, f_0)
-    cmp_res = ops[-1].result
-
+    cmp_res = ops.extend(_ll2mu_op('float_gt', (x, f_0)))
     # True -> x, False -> (-x)
     ops.append(muops.SELECT(cmp_res, x, neg_x, result=res))
     return ops
@@ -388,9 +384,104 @@ for triplet in __spec_cast_map:
 
 # ----------------
 # pointer operations
-def _llop2mu_malloc(T, res=None, llopname=None):
+def _llop2mu_malloc(T, flavor, res=None, llopname='malloc'):
     return [muops.NEW(T.value, result=res)]
 
 
-def _llop2mu_malloc_varsize(T, n, res=None, llopname=None):
+def _llop2mu_malloc_varsize(T, n, flavor, res=None, llopname='malloc_varsize'):
     return [muops.NEWHYBRID(T.value, n, result=res)]
+
+
+def __getfieldiref(var, cnst_fldname):
+    ops = _MuOpList()
+    iref = ops.append(muops.GETIREF(var)) if isinstance(var.mu_type, mutype.MuRef) else var
+    stt_t = iref.mu_type._T
+    idx = stt_t._index_of(cnst_fldname.value)
+    iref_fld = ops.append(muops.GETFIELDIREF(iref, idx))
+    return iref_fld, ops
+
+
+def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
+    iref_fld, ops = __getfieldiref(var, cnst_fldname)
+    ops.append(muops.LOAD(iref_fld, res))
+    return ops
+
+
+def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
+    iref_fld, ops = __getfieldiref(var, cnst_fldname)
+    ops.append(muops.STORE(iref_fld, val, res))
+    return ops
+
+
+def __getarrayitemiref(var, idx):
+    ops = _MuOpList()
+    iref = ops.append(muops.GETIREF(var)) if isinstance(var.mu_type, mutype.MuRef) else var
+    iref_var = ops.append(muops.GETVARPARTIREF(iref))
+    iref_itm = ops.append(muops.SHIFTIREF(iref_var, idx))
+    return iref_itm, ops
+
+
+def _llop2mu_getarrayitem(var, idx, res=None, llopname='getarrayitem'):
+    iref_itm, ops = __getarrayitemiref(var, idx)
+    ops.append(muops.LOAD(iref_itm, res))
+    return ops
+
+
+def _llop2mu_setarrayitem(var, idx, val, res=None, llopname='setarrayitem'):
+    iref_itm, ops = __getarrayitemiref(var, idx)
+    ops.append(muops.STORE(iref_itm, val))
+    return ops
+
+
+def _llop2mu_getarraysize(var, res=None, llopname='getarraysize'):
+    ops = _MuOpList()
+    iref = ops.append(muops.GETIREF(var)) if isinstance(var.mu_type, mutype.MuRef) else var
+    hyb_t = iref.mu_type._T
+    assert 'length' in hyb_t._flds
+    idx = hyb_t._index_of('length')     # assuming that every Hybrid type has a length field
+    iref_fld = ops.append(muops.GETFIELDIREF(iref, idx))
+    ops.append(muops.LOAD(iref_fld, res))
+    return ops
+
+
+def __getinterioriref(var, *offsets):
+    ops = _MuOpList()
+    iref = ops.append(muops.GETIREF(var)) if isinstance(var.mu_type, mutype.MuRef) else var
+    for o in offsets:
+        if o.concretetype == lltype.Void:
+            assert isinstance(o.value, str)
+            iref, subops = __getfieldiref(iref, o)
+        else:
+            assert isinstance(o.concretetype, lltype.Primitive)
+            hyb_t = iref.mu_type._T
+            assert isinstance(hyb_t, mutype.MuHybrid)
+            iref, subops = __getarrayitemiref(iref, o)
+        ops.extend(subops)
+    return iref, ops
+
+
+def _llop2mu_getinteriorfield(var, *offsets, **kwargs):
+    iref, ops = __getinterioriref(var, offsets)
+    res = kwargs['result'] if 'result' in kwargs else None
+    ops.append(muops.LOAD(iref, res))
+    return ops
+
+
+def _llop2mu_setinteriorfield(var, *offsets_val, **kwards):
+    offsets, val = offsets_val[:-1], offsets_val[-1]
+    iref, ops = __getinterioriref(var, offsets)
+    ops.extend(muops.STORE(iref, val))
+    return ops
+
+
+def _llop2mu_getinteriorarraysize(var, *offsets, **kwargs):
+    ops = _MuOpList()
+    iref = ops.extend(_llop2mu_getinteriorfield(var, offsets[:-1]))
+    o = offsets[-1]
+    assert o.concretetype == lltype.Void and isinstance(o.value, str)
+    hyb_t = iref.mu_type._T if iref else var.mu_type._T
+    assert isinstance(hyb_t, mutype.MuHybrid) and o.value == hyb_t._varfld
+
+    ops.extend(_llop2mu_getarraysize(iref if iref else var, res=kwargs['result']))
+    return ops
+
