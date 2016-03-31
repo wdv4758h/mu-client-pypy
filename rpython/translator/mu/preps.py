@@ -40,14 +40,16 @@ def chop(graphs, g_entry):
                     except AssertionError:
                         log.error("Error: \"%s\" graph not found" % callee._name)
                 elif op.opname == 'indirect_call':
-                    for callee in op.args[-1]:
-                        try:
-                            assert callee in graphs
-                            if not ref[callee]:
-                                ref[callee] = True
-                                visit(callee)
-                        except AssertionError:
-                            log.error("Error: \"%s\" graph not found" % callee._name)
+                    possible_graphs = op.args[-1].value
+                    if possible_graphs:
+                        for callee in possible_graphs:
+                            try:
+                                assert callee in graphs
+                                if not ref[callee]:
+                                    ref[callee] = True
+                                    visit(callee)
+                            except AssertionError:
+                                log.error("Error: \"%s\" graph not found" % callee._name)
 
     ref[g_entry] = True
     visit(g_entry)
