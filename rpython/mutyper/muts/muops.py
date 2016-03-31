@@ -51,6 +51,7 @@ class EXCEPT(object):
 class MuOperation(object):
     def __init__(self, *args, **kwargs):
         cls = self.__class__
+        self.opname = cls.__name__
 
         if 'result' not in kwargs:
             res = Variable('rtn')
@@ -77,7 +78,7 @@ class MuOperation(object):
         
     def __str__(self):
         cls = self.__class__
-        rhs = "%s %s" % (self.__class__.__name__, cls.__dict__['_fnc_str'](self))
+        rhs = "%s %s" % (self.opname, cls.__dict__['_fnc_str'](self))
         if self.result.mu_type is void_t:
             return rhs
         return "%s = %s" % (self.result.mu_name, rhs)

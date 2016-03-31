@@ -60,7 +60,7 @@ class MuTyper:
     def proc_arg(self, arg, blk):
         arg.mu_type = ll2mu_ty(arg.concretetype)
         if isinstance(arg, Constant):
-            if isinstance(arg.mu_type, mu.MuRef):
+            if isinstance(arg.mu_type, mut.MuRef):
                 gcell = MuGlobalCell(arg.mu_type)
                 gcell.value = ll2mu_val(arg.value)
 
@@ -68,6 +68,8 @@ class MuTyper:
                 ldgcell = Variable('ld' + gcell.mu_name._name)
                 self.ldgcells[gcell] = ldgcell
                 return ldgcell
+            elif isinstance(arg.value, llt.LowLevelType):
+                arg.value = ll2mu_ty(arg.value)
             else:
                 arg.value = ll2mu_val(arg.value, arg.concretetype)
         else:

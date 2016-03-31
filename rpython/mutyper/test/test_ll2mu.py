@@ -1,9 +1,11 @@
-from ..ll2mu import ll2mu_ty, ll2mu_val
+from rpython.mutyper.mutyper import MuTyper
+from ..ll2mu import ll2mu_ty, ll2mu_val, ll2mu_op
 from rpython.rtyper.lltypesystem import lltype as ll
 from rpython.mutyper.muts import mutype as mu
 from rpython.rtyper.lltypesystem.rstr import STR
 from rpython.rtyper.rclass import OBJECT
 from rpython.rtyper.test.test_llinterp import gengraph
+from rpython.flowspace.model import SpaceOperation, Variable, Constant
 
 
 def test_ll2mu_ty():
@@ -91,3 +93,62 @@ def test_ll2mu_fncptr():
     assert muv.fncname == "write"
     assert muv.graph is None
     assert muv.compilation_info == fncptr_write._obj.compilation_info
+
+
+def test_ll2muop_maps():
+    from ..ll2mu import __primop_map, __cast_map, __spec_cast_map
+    from rpython.rtyper.lltypesystem.lloperation import LL_OPERATIONS
+
+    # The keys in these maps must be valid LLOps.
+    for key in __primop_map:
+        assert key in LL_OPERATIONS
+    for key in __cast_map:
+        assert key in LL_OPERATIONS
+    for key in __spec_cast_map:
+        assert key in LL_OPERATIONS
+
+
+def test_ll2muop():
+    def fac(n):
+        if n in (0, 1):
+            return 1
+        return n * fac(n - 1)
+
+    _, _, g = gengraph(fac, [int])
+    # == == == == == == == == == == == == == == == == == == == == == == == ==
+    # (rpython.mutyper.test.test_mutyper:30)fac
+    # ------------------------
+    # blk0
+    # input: [n_0]
+    # operations:
+    # v36 = direct_call(( < * fn _ll_equal__Signe...Signed >), n_0, (0))
+    # v37 = direct_call(( < * fn _ll_equal__Signe...Signed >), n_0, (1))
+    # v38 = int_or(v36, v37)
+    # v39 = same_as(v38)
+    # switch: v39
+    # exits: [('blk@1', [n_0]), ('blk@2', [(1)])]
+    # ------------------------
+    # blk1
+    # input: [n_1]
+    # operations:
+    # v40 = int_sub(n_1, (1))
+    # v41 = direct_call(( < * fn fac >), v40)
+    # v42 = int_mul(n_1, v41)
+    # exits: [('blk@2', [v42])]
+    # ------------------------
+    # blk2
+    # input: [v43]
+    # operations:
+    # exits: []
+    # == == == == == == == == == == == == == == == == == == == == == == == ==
+    op = g.startblock.operations[2]
+    assert op.opname == 'int_or'
+    typer = MuTyper()
+    op.result = typer.proc_arg(op.result, g.startblock)
+    typer.proc_arglist(op.args, g.startblock)
+
+    muop = ll2mu_op(op)[0]
+    assert muop.opname == 'OR'
+    assert muop.op1 == op.args[0]
+    assert muop.op2 == op.args[1]
+    assert muop.result == op.result
