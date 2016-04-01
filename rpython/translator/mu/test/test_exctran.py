@@ -41,7 +41,7 @@ def test_exctran():
     assert exc.nor.args is blk.exits[0].args
     assert exc.exc.blk is blk.exits[1].target
     assert exc.exc.args is blk.exits[1].args
-    assert exc.nor.blk.operations[0].opname == 'mu_throw'
+    assert exc.nor.blk.operations[-1].opname == 'mu_throw'
     assert isinstance(exc.exc.blk.mu_excparam, Variable)
 
 
@@ -51,3 +51,7 @@ def test_exctran_gcbench():
     t, _, g = gengraph(gcbench.entry_point, [str])
 
     print_graph(g)
+    exctran = ExceptionTransformer(t)
+    exctran.exctran(g)
+
+    # TODO: rest of the test.

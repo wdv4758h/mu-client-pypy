@@ -41,7 +41,7 @@ class MuTyper:
     def specialise_block(self, blk):
         muops = []
         self.proc_arglist(blk.inputargs, blk)
-        if blk.mu_excparam:
+        if hasattr(blk, 'mu_excparam'):
             self.proc_arg(blk.mu_excparam, blk)
 
         for op in blk.operations:
