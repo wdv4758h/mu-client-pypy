@@ -43,3 +43,11 @@ def test_exctran():
     assert exc.exc.args is blk.exits[1].args
     assert exc.nor.blk.operations[0].opname == 'mu_throw'
     assert isinstance(exc.exc.blk.mu_excparam, Variable)
+
+
+def test_exctran_gcbench():
+    from rpython.translator.goal import gcbench
+    gcbench.ENABLE_THREADS = False
+    t, _, g = gengraph(gcbench.entry_point, [str])
+
+    print_graph(g)

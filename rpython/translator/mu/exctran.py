@@ -59,6 +59,12 @@ class ExceptionTransformer(object):
 
         self.helpergraphs = self.get_helpergraphs()
         backend_optimizations(translator, self.helpergraphs)
+        translator.graphs.extend(self.helpergraphs)
+        self.graphs = translator.graphs
+
+    def transform_all(self):
+        for g in self.graphs:
+            self.exctran(g)
 
     def linktran(self, g):
         """
