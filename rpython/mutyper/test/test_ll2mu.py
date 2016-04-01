@@ -24,7 +24,7 @@ def test_ll2mu_ty():
     assert PS.TO == S
 
     OBJ = ll2mu_ty(OBJECT)
-    assert OBJ.typeptr.TO.instantiate.Sig.ARGS[0].TO == OBJ
+    assert OBJ.typeptr.TO.instantiate.Sig.RTNS[0].TO == OBJ
 
     A = ll2mu_ty(ll.Array(ll.Char))
     assert isinstance(A, mu.MuHybrid)

@@ -109,7 +109,7 @@ def _lltype2mu_funcptr(llt):
     llfnc_t = llt.TO
     arg_ts = tuple([ll2mu_ty(arg) for arg in llfnc_t.ARGS if arg != lltype.Void])
     rtn_t = (ll2mu_ty(llfnc_t.RESULT), )
-    sig = mutype.MuFuncSig(rtn_t, arg_ts)
+    sig = mutype.MuFuncSig(arg_ts, rtn_t)
     return mutype.MuFuncRef(sig)
 
 
@@ -519,3 +519,5 @@ def _llop2mu_ptr_zero(ptr, res=None, llopname='ptr_zero'):
     cst = Constant(mutype.NULL)
     cst.mu_type = ptr.mu_type
     return _llop2mu_ptr_eq(ptr, cst, res)
+
+# TODO: rest of the operations

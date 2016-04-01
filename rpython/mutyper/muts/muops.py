@@ -110,7 +110,8 @@ for opname in "ADD SUB MUL SDIV SREM UDIV UREM SHL LSHR ASHR AND OR XOR FADD FSU
     globals()[opname] = _newop(opname, "op1 op2",
                                lambda (op1, op2): op1.mu_type,
                                lambda op: "<%s> %s %s %s" % (op.op1.mu_type.mu_name,
-                                                             op.op1.mu_name, op.op2.mu_name,
+                                                             op.op1.mu_name if hasattr(op.op1, 'mu_name') else op.op1,
+                                                             op.op2.mu_name if hasattr(op.op2, 'mu_name') else op.op2,
                                                              op.exc))
 
 
@@ -121,7 +122,9 @@ for opname in ("EQ NE SGE SGT SLE SLT UGE UGT ULE ULT "
     "FORD FOEQ FONE FOGT FOGE FOLT FOLE").split(' '):
     globals()[opname] = _newop(opname, "op1 op2",
                                lambda args: int1_t,
-                               lambda op: "<%s> %s %s" % (op.op1.mu_type.mu_name, op.op1.mu_name, op.op2.mu_name))
+                               lambda op: "<%s> %s %s" % (op.op1.mu_type.mu_name,
+                                                          op.op1.mu_name if hasattr(op.op1, 'mu_name') else op.op1,
+                                                          op.op2.mu_name if hasattr(op.op2, 'mu_name') else op.op2,))
 
 
 # ----------------------------------------------------------------

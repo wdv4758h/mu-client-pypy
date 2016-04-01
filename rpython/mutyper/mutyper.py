@@ -19,6 +19,7 @@ class MuTyper:
     def __init__(self):
         self.ldgcells = {}      # MuGlobalCells that need to be LOADed.
         self.gblcnsts = set()   # Constants that need to be defined on the global level
+        self.gbltypes = set()   # Types that need to be defined on the global level
         pass
 
     def specialise(self, g):
@@ -31,7 +32,7 @@ class MuTyper:
         blk = self.proc_gcells()
         if blk:
             blk.inputargs = g.startblock.inputargs
-            blk.exits = (Link([], g.startblock), )
+            blk.exits = (Link(g.startblock.inputargs, g.startblock), )
             g.startblock = blk
 
         for idx, blk in enumerate(g.iterblocks()):
@@ -50,7 +51,6 @@ class MuTyper:
                 muops += ll2mu_op(op)
             except NotImplementedError:
                 log.warning("Ignoring '%s'." % op)
-                muops += [op]
         blk.operations = tuple(muops)
 
     def proc_arglist(self, args, blk):
@@ -59,6 +59,7 @@ class MuTyper:
 
     def proc_arg(self, arg, blk):
         arg.mu_type = ll2mu_ty(arg.concretetype)
+        self.gbltypes.add(arg.mu_type)
         if isinstance(arg, Constant):
             if isinstance(arg.mu_type, mut.MuRef):
                 gcell = MuGlobalCell(arg.mu_type)
@@ -72,6 +73,8 @@ class MuTyper:
                 arg.value = ll2mu_ty(arg.value)
             elif not isinstance(arg.value, str):
                 arg.value = ll2mu_val(arg.value, arg.concretetype)
+                if not isinstance(arg.value, mut._mufuncref):
+                    self.gblcnsts.add(arg)
         else:
             arg.mu_name = MuName(arg.name, blk)
 
