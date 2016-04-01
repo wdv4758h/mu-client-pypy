@@ -457,7 +457,7 @@ def __getinterioriref(var, offsets):
 
 def _llop2mu_getinteriorfield(var, *offsets, **kwargs):
     iref, ops = __getinterioriref(var, offsets)
-    res = kwargs['result'] if 'result' in kwargs else None
+    res = kwargs['res'] if 'res' in kwargs else None
     ops.append(muops.LOAD(iref, result=res))
     return ops
 
@@ -470,13 +470,12 @@ def _llop2mu_setinteriorfield(var, *offsets_val, **kwards):
 
 
 def _llop2mu_getinteriorarraysize(var, *offsets, **kwargs):
-    ops = _MuOpList()
-    iref = ops.extend(_llop2mu_getinteriorfield(var, offsets[:-1]))
+    iref, ops = __getinterioriref(var, offsets[:-1])
     o = offsets[-1]
     assert o.concretetype == lltype.Void and isinstance(o.value, str)
     hyb_t = iref.mu_type.TO if iref else var.mu_type.TO
     assert isinstance(hyb_t, mutype.MuHybrid) and o.value == hyb_t._varfld
 
-    ops.extend(_llop2mu_getarraysize(iref if iref else var, res=kwargs['result']))
+    ops.extend(_llop2mu_getarraysize(iref, res=kwargs['res']))
     return ops
 

@@ -53,7 +53,7 @@ class MuOperation(object):
         cls = self.__class__
         self.opname = cls.__name__
 
-        if 'result' not in kwargs:
+        if 'result' not in kwargs or kwargs['result'] is None:
             res = Variable('rtn')
             res.mu_type = cls.__dict__['_fnc_rtntype'](args)
             res.mu_name = MuName(res.name, args[0].mu_name.scope)
@@ -222,12 +222,12 @@ GETIREF = _newop("GETIREF", "opnd",
                  lambda op: "<%s> %s" % (op.opnd.mu_type.mu_name, op.opnd.mu_name))
 
 GETFIELDIREF = _newop("GETFIELDIREF", "opnd idx",
-                      lambda (opnd, idx): opnd.mu_type.__class__(opnd[idx]),
+                      lambda (opnd, idx): opnd.mu_type.__class__(opnd.mu_type.TO[idx]),
                       lambda op: "%s <%s %d> %s" % ("PTR" if isinstance(op.opnd.mu_type, MuUPtr) else "",
                                                     op.opnd.mu_type.TO.mu_name, op.idx, op.opnd.mu_name))
 
 GETELEMIREF = _newop("GETELEMIREF", "opnd idx",
-                     lambda (opnd, idx): opnd.mu_type.__class__(opnd[idx]),
+                     lambda (opnd, idx): opnd.mu_type.__class__(opnd.mu_type.TO[idx]),
                      lambda op: "%s <%s %s> %s %s" % ("PTR" if isinstance(op.opnd.mu_type, MuUPtr) else "",
                                                    op.opnd.mu_type.TO.mu_name, op.idx.mu_type.mu_name,
                                                    op.opnd.mu_name, op.idx.mu_name))

@@ -188,3 +188,12 @@ def test_ll2muop_2():
 
     muops = ll2mu_op(op)
     assert map(lambda op: op.opname, muops) == ['GETIREF', 'GETVARPARTIREF', 'SHIFTIREF', 'LOAD']
+
+    opgen = _search_op(g, 'getinteriorarraysize')
+    op = opgen.next()
+    # len1_0 = getinteriorarraysize(v80, ('chars'))
+
+    op.result = typer.proc_arg(op.result, g.startblock)
+    typer.proc_arglist(op.args, g.startblock)
+    muops = ll2mu_op(op)
+    assert map(lambda op: op.opname, muops) == ['GETIREF', 'GETFIELDIREF', 'LOAD']
