@@ -222,12 +222,12 @@ GETIREF = _newop("GETIREF", "opnd",
                  lambda op: "<%s> %s" % (op.opnd.mu_type.mu_name, op.opnd.mu_name))
 
 GETFIELDIREF = _newop("GETFIELDIREF", "opnd idx",
-                      lambda (opnd, idx): opnd.__class__(opnd[idx]),
+                      lambda (opnd, idx): opnd.mu_type.__class__(opnd[idx]),
                       lambda op: "%s <%s %d> %s" % ("PTR" if isinstance(op.opnd.mu_type, MuUPtr) else "",
                                                     op.opnd.mu_type.TO.mu_name, op.idx, op.opnd.mu_name))
 
 GETELEMIREF = _newop("GETELEMIREF", "opnd idx",
-                     lambda (opnd, idx): opnd.__class__(opnd[idx]),
+                     lambda (opnd, idx): opnd.mu_type.__class__(opnd[idx]),
                      lambda op: "%s <%s %s> %s %s" % ("PTR" if isinstance(op.opnd.mu_type, MuUPtr) else "",
                                                    op.opnd.mu_type.TO.mu_name, op.idx.mu_type.mu_name,
                                                    op.opnd.mu_name, op.idx.mu_name))
@@ -239,7 +239,7 @@ SHIFTIREF = _newop("SHIFTIREF", "opnd offset",
                                                     op.opnd.mu_name, op.offset.mu_name))
 
 GETVARPARTIREF = _newop("GETVARPARTIREF", "opnd",
-                        lambda (opnd, ): opnd.mu_type[-1],
+                        lambda (opnd, ): opnd.mu_type.__class__(opnd.mu_type.TO[-1]),
                         lambda op: "%s <%s> %s" % ("PTR" if isinstance(op.opnd.mu_type, MuUPtr) else "",
                                                    op.opnd.mu_type.TO.mu_name, op.opnd.mu_name))
 

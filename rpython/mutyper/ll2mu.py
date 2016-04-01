@@ -392,18 +392,21 @@ def _llop2mu_malloc_varsize(T, n, flavor, res=None, llopname='malloc_varsize'):
     return [muops.NEWHYBRID(T.value, n, result=res)]
 
 
-def __getfieldiref(var, cnst_fldname):
+def __getfieldiref(var, fld):
     ops = _MuOpList()
-    iref = ops.append(muops.GETIREF(var)) if isinstance(var.mu_type, mutype.MuRef) else var
-    stt_t = iref.mu_type.TO
-    idx = stt_t._index_of(cnst_fldname.value)
-    iref_fld = ops.append(muops.GETFIELDIREF(iref, idx))
+    iref = var if isinstance(var.mu_type, mutype.MuIRef) else ops.append(muops.GETIREF(var))
+    mu_t = iref.mu_type.TO
+    if isinstance(mu_t, mutype.MuHybrid) and fld == mu_t._varfld:
+        iref_fld = ops.append(muops.GETVARPARTIREF(iref))
+    else:
+        idx = mu_t._index_of(fld)
+        iref_fld = ops.append(muops.GETFIELDIREF(iref, idx))
     return iref_fld, ops
 
 
 def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
     iref_fld, ops = __getfieldiref(var, cnst_fldname)
-    ops.append(muops.LOAD(iref_fld, res))
+    ops.append(muops.LOAD(iref_fld, result=res))
     return ops
 
 
@@ -414,16 +417,14 @@ def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
 
 
 def __getarrayitemiref(var, idx):
-    ops = _MuOpList()
-    iref = ops.append(muops.GETIREF(var)) if isinstance(var.mu_type, mutype.MuRef) else var
-    iref_var = ops.append(muops.GETVARPARTIREF(iref))
+    iref_var, ops = __getfieldiref(var, var.mu_type.TO._varfld)
     iref_itm = ops.append(muops.SHIFTIREF(iref_var, idx))
     return iref_itm, ops
 
 
 def _llop2mu_getarrayitem(var, idx, res=None, llopname='getarrayitem'):
     iref_itm, ops = __getarrayitemiref(var, idx)
-    ops.append(muops.LOAD(iref_itm, res))
+    ops.append(muops.LOAD(iref_itm, result=res))
     return ops
 
 
@@ -434,36 +435,30 @@ def _llop2mu_setarrayitem(var, idx, val, res=None, llopname='setarrayitem'):
 
 
 def _llop2mu_getarraysize(var, res=None, llopname='getarraysize'):
-    ops = _MuOpList()
-    iref = ops.append(muops.GETIREF(var)) if isinstance(var.mu_type, mutype.MuRef) else var
-    hyb_t = iref.mu_type.TO
-    assert 'length' in hyb_t._flds
-    idx = hyb_t._index_of('length')     # assuming that every Hybrid type has a length field
-    iref_fld = ops.append(muops.GETFIELDIREF(iref, idx))
-    ops.append(muops.LOAD(iref_fld, res))
+    iref_fld, ops = __getfieldiref(var, 'length')   # assuming that every Hybrid type has a length field
+    ops.append(muops.LOAD(iref_fld, result=res))
     return ops
 
 
 def __getinterioriref(var, offsets):
     ops = _MuOpList()
-    iref = ops.append(muops.GETIREF(var)) if isinstance(var.mu_type, mutype.MuRef) else var
+    iref = var if isinstance(var.mu_type, mutype.MuIRef) else ops.append(muops.GETIREF(var))
     for o in offsets:
         if o.concretetype == lltype.Void:
             assert isinstance(o.value, str)
-            iref, subops = __getfieldiref(iref, o)
+            iref, subops = __getfieldiref(iref, o.value)
+            ops.extend(subops)
         else:
             assert isinstance(o.concretetype, lltype.Primitive)
-            hyb_t = iref.mu_type.TO
-            assert isinstance(hyb_t, mutype.MuHybrid)
-            iref, subops = __getarrayitemiref(iref, o)
-        ops.extend(subops)
+            iref = ops.append(muops.SHIFTIREF(iref, o))
+
     return iref, ops
 
 
 def _llop2mu_getinteriorfield(var, *offsets, **kwargs):
     iref, ops = __getinterioriref(var, offsets)
     res = kwargs['result'] if 'result' in kwargs else None
-    ops.append(muops.LOAD(iref, res))
+    ops.append(muops.LOAD(iref, result=res))
     return ops
 
 

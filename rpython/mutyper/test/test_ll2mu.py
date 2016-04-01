@@ -180,10 +180,11 @@ def test_ll2muop_2():
     _, _, g = gengraph(f, [str])
     opgen = _search_op(g, 'getinteriorfield')
     op = opgen.next()
+    # v79 = getinteriorfield(s_0, ('chars'), (0))
 
     typer = MuTyper()
     op.result = typer.proc_arg(op.result, g.startblock)
     typer.proc_arglist(op.args, g.startblock)
 
     muops = ll2mu_op(op)
-    assert map(lambda op: op.opname, muops) == ['GETIREF']
+    assert map(lambda op: op.opname, muops) == ['GETIREF', 'GETVARPARTIREF', 'SHIFTIREF', 'LOAD']
