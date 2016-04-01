@@ -255,6 +255,12 @@ class _MuOpList(list):
 
 
 # ----------------
+# exception transform ops
+def _llop2mu_mu_throw(exc, res=None, llopname='mu_throw'):
+    return [muops.THROW(exc)]
+
+
+# ----------------
 # call ops
 def _llop2mu_direct_call(cst_fnc, *args, **kwargs):
     g = cst_fnc.value.graph

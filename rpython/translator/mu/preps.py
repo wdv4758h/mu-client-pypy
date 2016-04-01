@@ -63,20 +63,20 @@ def prepare(graphs, entry_graph):
     graphs = chop(graphs, entry_graph)
     log.graphchop("%d -> %d graphs" % (n0, len(graphs)))
 
+    name_dic = {}   # {str: ([FunctionGraph], int)}
     # Assign names
     for g in graphs:
         # Generate name
         name = g.name if '.' in g.name else g.name.split('__')[0]
-        line_no = g.startline
-        g.muname = MuName("%s_%s" % (line_no, name))
-
-        # TODO: g.musig = MuFuncSig(...)
-
-        for idx, blk in enumerate(list(g.iterblocks())):
-            blk.muname = MuName("blk%d" % idx, g)
-            for var in blk.getvariables():
-                var.muname = MuName(var.name, blk)
-            for cst in blk.getconstants():
-                cst.muname = MuName("cst", blk)
+        if name not in name_dic:
+            ctr = 0
+            name_dic[name] = ([g], ctr)
+        else:
+            gs, ctr = name_dic[name]
+            if g not in gs:
+                gs.append(g)
+                ctr += 1
+                name_dic[name] = (gs, ctr)
+        g.name = "%s_%d" % (name, ctr)
 
     return graphs

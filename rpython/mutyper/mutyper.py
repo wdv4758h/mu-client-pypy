@@ -41,6 +41,8 @@ class MuTyper:
     def specialise_block(self, blk):
         muops = []
         self.proc_arglist(blk.inputargs, blk)
+        if blk.mu_excparam:
+            self.proc_arg(blk.mu_excparam, blk)
 
         for op in blk.operations:
             # set up -- process the result and the arguments
@@ -51,6 +53,13 @@ class MuTyper:
                 muops += ll2mu_op(op)
             except NotImplementedError:
                 log.warning("Ignoring '%s'." % op)
+
+            # process the potential exception clause
+            exc = getattr(op, 'mu_exc', None)
+            if exc:
+                self.proc_arglist(exc.nor.args, blk)
+                self.proc_arglist(exc.exc.args, blk)
+                muops[-1].exc = exc
         blk.operations = tuple(muops)
 
     def proc_arglist(self, args, blk):
