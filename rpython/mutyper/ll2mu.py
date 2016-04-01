@@ -479,3 +479,26 @@ def _llop2mu_getinteriorarraysize(var, *offsets, **kwargs):
     ops.extend(_llop2mu_getarraysize(iref, res=kwargs['res']))
     return ops
 
+
+def _llop2mu_cast_pointer(cst_TYPE, var_ptr, res=None, llopname='cast_pointer'):
+    return [muops.REFCAST(var_ptr, res.mu_typem if res else ll2mu_ty(cst_TYPE.value), result=res)]
+
+
+def _llop2mu_ptr_eq(ptr1, ptr2, res=None, llopname='ptr_eq'):
+    return [muops.EQ(ptr1, ptr2, result=res)]
+
+
+def _llop2mu_ptr_ne(ptr1, ptr2, res=None, llopname='ptr_eq'):
+    return [muops.NE(ptr1, ptr2, result=res)]
+
+
+def _llop2mu_ptr_nonzero(ptr, res=None, llopname='ptr_nonzero'):
+    cst = Constant(mutype.NULL)
+    cst.mu_type = ptr.mu_type
+    return _llop2mu_ptr_ne(ptr, cst, res)
+
+
+def _llop2mu_ptr_zero(ptr, res=None, llopname='ptr_zero'):
+    cst = Constant(mutype.NULL)
+    cst.mu_type = ptr.mu_type
+    return _llop2mu_ptr_eq(ptr, cst, res)
