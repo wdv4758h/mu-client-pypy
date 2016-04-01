@@ -255,7 +255,24 @@ class _MuOpList(list):
 
 
 # ----------------
+# call ops
+def _llop2mu_direct_call(cst_fnc, *args, **kwargs):
+    g = cst_fnc.value.graph
+    res = kwargs['res'] if 'res' in kwargs else None
+    return [muops.CALL(g, args, result=res)]
+
+
+def _llop2mu_indirect_call(var_callee, *args, **kwargs):
+    res = kwargs['res'] if 'res' in kwargs else None
+    return [muops.CALL(var_callee, args[:-1], result=res)]
+
+
+# ----------------
 # primitive ops
+def _llop2mu_bool_not(x, res=None, llopname='bool_not'):
+    return [muops.XOR(x, _newprimconst(x.mu_type, 1), result=res)]
+
+
 def _llop2mu_int_is_true(x, res=None, llopname='int_is_true'):
     return [muops.NE(x, _newprimconst(x.mu_type, 0), result=res)]
 

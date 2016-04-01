@@ -43,6 +43,6 @@ def test_argtransform():
     assert g.startblock.mu_name == MuName("blk0", g)
     blk = g.startblock.exits[0].target
     op = blk.operations[1]  # v41 = direct_call((<* fn fac>), v40)
-    assert isinstance(op.args[0].value, mut._mufuncref)
+    assert op.callee == g
     assert op.result.mu_name == MuName(op.result.name, blk)
     assert op.result.mu_type == mut.int64_t

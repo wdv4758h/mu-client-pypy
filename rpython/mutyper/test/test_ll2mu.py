@@ -154,6 +154,16 @@ def test_ll2muop_1():
     assert muop.op2 == op.args[1]
     assert muop.result == op.result
 
+    op = g.startblock.operations[0]
+    assert op.opname == 'direct_call'
+    graph = op.args[0].value._obj.graph
+    op.result = typer.proc_arg(op.result, g.startblock)
+    typer.proc_arglist(op.args, g.startblock)
+
+    muop = ll2mu_op(op)[0]
+    assert muop.opname == 'CALL'
+    assert muop.callee == graph
+
 
 def _search_op(g, opname, searched=list()):
     searched.append(g)
