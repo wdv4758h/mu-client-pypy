@@ -26,7 +26,7 @@ class MuTyper:
         g.mu_name = MuName(g.name)
         get_arg_types = lambda lst: map(ll2mu_ty, map(lambda arg: arg.concretetype, lst))
         g.mu_type = mut.MuFuncRef(mut.MuFuncSig(get_arg_types(g.startblock.inputargs),
-                                                get_arg_types(g.returnblock.inputargs[0].concretetype)))
+                                                get_arg_types(g.returnblock.inputargs)))
         for blk in g.iterblocks():
             self.specialise_block(blk)
 
@@ -79,12 +79,13 @@ class MuTyper:
                 ldgcell = Variable('ld' + gcell.mu_name._name)
                 self.ldgcells[gcell] = ldgcell
                 return ldgcell
-            elif isinstance(arg.value, llt.LowLevelType):
-                arg.value = ll2mu_ty(arg.value)
-            elif not isinstance(arg.value, str):
-                arg.value = ll2mu_val(arg.value, arg.concretetype)
-                if not isinstance(arg.value, mut._mufuncref):
-                    self.gblcnsts.add(arg)
+            elif not isinstance(arg.value, mutype._muobject):
+                if isinstance(arg.value, llt.LowLevelType):
+                    arg.value = ll2mu_ty(arg.value)
+                elif not isinstance(arg.value, (str, dict)):
+                    arg.value = ll2mu_val(arg.value, arg.concretetype)
+                    if not isinstance(arg.value, mut._mufuncref):
+                        self.gblcnsts.add(arg)
         else:
             arg.mu_name = MuName(arg.name, blk)
 

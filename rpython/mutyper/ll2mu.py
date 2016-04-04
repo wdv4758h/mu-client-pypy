@@ -96,7 +96,7 @@ def _lltype2mu_varstt(llt):
 
 
 def _lltype2mu_arr(llt):
-    return mutype.MuHybrid("%s" % llt.OF._name, ('length', mutype.int64_t), ('items', ll2mu_ty(llt.OF)))
+    return mutype.MuHybrid("%s" % llt.OF.__name__, ('length', mutype.int64_t), ('items', ll2mu_ty(llt.OF)))
 
 
 def _lltype2mu_ptr(llt):
@@ -125,6 +125,12 @@ def ll2mu_val(llv, llt=None):
         if not isinstance(llt, lltype.Primitive):
             raise TypeError("Wrong type information '%r' for specialising %r" % (llt, llv))
         return _llval2mu_prim(llv, llt)
+
+    elif isinstance(llv, CDefinedIntSymbolic):
+        return _llval2mu_prim(llv.default, llt)
+
+    elif isinstance(llv, TotalOrderSymbolic):
+        return _llval2mu_prim(llv.compute_fn(), llt)
 
     elif isinstance(llv, lltype._fixedsizearray):
         return _llval2mu_arrfix(llv)
@@ -428,14 +434,14 @@ def __getfieldiref(var, fld):
 
 
 def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
-    iref_fld, ops = __getfieldiref(var, cnst_fldname)
+    iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
     ops.append(muops.LOAD(iref_fld, result=res))
     return ops
 
 
 def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
-    iref_fld, ops = __getfieldiref(var, cnst_fldname)
-    ops.append(muops.STORE(iref_fld, val, res))
+    iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
+    ops.append(muops.STORE(iref_fld, val))
     return ops
 
 
