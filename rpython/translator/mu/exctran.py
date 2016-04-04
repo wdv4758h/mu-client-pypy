@@ -225,8 +225,7 @@ class ExceptionTransformer(object):
             lnks = blk.exits
             blk_catch, excdataptr = create_catch_block()
             blk.exits = (lnks[0], self.create_link(blk, blk_catch, []))  # Replace the output link
-            blk.raising_op.mu_exc = EXCEPT(DEST(lnks[0].target, lnks[0].args),
-                                           DEST(blk_catch, blk.exits[1].args))
+            blk.raising_op.mu_exc = EXCEPT(DEST.from_link(lnks[0]), DEST.from_link(blk.exits[1]))
             chain = self.create_compare_blocks(lnks[1:])
             blk_catch.exits = (self.create_link(blk_catch, chain,
                                                 [excdataptr, self.wrap_llexitcase(lnks[1].llexitcase)]), )
@@ -241,6 +240,7 @@ class ExceptionTransformer(object):
                 blk_catch.exits = (l, )
                 l.prevblock = blk_catch
                 blk.exits = (blk.exits[0], self.create_link(blk, blk_catch, []))
+                blk.raising_op.mu_exc = EXCEPT(DEST.from_link(blk.exits[0]), DEST.from_link(blk.exits[1]))
 
                 # process args
                 if l.args[0] is self.magicc_excdata:
@@ -260,9 +260,9 @@ class ExceptionTransformer(object):
                 # (which I'm not sure why it's not converted into a call).
                 blk_catch = blk.exits[1].target
                 excobjptr = Variable("excobjptr")
-                excobjptr.concretetype = None
-                blk_catch.operations = list(blk_catch.operations)
-                blk_catch.operations.append(SpaceOperation('mu_landingpad', [], excobjptr))
+                excobjptr.concretetype = lltype.Ptr(lltype.OpaqueType('_Void'))
+                blk_catch.mu_excparam = excobjptr
+                blk.raising_op.mu_exc = EXCEPT(DEST.from_link(blk.exits[0]), DEST.from_link(blk.exits[1]))
 
     def create_compare_blocks(self, lnks):
         """

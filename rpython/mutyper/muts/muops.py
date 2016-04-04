@@ -13,6 +13,10 @@ class DEST:
         self.blk = blk
         self.args = args
 
+    @staticmethod
+    def from_link(lnk):
+        return DEST(lnk.target, lnk.args)
+
     def __str__(self):
         return "%s(%s)" % (self.blk.mu_name, ' '.join([str(arg.mu_name) for arg in self.args]))
 

@@ -54,4 +54,15 @@ def test_exctran_gcbench():
     exctran = ExceptionTransformer(t)
     exctran.exctran(g)
 
-    # TODO: rest of the test.
+    excblk = g.startblock.exits[0].target
+    assert hasattr(excblk.raising_op, 'mu_exc')
+    exc = excblk.raising_op.mu_exc
+
+    norlnk = excblk.exits[0]
+    assert exc.nor.blk is norlnk.target
+    assert exc.nor.args is norlnk.args
+
+    exclnk = excblk.exits[1]
+    assert exc.exc.blk is exclnk.target
+    assert exc.exc.args is exclnk.args
+    assert isinstance(exclnk.target.mu_excparam, Variable)
