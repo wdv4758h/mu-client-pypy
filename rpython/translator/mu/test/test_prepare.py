@@ -19,3 +19,14 @@ def test_graph_rename():
 
     names = map(lambda g: g.name, graphs)
     assert 'add_0' in names and 'add_1' in names
+
+
+def test_remove_None_return():
+    def f(x):
+        print(x + 1)
+
+    t, _, graph = gengraph(f, [int])
+    print_graph(graph)
+    graphs = prepare(t.graphs, graph)
+    assert graph.returnblock.inputargs == []
+    assert graph.startblock.exits[0].args == []

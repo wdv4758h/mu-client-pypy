@@ -24,8 +24,9 @@ class MuTyper:
 
     def specialise(self, g):
         g.mu_name = MuName(g.name)
-        g.mu_type = mut.MuFuncRef(mut.MuFuncSig([ll2mu_ty(arg.concretetype) for arg in g.startblock.inputargs],
-                                                [ll2mu_ty(g.returnblock.inputargs[0].concretetype)]))
+        get_arg_types = lambda lst: map(ll2mu_ty, map(lambda arg: arg.concretetype, lst))
+        g.mu_type = mut.MuFuncRef(mut.MuFuncSig(get_arg_types(g.startblock.inputargs),
+                                                get_arg_types(g.returnblock.inputargs[0].concretetype)))
         for blk in g.iterblocks():
             self.specialise_block(blk)
 

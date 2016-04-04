@@ -3,6 +3,7 @@ Preparations before the MuTyper process
 """
 import py
 from rpython.mutyper.muts.muentity import MuName
+from rpython.rtyper.lltypesystem.lltype import Void
 from rpython.tool.ansi_print import ansi_log
 
 log = py.log.Producer("preps")
@@ -64,9 +65,9 @@ def prepare(graphs, entry_graph):
     log.graphchop("%d -> %d graphs" % (n0, len(graphs)))
 
     name_dic = {}   # {str: ([FunctionGraph], int)}
-    # Assign names
+
     for g in graphs:
-        # Generate name
+        # Assign names
         name = g.name if '.' in g.name else g.name.split('__')[0]
         if name not in name_dic:
             ctr = 0
@@ -79,4 +80,11 @@ def prepare(graphs, entry_graph):
                 name_dic[name] = (gs, ctr)
         g.name = "%s_%d" % (name, ctr)
 
+        # Remove the Void inputarg in return block and (None) constants in links.
+        if g.returnblock.inputargs[0].concretetype == Void:
+            g.returnblock.inputargs = []
+            for blk in g.iterblocks():
+                for lnk in blk.exits:
+                    if lnk.target is g.returnblock:
+                        lnk.args = []
     return graphs
