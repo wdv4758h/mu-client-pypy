@@ -27,6 +27,7 @@ class FunctionGraph(object):
 
         self.mu_name = None
         self.mu_type = None
+        self.mu_version = None
 
     def getargs(self):
         return self.startblock.inputargs

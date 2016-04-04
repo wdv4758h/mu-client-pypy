@@ -1,7 +1,8 @@
 """
 Converts the LLTS types and operations to MuTS.
 """
-from rpython.flowspace.model import FunctionGraph, Block, Link, Variable, Constant
+from rpython.flowspace.model import FunctionGraph, Block, Link, Variable, Constant, c_last_exception
+from rpython.mutyper.muts.muops import DEST
 from .muts.muentity import *
 from rpython.rtyper.lltypesystem import lltype as llt
 from .muts import mutype as mut
@@ -27,6 +28,10 @@ class MuTyper:
         get_arg_types = lambda lst: map(ll2mu_ty, map(lambda arg: arg.concretetype, lst))
         g.mu_type = mut.MuFuncRef(mut.MuFuncSig(get_arg_types(g.startblock.inputargs),
                                                 get_arg_types(g.returnblock.inputargs)))
+        ver = Variable('_ver')
+        ver.mu_name = MuName(ver.name, g)
+        g.mu_version = ver
+
         for blk in g.iterblocks():
             self.specialise_block(blk)
 
@@ -34,6 +39,7 @@ class MuTyper:
         if blk:
             blk.inputargs = g.startblock.inputargs
             blk.exits = (Link(g.startblock.inputargs, g.startblock), )
+            blk.operations += (muop.BRANCH(DEST.from_link(blk.exits[0])),)
             g.startblock = blk
 
         for idx, blk in enumerate(g.iterblocks()):
@@ -61,6 +67,18 @@ class MuTyper:
                 self.proc_arglist(exc.nor.args, blk)
                 self.proc_arglist(exc.exc.args, blk)
                 muops[-1].exc = exc
+
+        # Exits
+        for e in blk.exits:
+            self.proc_arglist(e.args, blk)
+        if blk.exitswitch is not c_last_exception:
+            if len(blk.exits) == 0:
+                muops.append(muop.RET(blk.inputargs[0] if len(blk.inputargs) == 1 else None))
+            elif len(blk.exits) == 1:
+                muops.append(muop.BRANCH(DEST.from_link(blk.exits[0])))
+            elif len(blk.exits) == 2:
+                blk.exitswitch = self.proc_arg(blk.exitswitch, blk)
+                muops.append(muop.BRANCH2(blk.exitswitch, DEST.from_link(blk.exits[0]), DEST.from_link(blk.exits[1])))
         blk.operations = tuple(muops)
 
     def proc_arglist(self, args, blk):
@@ -76,7 +94,10 @@ class MuTyper:
                 gcell.value = ll2mu_val(arg.value)
 
                 # A loaded gcell variable, ie. ldgcell = LOAD gcell
-                ldgcell = Variable('ld' + gcell.mu_name._name)
+                ldgcell = Variable('ld' + MuGlobalCell.prefix + arg.mu_type.mu_name._name)
+                ldgcell.mu_type = arg.mu_type
+                ldgcell.mu_name = MuName(ldgcell.name, blk)
+                gcell.mu_name = MuName(ldgcell.name[2:])
                 self.ldgcells[gcell] = ldgcell
                 return ldgcell
             elif not isinstance(arg.value, mutype._muobject):
@@ -84,8 +105,9 @@ class MuTyper:
                     arg.value = ll2mu_ty(arg.value)
                 elif not isinstance(arg.value, (str, dict)):
                     arg.value = ll2mu_val(arg.value, arg.concretetype)
-                    if not isinstance(arg.value, mut._mufuncref):
+                    if not isinstance(arg.value, mutype._mufuncref):
                         self.gblcnsts.add(arg)
+                        arg.mu_name = MuName(str(arg.value))
         else:
             arg.mu_name = MuName(arg.name, blk)
 

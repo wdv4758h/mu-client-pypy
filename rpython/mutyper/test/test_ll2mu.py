@@ -1,4 +1,5 @@
 from rpython.mutyper.mutyper import MuTyper
+from rpython.translator.mu.preps import prepare
 from ..ll2mu import ll2mu_ty, ll2mu_val, ll2mu_op
 from rpython.rtyper.lltypesystem import lltype as ll
 from rpython.mutyper.muts import mutype as mu
@@ -207,3 +208,18 @@ def test_ll2muop_2():
     typer.proc_arglist(op.args, g.startblock)
     muops = ll2mu_op(op)
     assert map(lambda op: op.opname, muops) == ['GETIREF', 'GETFIELDIREF', 'LOAD']
+
+
+def test_crush():
+    def main(argv):
+        return int(argv[0]) * 10
+
+    t, _, g = gengraph(main, [[str]], backendopt=True)
+
+    t.graphs = prepare(t.graphs, g)
+    graph = g.startblock.operations[-2].args[0].value._obj.graph
+
+    cst = graph.startblock.exits[0].args[0]
+    v = cst.value._obj.rtti
+    print v, v._TYPE
+    ll2mu_val(v)

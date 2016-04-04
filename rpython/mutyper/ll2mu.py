@@ -78,7 +78,12 @@ def _lltype2mu_stt(llt):
     except KeyError:
         stt = mutype.MuStruct(llt._name)
         _sttcache[llt] = stt
-        stt._setfields([(n, ll2mu_ty(llt._flds[n])) for n in llt._names])
+        lst = []
+        for n, t in llt._flds.items():
+            t_mu = ll2mu_ty(t)
+            if not (t_mu is mutype.void_t or (isinstance(t_mu, mutype.MuRef) and t_mu.TO is mutype.void_t)):
+                lst.append((n, t_mu))
+        stt._setfields(lst)
         return stt
 
 
@@ -174,7 +179,7 @@ def _llval2mu_stt(llv):
 
     mut = ll2mu_ty(llv._TYPE)
     stt = mutype._mustruct(mut)
-    for fld in llv._TYPE._names:
+    for fld in mut._names:
         setattr(stt, fld, ll2mu_val(getattr(llv, fld), getattr(llv._TYPE, fld)))
 
     return stt

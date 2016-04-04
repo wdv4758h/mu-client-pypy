@@ -3,7 +3,8 @@ Preparations before the MuTyper process
 """
 import py
 from rpython.mutyper.muts.muentity import MuName
-from rpython.rtyper.lltypesystem.lltype import Void
+from rpython.rtyper.lltypesystem.lltype import Void, LowLevelType
+from rpython.flowspace.model import Constant
 from rpython.tool.ansi_print import ansi_log
 
 log = py.log.Producer("preps")
@@ -79,6 +80,15 @@ def prepare(graphs, entry_graph):
                 ctr += 1
                 name_dic[name] = (gs, ctr)
         g.name = "%s_%d" % (name, ctr)
+
+        def _keep_arg(arg):
+            # Returns True if the argument/parameter is to be kept
+            return arg.concretetype != Void or \
+                   (isinstance(arg, Constant) and (isinstance(arg.value, (str, LowLevelType))))
+            # (isinstance(arg.value, str) or arg.value is None))
+
+        for _, op in g.iterblockops():
+            op.args = [arg for arg in op.args if _keep_arg(arg)]
 
         # Remove the Void inputarg in return block and (None) constants in links.
         if g.returnblock.inputargs[0].concretetype == Void:

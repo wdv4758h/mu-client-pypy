@@ -243,3 +243,4 @@ def test_memalloc():
         new(H)
     rh = newhybrid(H, int64_t(10))
     assert rh._getiref().chars._obj == int8_t(0)
+

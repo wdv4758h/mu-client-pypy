@@ -543,6 +543,9 @@ class MuArray(MuContainerType):
             return "array<%s %d>" % (self.OF._mu_constructor_expanded, self.length)
         return saferecursive(_inner, "...")()
 
+    def _allocate(self, initialization=None, parent=None, parentindex=None):
+        return _muarray(self, parent, parentindex)
+
 
 class _mumemarray(_muparentable):
     def __init__(self, OF, n, parent=None, parentindex=None):
@@ -715,6 +718,9 @@ class MuFuncRef(MuRefType):
             return "%s<%s>" % (self.__class__.type_constr_name, self.Sig._mu_constructor_expanded)
         return saferecursive(_inner, "...")()
 
+    def _allocate(self, initialization=None, parent=None, parentindex=None):
+        return _mufuncref(self)
+
 
 class _mufuncref(_mugenref):
     # TODO: This needs to be reviewed.
@@ -752,6 +758,9 @@ class MuRef(MuRefType):
         def _inner():
             return "%s<%s>" % (self.__class__.type_constr_name, self.TO._mu_constructor_expanded)
         return saferecursive(_inner, "...")()
+
+    def _allocate(self, initialization=None, parent=None, parentindex=None):
+        return _muref(self, None)
 
 
 class _muref(_mugenref, _mucontainer):

@@ -60,7 +60,8 @@ class MuOperation(object):
         if 'result' not in kwargs or kwargs['result'] is None:
             res = Variable('rtn')
             res.mu_type = cls.__dict__['_fnc_rtntype'](args)
-            res.mu_name = MuName(res.name, args[0].mu_name.scope)
+            if res.mu_type is not void_t:
+                res.mu_name = MuName(res.name, args[0].mu_name.scope)
             kwargs['result'] = res
 
         if 'exc' not in kwargs:
@@ -155,11 +156,11 @@ SELECT = _newop("SELECT", "cond ifTrue ifFalse",
 # Intra-function Control Flow
 BRANCH = _newop("BRANCH", "dest",
                 lambda args: void_t,
-                lambda op: "%s %s" % (op.__class__.__name__, op.dest))
+                lambda op: "%s" % op.dest)
 
 BRANCH2 = _newop("BRANCH2", "cond ifTrue ifFalse",
                  lambda args: void_t,
-                 lambda op: "%s %s %s %s" % (op.__class__.__name__, op.cond.mu_name, op.ifTrue, op.ifFalse))
+                 lambda op: "%s %s %s" % (op.cond.mu_name, op.ifTrue, op.ifFalse))
 
 SWITCH = _newop("SWITCH", "opnd default cases",
                 lambda args: void_t,
@@ -180,18 +181,17 @@ CALL = _newop("CALL", "callee args",
 
 TAILCALL = _newop("TAILCALL", "callee args",
                   lambda args: void_t,
-                  lambda op: "%s <%s> (%s) %s %s" % (op.__class__.__name__,
-                                                     op.callee.mu_type.Sig.mu_name,
+                  lambda op: "<%s> (%s) %s %s" % (op.callee.mu_type.Sig.mu_name,
                                                      ' '.join([str(arg.mu_name) for arg in op.args]),
                                                      op.exc, op.ka))
 
 RET = _newop("RET", "rv",
              lambda args: void_t,
-             lambda op: "%s (%s)" % (op.__class__.__name__, op.rv.mu_name))
+             lambda op: "(%s)" % (op.rv.mu_name if op.rv else ''))
 
 THROW = _newop("THROW", "exc",
                lambda args: void_t,
-               lambda op: "%s %s" % (op.__class__.__name__, op.exc))
+               lambda op: "%s" % op.exc)
 
 
 # ----------------------------------------------------------------
@@ -256,13 +256,15 @@ GETVARPARTIREF = _newop("GETVARPARTIREF", "opnd",
 # NOTE: memory order is not implemented.
 LOAD = _newop("LOAD", "loc",
               lambda (loc, ): loc.mu_type.TO,
-              lambda op: "%s <%s> %s %s" % ("PTR" if isinstance(op.opnd.mu_type, MuUPtr) else "",
-                                            op.result.mu_type.mu_name, op.loc.mu_name, op.exc))
+              lambda op: "%s <%s> %s %s" % ("PTR" if isinstance(op.loc.mu_type, MuUPtr) else "",
+                                            op.result.mu_type.mu_name, op.loc.mu_name,
+                                            op.exc if hasattr(op, 'exc') else ''))
 
 STORE = _newop("STORE", "loc val",
                lambda (loc, val): void_t,
-               lambda op: "%s <%s> %s %s %s" % ("PTR" if isinstance(op.opnd.mu_type, MuUPtr) else "",
-                                                op.val.mu_type.mu_name, op.loc.mu_name, op.val.mu_name, op.exc))
+               lambda op: "%s <%s> %s %s %s" % ("PTR" if isinstance(op.loc.mu_type, MuUPtr) else "",
+                                                op.val.mu_type.mu_name, op.loc.mu_name, op.val.mu_name,
+                                                op.exc if hasattr(op, 'exc') else ''))
 
 
 # ----------------------------------------------------------------

@@ -75,3 +75,17 @@ def test_typesandconsts():
     assert len(typer.gblcnsts) == 2
     assert len(typer.ldgcells) == 0
     assert len(typer.gbltypes) == 4     # (funcref<(i64, i64)->i1>, funcref<(i64)->i64>, i64, i1)
+
+
+def test_crush():
+    def main(argv):
+        return int(argv[0]) * 10
+
+    t, _, g = gengraph(main, [[str]], backendopt=True)
+
+    from rpython.translator.mu.preps import prepare
+    t.graphs = prepare(t.graphs, g)
+
+    mutyper = MuTyper()
+    graph = g.startblock.operations[-2].args[0].value._obj.graph
+    mutyper.specialise(graph)

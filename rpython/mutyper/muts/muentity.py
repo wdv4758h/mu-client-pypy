@@ -2,7 +2,6 @@
 Definition of a general entity in Mu.
 """
 
-
 SCOPE_GLOBAL = "global"
 
 
@@ -81,6 +80,11 @@ class MuGlobalCell(MuEntity):
         MuEntity.__init__(self, MuName(name))
         self._T = mu_type
         self.value = mu_type._defl()
+
+    @property
+    def mu_type(self):
+        from rpython.mutyper.muts.mutype import MuIRef
+        return MuIRef(self._T)
 
     def __repr__(self):
         return "MuGlobalCell <%s> { %r }" % (self._T, self.value)
