@@ -790,7 +790,7 @@ class _muref(_mugenref, _mucontainer):
 
 class MuIRef(MuRef):
     type_prefix = "irf"
-    type_str_sym = "~"
+    type_str_sym = "&"
     type_constr_name = "iref"
 
 
@@ -802,7 +802,7 @@ class _muiref(_muref, _muparentable):
         _muparentable.__init__(self, parent, parentindex)
 
     def __str__(self):
-        return "~ %s" % self._obj0
+        return "& %s" % self._obj0
 
     def __nonzero__(self):
         raise RuntimeError("do not test an interior pointer for nullity")
