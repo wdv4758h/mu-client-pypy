@@ -213,6 +213,8 @@ def _llval2mu_arr(llv):
 
 
 def _llval2mu_ptr(llv):
+    if llv._obj0 is None:
+        return mutype._munullref(ll2mu_ty(llv._TYPE))
     if isinstance(llv._TYPE.TO, lltype.FuncType):
         return _llval2mu_funcptr(llv)
     mut = ll2mu_ty(llv._TYPE)

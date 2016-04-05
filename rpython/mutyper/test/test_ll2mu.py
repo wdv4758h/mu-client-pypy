@@ -53,7 +53,7 @@ def test_ll2mu_val():
     assert mu_irs.hash._obj.val == ll_ps.hash
     assert mu_irs.length._obj.val == len(string)
     for i in range(len(string)):
-        mu_irs.chars[i]._obj.val == ord(string[i])
+        assert mu_irs.chars[i]._obj.val == ord(string[i])
 
 
 def test_ll2mu_fncptr():

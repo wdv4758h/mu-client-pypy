@@ -598,7 +598,7 @@ class _mumemarray(_muparentable):
         self._iteridx = 0
         return self
 
-    def __next__(self):
+    def next(self):
         if self._iteridx >= len(self):
             raise StopIteration
         obj = self[self._iteridx]
@@ -619,7 +619,7 @@ class _muarray(_mumemarray, _mucontainer):
 # ----------------------------------------------------------
 class MuRefType(MuType):
     def _defl(self, parent=None, parentindex=None):
-        return NULL
+        return _munullref(self)
 
 
 class _mugenref(_muobject):  # value of general reference types
@@ -910,9 +910,6 @@ class _muiref(_muref, _muparentable):
 
     def _pin(self):
         return self._parent._pin()
-
-
-NULL = _mugenref(MuRef(void_t))    # NULL is a value of general reference type
 
 
 class MuUPtr(MuIRef):
