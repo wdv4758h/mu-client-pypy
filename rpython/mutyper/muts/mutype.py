@@ -630,6 +630,17 @@ class _mugenref(_muobject):  # value of general reference types
     #     raise TypeError("reference objects are not hashable")
 
 
+class _munullref(_mugenref):
+    def __init__(self, TYPE):
+        _mugenref.__init__(self, TYPE)
+
+    def __str__(self):
+        return 'NULL'
+
+    def __eq__(self, other):
+        return isinstance(other, _munullref)
+
+
 # ----------------------------------------------------------
 class MuFuncSig(MuType):
     type_prefix = "sig"
@@ -719,7 +730,7 @@ class MuFuncRef(MuRefType):
         return saferecursive(_inner, "...")()
 
     def _allocate(self, initialization=None, parent=None, parentindex=None):
-        return _mufuncref(self)
+        return _munullref(self)
 
 
 class _mufuncref(_mugenref):
@@ -760,7 +771,7 @@ class MuRef(MuRefType):
         return saferecursive(_inner, "...")()
 
     def _allocate(self, initialization=None, parent=None, parentindex=None):
-        return _muref(self, None)
+        return _munullref(self)
 
 
 class _muref(_mugenref, _mucontainer):

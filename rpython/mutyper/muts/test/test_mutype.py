@@ -162,7 +162,7 @@ def test_refs():
     assert hash(R) == hash(R2)
 
     IR = MuIRef(S)
-    assert str(IR) == "~ %s" % S
+    assert str(IR) == "& %s" % S
     assert repr(IR.mu_name) == "@irfsttCircle"
     assert IR.mu_constructor == "iref<@sttCircle>"
     assert IR._mu_constructor_expanded == "iref<%s>" % S._mu_constructor_expanded

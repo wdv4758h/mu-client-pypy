@@ -1,3 +1,4 @@
+import pytest
 from rpython.mutyper.mutyper import MuTyper
 from rpython.translator.mu.preps import prepare
 from ..ll2mu import ll2mu_ty, ll2mu_val, ll2mu_op
@@ -222,4 +223,5 @@ def test_crush():
     cst = graph.startblock.exits[0].args[0]
     v = cst.value._obj.rtti
     print v, v._TYPE
-    ll2mu_val(v)
+    with pytest.raises(NotImplementedError):
+        ll2mu_val(v)
