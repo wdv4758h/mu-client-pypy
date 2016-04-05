@@ -2100,7 +2100,11 @@ class _func(_container):
         return '<%s>' % (self,)
 
     def __str__(self):
-        return "fn %s" % self._name
+        if hasattr(self, 'graph'):
+            name = self.graph.name
+        else:
+            name = self._name
+        return "fn %s" % name
 
     def __eq__(self, other):
         return (self.__class__ is other.__class__ and

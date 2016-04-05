@@ -25,6 +25,10 @@ class FunctionGraph(object):
         self.exceptblock.exits = ()
         self.tag = None
 
+        self.mu_name = None
+        self.mu_type = None
+        self.mu_version = None
+
     def getargs(self):
         return self.startblock.inputargs
 
@@ -163,7 +167,7 @@ class Link(object):
 
 class Block(object):
     __slots__ = """inputargs operations exitswitch
-                exits blockcolor""".split()
+                exits blockcolor mu_name mu_excparam""".split()
 
     def __init__(self, inputargs):
         self.inputargs = list(inputargs)  # mixed list of variable/const XXX
@@ -262,7 +266,7 @@ class Block(object):
 
 
 class Variable(object):
-    __slots__ = ["_name", "_nr", "annotation", "concretetype"]
+    __slots__ = ["_name", "_nr", "annotation", "concretetype", "mu_name", "mu_type"]
 
     dummyname = 'v'
     namesdict = {dummyname: (dummyname, 0)}
@@ -337,7 +341,7 @@ class Variable(object):
 
 
 class Constant(Hashable):
-    __slots__ = ["concretetype"]
+    __slots__ = ["concretetype", "mu_name", "mu_type"]
 
     def __init__(self, value, concretetype=None):
         Hashable.__init__(self, value)
