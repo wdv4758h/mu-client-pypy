@@ -97,7 +97,6 @@ class MuTyper:
                 ldgcell = Variable('ld' + MuGlobalCell.prefix + arg.mu_type.mu_name._name)
                 ldgcell.mu_type = arg.mu_type
                 ldgcell.mu_name = MuName(ldgcell.name, blk)
-                gcell.mu_name = MuName(ldgcell.name[2:])
                 self.ldgcells[gcell] = ldgcell
                 return ldgcell
             elif not isinstance(arg.value, mutype._muobject):

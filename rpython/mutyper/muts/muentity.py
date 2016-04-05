@@ -74,9 +74,16 @@ class MuEntity(object):
 
 class MuGlobalCell(MuEntity):
     prefix = "gcl"
+    _name_dic = {}
 
     def __init__(self, mu_type):
         name = MuGlobalCell.prefix + mu_type.mu_name._name
+        if name in MuGlobalCell._name_dic:
+            n = MuGlobalCell._name_dic[name] + 1
+        else:
+            n = 0
+        MuGlobalCell._name_dic[name] = n
+        name = "%s_%d" % (name, n)
         MuEntity.__init__(self, MuName(name))
         self._T = mu_type
         self.value = mu_type._defl()
