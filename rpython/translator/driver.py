@@ -15,6 +15,7 @@ from rpython.rlib.entrypoint import secondary_entrypoints,\
      annotated_jit_entrypoints
 from .mu.preps import prepare
 from .mu.exctran import ExceptionTransformer
+from .mu.genmu import MuTextIRGenerator
 
 import py
 from rpython.tool.ansi_print import ansi_log
@@ -548,26 +549,23 @@ class TranslationDriver(SimpleTaskEngine):
         exctran.transform_all()
 
         bk = self.translator.annotator.bookkeeper
-        entry_graph = bk.getdesc(self.entry_point).getuniquegraph()
-        self.translator.graphs = prepare(self.translator.graphs, entry_graph)
+        self.entry_graph = bk.getdesc(self.entry_point).getuniquegraph()
+        self.translator.graphs = prepare(self.translator.graphs, self.entry_graph)
 
-        typer = MuTyper()
+        self.mutyper = MuTyper()
         for g in self.translator.graphs:
-            typer.specialise(g)
+            self.mutyper.specialise(g)
 
     @taskdef(["mutype_mu"], "MuIR Code Generation")
     def task_compile_mu(self):
-        # self.bundle = MuIRCodeBundle(self.translator.graphs, self.mutyper, self.mu_exctran)
-        # code = self.bundle.codegen()
-        #
-        # bundle = self.compute_exe_name()
-        # if bundle.ext != '.uir':
-        #     bundle += '.uir'
-        #
-        # fp = bundle.open('w')
-        # fp.write(code)
-        # fp.close()
         self.log.info("Task compile_mu")
+        target_name = self.compute_exe_name()
+        bundle_name = target_name + '.uir'
+        hail_name = target_name + '.hail'
+        with open(bundle_name, 'w') as fp_bundle:
+            with open(hail_name, 'w') as fp_hail:
+                irgen = MuTextIRGenerator(self.translator.graphs, self.mutyper, self.entry_graph)
+                irgen.codegen(fp_bundle, fp_hail)
 
     def proceed(self, goals):
         if not goals:
