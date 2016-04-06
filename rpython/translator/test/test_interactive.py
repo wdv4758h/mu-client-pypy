@@ -78,3 +78,12 @@ def test_simple_compile_c():
     dll = ctypes.CDLL(str(t.driver.c_entryp))
     f = dll.pypy_g_f
     assert f(2, 3) == 5
+
+
+def test_backend_mu():
+    def f(x, y):
+        return x, y
+
+    t = Translation(f, [int, int], backend='mu')
+    t.mutype()
+    assert 'mutype_mu' in t.driver.done

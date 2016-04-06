@@ -6,7 +6,7 @@ from rpython.tool.udir import udir
 def test_ctr():
     td = TranslationDriver()
     expected = ['annotate', 'backendopt', 'llinterpret', 'rtype', 'source',
-                'compile', 'pyjitpl']
+                'compile', 'pyjitpl', 'mutype']
     assert set(td.exposed) == set(expected)
 
     assert td.backend_select_goals(['compile_c']) == ['compile_c']
@@ -28,7 +28,7 @@ def test_ctr():
         'backendopt_lltype']
 
     expected = ['annotate', 'backendopt_lltype', 'llinterpret_lltype',
-                'rtype_lltype', 'source_c', 'compile_c', 'pyjitpl_lltype', ]
+                'rtype_lltype', 'source_c', 'compile_c', 'pyjitpl_lltype', 'mutype', 'compile_mu']
     assert set(td.exposed) == set(expected)
 
     td = TranslationDriver({'backend': None, 'type_system': 'lltype'})
@@ -42,9 +42,13 @@ def test_ctr():
         'backendopt_lltype']
 
     expected = ['annotate', 'backendopt', 'llinterpret', 'rtype', 'source_c',
-                'compile_c', 'pyjitpl']
+                'compile_c', 'pyjitpl', 'mutype', 'compile_mu']
 
     assert set(td.exposed) == set(expected)
+
+    td = TranslationDriver({'backend': 'mu'})
+    assert 'mutype' in td.exposed
+    assert td.backend_select_goals(['compile']) == ['compile_mu']
 
 
 def test_create_exe():

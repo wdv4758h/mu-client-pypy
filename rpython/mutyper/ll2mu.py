@@ -439,11 +439,11 @@ for triplet in __spec_cast_map:
 
 # ----------------
 # pointer operations
-def _llop2mu_malloc(T, flavor, res=None, llopname='malloc'):
+def _llop2mu_malloc(T, res=None, llopname='malloc'):
     return [muops.NEW(T.value, result=res)]
 
 
-def _llop2mu_malloc_varsize(T, n, flavor, res=None, llopname='malloc_varsize'):
+def _llop2mu_malloc_varsize(T, n, res=None, llopname='malloc_varsize'):
     return [muops.NEWHYBRID(T.value, n, result=res)]
 
 
