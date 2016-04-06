@@ -3,7 +3,7 @@ from rpython.rtyper.test.test_llinterp import gengraph
 from rpython.flowspace.model import FunctionGraph
 from ...ll2mu import ll2mu_ty, ll2mu_val
 from rpython.rtyper.lltypesystem.rstr import STR, malloc
-from ..mutype import int64_t, NULL
+from ..mutype import int64_t
 
 
 def test_muname():
@@ -50,7 +50,6 @@ def test_muglobalcell():
     ir.length._obj = int64_t(len(string))
 
     gcell = MuGlobalCell(mut)
-    assert repr(gcell.mu_name) == "@gclrefhybrpy_string"
-    assert gcell._obj == NULL
+    assert repr(gcell.mu_name) == "@gclrefhybrpy_string_0"
     gcell._obj = muv
     assert gcell._obj == muv

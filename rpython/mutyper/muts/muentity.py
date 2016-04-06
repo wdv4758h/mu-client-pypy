@@ -75,8 +75,16 @@ class MuEntity(object):
 class MuGlobalCell(MuEntity):
     prefix = "gcl"
     _name_dic = {}
+    _cache = {}
 
-    def __init__(self, mu_type):
+    def __new__(cls, mu_type, mu_val=None):
+        if mu_val and mu_val in MuGlobalCell._cache:
+            return MuGlobalCell._cache[mu_val]
+        obj = object.__new__(cls)
+        MuGlobalCell._cache[mu_val] = obj
+        return obj
+
+    def __init__(self, mu_type, mu_val=None):
         name = MuGlobalCell.prefix + mu_type.mu_name._name
         if name in MuGlobalCell._name_dic:
             n = MuGlobalCell._name_dic[name] + 1
@@ -86,7 +94,7 @@ class MuGlobalCell(MuEntity):
         name = "%s_%d" % (name, n)
         MuEntity.__init__(self, MuName(name))
         self._T = mu_type
-        self.value = mu_type._defl()
+        self.value = mu_val if mu_val else mu_type._defl()
 
     @property
     def mu_type(self):
@@ -107,3 +115,6 @@ class MuGlobalCell(MuEntity):
         return self.value
 
     _obj = property(_load, _store)
+
+    def __eq__(self, other):
+        return isinstance(other, MuGlobalCell) and self.mu_type == other.mu_type and self.value == other.value

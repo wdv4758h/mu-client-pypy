@@ -320,6 +320,12 @@ class _mustruct(_muparentable, _mucontainer):
     def _getattr(self, field_name):
         return getattr(self, field_name)
 
+    def __eq__(self, other):
+        return other._TYPE == self._TYPE and \
+               reduce(lambda a, b: a and b,
+                      map(lambda fld: self._getattr(fld) == other._getattr(fld), self._TYPE._names),
+                      True)
+
 
 # ----------------------------------------------------------
 class MuHybrid(MuContainerType):
@@ -455,12 +461,9 @@ class _muhybrid(_muparentable, _mucontainer):
         object.__setattr__(self, key, value)
 
     def _str_item(self, item):
-        if isinstance(self._TYPE.OF, MuStruct):
+        if isinstance(mu_typeOf(item), MuStruct):
             of = self._TYPE.OF
-            if self._TYPE._anonym_struct:
-                return "{%s}" % item._str_fields()
-            else:
-                return "%s {%s}" % (of._name, item._str_fields())
+            return "%s {%s}" % (of._name, item._str_fields())
         else:
             return repr(item)
 
@@ -483,7 +486,7 @@ class _muhybrid(_muparentable, _mucontainer):
             fields.insert(skipped_after, '(...)')
         fix_part = ', '.join(fields)
 
-        items = self._TYPE._varfld
+        items = getattr(self, self._TYPE._varfld)
         if len(items) > 20:
             items = items[:12] + items[-5:]
             skipped_at = 12
@@ -501,6 +504,12 @@ class _muhybrid(_muparentable, _mucontainer):
 
     def _getattr(self, field_name):
         return getattr(self, field_name)
+
+    def __eq__(self, other):
+        return other._TYPE == self._TYPE and \
+               reduce(lambda a, b: a and b,
+                      map(lambda fld: self._getattr(fld) == other._getattr(fld), self._TYPE._names),
+                      True)
 
 
 # ----------------------------------------------------------
@@ -598,12 +607,15 @@ class _mumemarray(_muparentable):
         self._iteridx = 0
         return self
 
-    def __next__(self):
+    def next(self):
         if self._iteridx >= len(self):
             raise StopIteration
         obj = self[self._iteridx]
         self._iteridx += 1
         return obj
+
+    def __eq__(self, other):
+        return self._OF == other._OF and self.items == other.items
 
 
 class _muarray(_mumemarray, _mucontainer):
@@ -619,7 +631,7 @@ class _muarray(_mumemarray, _mucontainer):
 # ----------------------------------------------------------
 class MuRefType(MuType):
     def _defl(self, parent=None, parentindex=None):
-        return NULL
+        return _munullref(self)
 
 
 class _mugenref(_muobject):  # value of general reference types
@@ -910,9 +922,6 @@ class _muiref(_muref, _muparentable):
 
     def _pin(self):
         return self._parent._pin()
-
-
-NULL = _mugenref(MuRef(void_t))    # NULL is a value of general reference type
 
 
 class MuUPtr(MuIRef):
