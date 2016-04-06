@@ -119,7 +119,26 @@ def _lltype2mu_funcptr(llt):
 
 
 # ----------------------------------------------------------
+__ll2muval_cache = {}
+__ll2muval_cache_ptr = {}
+
+
 def ll2mu_val(llv, llt=None):
+    if isinstance(llv, CDefinedIntSymbolic):
+        llv = llv.default
+    elif isinstance(llv, TotalOrderSymbolic):
+        llv = llv.compute_fn()
+
+    cache, v = (__ll2muval_cache_ptr, llv._obj) if isinstance(llv, lltype._ptr) else (__ll2muval_cache, llv)
+    try:
+        return cache[v]
+    except KeyError:
+        muv = _ll2mu_val(llv, llt)
+        cache[v] = muv
+        return muv
+
+
+def _ll2mu_val(llv, llt=None):
     """
     Map LLTS value types to MuTS value types
     :param llv: LLTS value

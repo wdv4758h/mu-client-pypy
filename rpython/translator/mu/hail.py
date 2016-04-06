@@ -3,6 +3,7 @@ Generate the Heap Allocation and Initialisation Language (HAIL) script
 to initialise the global cells.
 """
 from rpython.mutyper.muts import mutype
+from rpython.mutyper.muts.muentity import MuGlobalCell, MuName
 
 
 class _HAILName:
@@ -13,6 +14,7 @@ class _HAILName:
             n = _HAILName._name_dic[name] + 1
         else:
             n = 0
+        _HAILName._name_dic[name] = n
         self.name = "%s_%d" % (name, n)
 
     def __str__(self):
@@ -31,13 +33,14 @@ class HAILGenerator:
 
     def _find_refs(self, obj, gcell=None):
         if isinstance(obj, (mutype._muref, mutype._muiref)):
-            if obj not in self._refs:
-                self._refs[obj] = gcell.mu_name if gcell else _HAILName(mutype.mu_typeOf(obj).mu_name._name)
-            elif isinstance(self._refs[obj], _HAILName) and gcell:
-                self._refs[obj] = gcell.mu_name
+            refnt = obj._obj0
+            if refnt not in self._refs:
+                self._refs[refnt] = gcell.mu_name if gcell else _HAILName(mutype.mu_typeOf(obj).mu_name._name)
+            elif isinstance(self._refs[refnt], _HAILName) and gcell:
+                self._refs[refnt] = gcell.mu_name
             else:
                 return
-            self._find_refs(obj._obj0)
+            self._find_refs(refnt)
 
         elif isinstance(obj, (mutype._mustruct, mutype._muhybrid)):
             for fld in mutype.mu_typeOf(obj)._flds:
@@ -51,14 +54,14 @@ class HAILGenerator:
     def codegen(self, fp):
         # Allocate everything first
         for r, n in self._refs.items():
-            obj_t = mutype.mu_typeOf(r._obj0)
+            obj_t = mutype.mu_typeOf(r)
             if isinstance(obj_t, mutype.MuHybrid):
-                fp.write(".newhybrid %s <%s> %d\n" % (n, obj_t.mu_name, len(r._obj0._getattr(obj_t._varfld))))
+                fp.write(".newhybrid %s <%s> %d\n" % (n, obj_t.mu_name, len(r._getattr(obj_t._varfld))))
             else:
                 fp.write(".new %s <%s>\n" % (n, obj_t.mu_name))
 
         for r, n in self._refs.items():
-            fp.write(".init %s = %s\n" % (n, self._getinitstr(r._obj0)))
+            fp.write(".init %s = %s\n" % (n, self._getinitstr(r)))
 
     def _getinitstr(self, obj):
         if isinstance(obj, (mutype._muprimitive, mutype._munullref)):
@@ -71,7 +74,10 @@ class HAILGenerator:
             return "{%s}" % ' '.join([self._getinitstr(itm) for itm in obj])
 
         elif isinstance(obj, (mutype._muref, mutype._muiref)):
-            assert obj in self._refs
-            return str(self._refs[obj])
+            assert obj._obj0 in self._refs
+            name = self._refs[obj._obj0]
+            if isinstance(name, MuName) and 'gcl' in str(name):
+                return "*%s" % name
+            return str(name)
         else:
             raise TypeError("Unknown value '%s' of type '%s'." % (obj, mutype.mu_typeOf(obj)))

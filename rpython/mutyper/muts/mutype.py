@@ -320,6 +320,12 @@ class _mustruct(_muparentable, _mucontainer):
     def _getattr(self, field_name):
         return getattr(self, field_name)
 
+    def __eq__(self, other):
+        return other._TYPE == self._TYPE and \
+               reduce(lambda a, b: a and b,
+                      map(lambda fld: self._getattr(fld) == other._getattr(fld), self._TYPE._names),
+                      True)
+
 
 # ----------------------------------------------------------
 class MuHybrid(MuContainerType):
@@ -455,12 +461,9 @@ class _muhybrid(_muparentable, _mucontainer):
         object.__setattr__(self, key, value)
 
     def _str_item(self, item):
-        if isinstance(self._TYPE.OF, MuStruct):
+        if isinstance(mu_typeOf(item), MuStruct):
             of = self._TYPE.OF
-            if self._TYPE._anonym_struct:
-                return "{%s}" % item._str_fields()
-            else:
-                return "%s {%s}" % (of._name, item._str_fields())
+            return "%s {%s}" % (of._name, item._str_fields())
         else:
             return repr(item)
 
@@ -483,7 +486,7 @@ class _muhybrid(_muparentable, _mucontainer):
             fields.insert(skipped_after, '(...)')
         fix_part = ', '.join(fields)
 
-        items = self._TYPE._varfld
+        items = getattr(self, self._TYPE._varfld)
         if len(items) > 20:
             items = items[:12] + items[-5:]
             skipped_at = 12
@@ -501,6 +504,12 @@ class _muhybrid(_muparentable, _mucontainer):
 
     def _getattr(self, field_name):
         return getattr(self, field_name)
+
+    def __eq__(self, other):
+        return other._TYPE == self._TYPE and \
+               reduce(lambda a, b: a and b,
+                      map(lambda fld: self._getattr(fld) == other._getattr(fld), self._TYPE._names),
+                      True)
 
 
 # ----------------------------------------------------------
@@ -604,6 +613,9 @@ class _mumemarray(_muparentable):
         obj = self[self._iteridx]
         self._iteridx += 1
         return obj
+
+    def __eq__(self, other):
+        return self._OF == other._OF and self.items == other.items
 
 
 class _muarray(_mumemarray, _mucontainer):

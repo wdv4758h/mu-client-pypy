@@ -1,3 +1,4 @@
+from rpython.translator.mu.preps import prepare
 from ..mutyper import MuTyper
 from rpython.rtyper.lltypesystem import lltype as llt
 from ..muts import mutype as mut
@@ -7,23 +8,6 @@ from ..muts.muentity import MuGlobalCell, MuName
 from rpython.rtyper.test.test_llinterp import gengraph
 from ..ll2mu import *
 from ..tools.textgraph import print_graph
-
-
-def test_gcell():
-    typer = MuTyper()
-
-    string = "hello"
-    ll_ps = llt.malloc(STR, len(string))
-    ll_ps.hash = hash(string)
-    for i in range(len(string)):
-        ll_ps.chars[i] = string[i]
-
-    cnst = Constant(ll_ps, llt.Ptr(STR))
-
-    ldgcell = typer.proc_arg(cnst, None)
-
-    assert isinstance(ldgcell, Variable)
-    assert ldgcell.name == 'ldgclrefhybrpy_string_0'
 
 
 def test_ldgcell():
@@ -36,6 +20,25 @@ def test_ldgcell():
     op = g.startblock.operations[0]
     assert op.opname == 'LOAD'
     assert isinstance(op.loc, MuGlobalCell)
+
+
+def test_gcellnodup():
+    def main(argv):
+        return int(argv[0]) * 10
+
+    t, _, g = gengraph(main, [[str]], backendopt=True)
+
+    t.graphs = prepare(t.graphs, g)
+
+    graph = g.startblock.operations[-2].args[0].value._obj.graph
+    print_graph(graph)
+
+    mutyper = MuTyper()
+    for _g in t.graphs:
+        mutyper.specialise(_g)
+
+    print mutyper.ldgcells
+    assert len(mutyper.ldgcells) == 2
 
 
 def test_argtransform():
@@ -77,15 +80,15 @@ def test_typesandconsts():
     assert len(typer.gbltypes) == 4     # (funcref<(i64, i64)->i1>, funcref<(i64)->i64>, i64, i1)
 
 
-def test_crush():
-    def main(argv):
-        return int(argv[0]) * 10
-
-    t, _, g = gengraph(main, [[str]], backendopt=True)
-
-    from rpython.translator.mu.preps import prepare
-    t.graphs = prepare(t.graphs, g)
-
-    mutyper = MuTyper()
-    graph = g.startblock.operations[-2].args[0].value._obj.graph
-    mutyper.specialise(graph)
+# def test_crush():
+#     def main(argv):
+#         return int(argv[0]) * 10
+#
+#     t, _, g = gengraph(main, [[str]], backendopt=True)
+#
+#     from rpython.translator.mu.preps import prepare
+#     t.graphs = prepare(t.graphs, g)
+#
+#     mutyper = MuTyper()
+#     graph = g.startblock.operations[-2].args[0].value._obj.graph
+#     mutyper.specialise(graph)

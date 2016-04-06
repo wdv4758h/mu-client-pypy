@@ -35,21 +35,22 @@ def test_linkedlist():
     hailgen = HAILGenerator()
     hailgen.add_gcell(gcell1)
     assert len(hailgen._refs) == 2
-    assert isinstance(hailgen._refs[nd2], _HAILName)
+    assert isinstance(hailgen._refs[nd2._obj0], _HAILName)
 
     hailgen.add_gcell(gcell2)
     assert len(hailgen._refs) == 2
-    assert hailgen._refs[nd2] == gcell2.mu_name
+    assert hailgen._refs[nd2._obj0] == gcell2.mu_name
 
     strio = StringIO()
     hailgen.codegen(strio)
     out = strio.getvalue()
     strio.close()
 
+    print out
     assert '.new @gclrefsttNode_0 <@sttNode>' in out
     assert '.new @gclrefsttNode_1 <@sttNode>' in out
-    assert '.init @gclrefsttNode_0 = {1 @gclrefsttNode_1}' in out
-    assert '.init @gclrefsttNode_1 = {2 @gclrefsttNode_0}' in out
+    assert '.init @gclrefsttNode_0 = {1 *@gclrefsttNode_1}' in out
+    assert '.init @gclrefsttNode_1 = {2 *@gclrefsttNode_0}' in out
 
 
 def test_string():
@@ -72,6 +73,7 @@ def test_string():
     out = strio.getvalue()
     strio.close()
 
+    print out
     alloc_str = '.newhybrid %s <%s> 5' % (gcell.mu_name, mu_t.TO.mu_name)
     assert alloc_str in out
     init_str = '.init %s = {%d 5 {%s}}' % (gcell.mu_name, ll_ps.hash, ' '.join(map(lambda c: str(ord(c)), ll_ps.chars)))

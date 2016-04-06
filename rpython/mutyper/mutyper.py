@@ -21,6 +21,7 @@ class MuTyper:
         self.ldgcells = {}      # MuGlobalCells that need to be LOADed.
         self.gblcnsts = set()   # Constants that need to be defined on the global level
         self.gbltypes = set()   # Types that need to be defined on the global level
+        self._cnst_gcell_dict = {}  # mapping Constant to MuGlobalCell
         pass
 
     def specialise(self, g):
@@ -32,18 +33,13 @@ class MuTyper:
         ver.mu_name = MuName(ver.name, g)
         g.mu_version = ver
 
+        for idx, blk in enumerate(g.iterblocks()):
+            blk.mu_name = MuName("blk%d" % idx, g)
+
         for blk in g.iterblocks():
             self.specialise_block(blk)
 
-        blk = self.proc_gcells()
-        if blk:
-            blk.inputargs = g.startblock.inputargs
-            blk.exits = (Link(g.startblock.inputargs, g.startblock), )
-            blk.operations += (muop.BRANCH(DEST.from_link(blk.exits[0])),)
-            g.startblock = blk
-
-        for idx, blk in enumerate(g.iterblocks()):
-            blk.mu_name = MuName("blk%d" % idx, g)
+        self.proc_gcells(g)
 
     def specialise_block(self, blk):
         muops = []
@@ -90,15 +86,23 @@ class MuTyper:
         self.gbltypes.add(arg.mu_type)
         if isinstance(arg, Constant):
             if isinstance(arg.mu_type, mut.MuRef):
-                gcell = MuGlobalCell(arg.mu_type)
-                gcell.value = ll2mu_val(arg.value)
+                if arg not in self._cnst_gcell_dict:
+                    gcell = MuGlobalCell(arg.mu_type, ll2mu_val(arg.value))
+                    self._cnst_gcell_dict[arg] = gcell
+                else:
+                    gcell = self._cnst_gcell_dict[arg]
 
-                # A loaded gcell variable, ie. ldgcell = LOAD gcell
-                ldgcell = Variable('ld' + MuGlobalCell.prefix + arg.mu_type.mu_name._name)
-                ldgcell.mu_type = arg.mu_type
-                ldgcell.mu_name = MuName(ldgcell.name, blk)
-                self.ldgcells[gcell] = ldgcell
-                return ldgcell
+                if gcell not in self.ldgcells:
+                    self.ldgcells[gcell] = {}
+                try:
+                    return self.ldgcells[gcell][blk.mu_name.scope]
+                except KeyError:
+                    # A loaded gcell variable, ie. ldgcell = LOAD gcell
+                    ldgcell = Variable('ld' + MuGlobalCell.prefix + arg.mu_type.mu_name._name)
+                    ldgcell.mu_type = arg.mu_type
+                    ldgcell.mu_name = MuName(ldgcell.name, blk)
+                    self.ldgcells[gcell][blk.mu_name.scope] = ldgcell
+                    return ldgcell
             elif not isinstance(arg.value, mutype._muobject):
                 if isinstance(arg.value, llt.LowLevelType):
                     arg.value = ll2mu_ty(arg.value)
@@ -112,11 +116,17 @@ class MuTyper:
 
         return arg
 
-    def proc_gcells(self):
-        if self.ldgcells:
-            ops = []
-            for gcell, ldgcell in self.ldgcells.items():
-                ops.append(muop.LOAD(gcell, result=ldgcell))
+    def proc_gcells(self, g):
+        ops = []
+        for gcell, dic in self.ldgcells.items():
+            for _g, ldgcell in dic.items():
+                if _g is g:
+                    ops.append(muop.LOAD(gcell, result=ldgcell))
+        if len(ops) > 0:
             blk = Block([])
             blk.operations = tuple(ops)
-            return blk
+            blk.mu_name = MuName("blk_load", g)
+            blk.inputargs = g.startblock.inputargs
+            blk.exits = (Link(g.startblock.inputargs, g.startblock),)
+            blk.operations += (muop.BRANCH(DEST.from_link(blk.exits[0])),)
+            g.startblock = blk
