@@ -562,8 +562,8 @@ class TranslationDriver(SimpleTaskEngine):
         target_name = self.compute_exe_name()
         bundle_name = target_name + '.uir'
         hail_name = target_name + '.hail'
-        with open(bundle_name, 'w') as fp_bundle:
-            with open(hail_name, 'w') as fp_hail:
+        with bundle_name.open('w') as fp_bundle:
+            with hail_name.open('w') as fp_hail:
                 irgen = MuTextIRGenerator(self.translator.graphs, self.mutyper, self.entry_graph)
                 irgen.codegen(fp_bundle, fp_hail)
 
