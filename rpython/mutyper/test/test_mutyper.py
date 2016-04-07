@@ -92,3 +92,15 @@ def test_typesandconsts():
 #     mutyper = MuTyper()
 #     graph = g.startblock.operations[-2].args[0].value._obj.graph
 #     mutyper.specialise(graph)
+
+
+def test_pick_out_gen_const():
+    def f(x):
+        return - x
+
+    _, _, g = gengraph(f, [int])
+    print_graph(g)
+
+    mutyper = MuTyper()
+    mutyper.specialise(g)
+    assert len(mutyper.gblcnsts) == 1   # 0

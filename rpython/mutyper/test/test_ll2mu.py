@@ -4,6 +4,7 @@ from rpython.translator.mu.preps import prepare
 from ..ll2mu import ll2mu_ty, ll2mu_val, ll2mu_op
 from rpython.rtyper.lltypesystem import lltype as ll
 from rpython.mutyper.muts import mutype as mu
+from rpython.mutyper.muts import muops
 from rpython.rtyper.lltypesystem.rstr import STR
 from rpython.rtyper.rclass import OBJECT
 from rpython.rtyper.test.test_llinterp import gengraph
@@ -225,3 +226,68 @@ def test_crush():
     print v, v._TYPE
     with pytest.raises(NotImplementedError):
         ll2mu_val(v)
+
+
+def test_address():
+    def f(s):
+        return s + '_suffix'
+
+    t, _, g_f = gengraph(f, [str], backendopt=True)
+
+    g = g_f.startblock.operations[0].args[0].value._obj.graph
+    print_graph(g)
+
+    blk = g.startblock.exits[1].target.exits[1].target
+    # ------------------------------------------------------
+    # blk_4
+    # input: [dst_0, src_0, length_10, len2_0, s2_3]
+    # operations:
+    #     v94 = debug_assert((True), ('copystrc: negative srcstart'))
+    #     v95 = int_add((0), length_10)
+    #     v96 = getinteriorarraysize(src_0, ('chars'))
+    #     v97 = int_le(v95, v96)
+    #     v98 = debug_assert(v97, ('copystrc: src ovf'))
+    #     v99 = debug_assert((True), ('copystrc: negative dststart'))
+    #     v100 = int_add((0), length_10)
+    #     v101 = getinteriorarraysize(dst_0, ('chars'))
+    #     v102 = int_le(v100, v101)
+    #     v103 = debug_assert(v102, ('copystrc: dst ovf'))
+    #     v104 = cast_ptr_to_adr(src_0)
+    #     v105 = adr_add(v104, (< <FieldOffset <GcStru...r> 0> >))
+    #     v106 = cast_ptr_to_adr(dst_0)
+    #     v107 = adr_add(v106, (< <FieldOffset <GcStru...r> 0> >))
+    #     v108 = int_mul((<ItemOffset <Char> 1>), length_10)
+    #     v109 = raw_memcopy(v105, v107, v108)
+    #     v110 = keepalive(src_0)
+    #     v111 = keepalive(dst_0)
+    #     v112 = int_ge(len2_0, (0))
+    # switch: v112
+    # exits: [('blk_3', [(<* struct object_vtabl...=... }>), (<* struct object { typ...=... }>)]),
+    #           ('blk_5', [dst_0, length_10, s2_3, len2_0])]
+    # ------------------------------------------------------
+    op = blk.operations[10]     # v104 = cast_ptr_to_adr(src_0)
+
+    mutyper = MuTyper()
+    op.args[0] = mutyper.proc_arg(op.args[0], blk)
+    op.result = mutyper.proc_arg(op.result, blk, llptr_t=op.args[0].concretetype)
+    assert isinstance(op.result.mu_type, mu.MuUPtr)
+    assert op.result.mu_type.TO == op.args[0].mu_type.TO
+    muop = ll2mu_op(op)[0]
+    assert isinstance(muop, muops.NATIVE_PIN)
+
+    assert isinstance(ll2mu_op(blk.operations[16])[0], muops.NATIVE_UNPIN)
+
+    op = blk.operations[11]     # v105 = adr_add(v104, (< <FieldOffset <GcStru...r> 0> >))
+    assert isinstance(op.args[0].mu_type, mu.MuUPtr)
+    oplist = ll2mu_op(op)
+    assert len(oplist) == 2
+    assert 'GETVARPARTIREF PTR' in str(oplist[0])
+    assert 'SHIFTIREF PTR' in str(oplist[1])
+
+    op = blk.operations[14]     # v108 = int_mul((<ItemOffset <Char> 1>), length_10)
+    mutyper.proc_arglist(op.args, blk)
+    assert op.args[0].value == mu.int64_t(1)
+    op.result = mutyper.proc_arg(op.result, blk)
+    oplist = ll2mu_op(op)
+    assert len(oplist) == 1
+    assert 'MUL <@i64> @1 %length' in str(oplist[0])

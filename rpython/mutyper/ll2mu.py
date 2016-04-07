@@ -1,4 +1,7 @@
+from rpython.mutyper.muts.muentity import MuName
 from rpython.rtyper.lltypesystem import lltype
+from rpython.rtyper.lltypesystem import llmemory
+from rpython.rtyper.lltypesystem.llmemory import ItemOffset
 from .muts import mutype
 from .muts import muops
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
@@ -15,13 +18,16 @@ py.log.setconsumer("ll2mu", ansi_log)
 
 
 # ----------------------------------------------------------
-def ll2mu_ty(llt):
+def ll2mu_ty(llt, llptr_t=None):
     """
     Map LLTS type to MuTS type.
     :param llt: LLType
+    :param llptr_t: when llt is Address, this Ptr type is used to supply the missing type information.
     :return: MuType
     """
-    if isinstance(llt, lltype.Primitive):
+    if llt is llmemory.Address:
+        return _lltype2mu_addr(llptr_t)
+    elif isinstance(llt, lltype.Primitive):
         return _lltype2mu_prim(llt)
     elif isinstance(llt, lltype.FixedSizeArray):
         return _lltype2mu_arrfix(llt)
@@ -118,6 +124,9 @@ def _lltype2mu_funcptr(llt):
     return mutype.MuFuncRef(sig)
 
 
+def _lltype2mu_addr(llptr_t):
+    return mutype.MuUPtr(ll2mu_ty(llptr_t.TO))
+
 # ----------------------------------------------------------
 __ll2muval_cache = {}
 __ll2muval_cache_ptr = {}
@@ -128,6 +137,8 @@ def ll2mu_val(llv, llt=None):
         llv = llv.default
     elif isinstance(llv, TotalOrderSymbolic):
         llv = llv.compute_fn()
+    elif isinstance(llv, ItemOffset):
+        llv = mutype.mu_sizeOf(ll2mu_ty(llv.TYPE))
 
     cache, v = (__ll2muval_cache_ptr, llv._obj) if isinstance(llv, lltype._ptr) else (__ll2muval_cache, llv)
     try:
@@ -271,6 +282,7 @@ def _ll2mu_op(opname, args, result=None):
 def _newprimconst(mut, primval):
     c = Constant(mut(primval))
     c.mu_type = mut
+    c.mu_name = MuName(str(primval))
     return c
 
 
@@ -557,5 +569,28 @@ def _llop2mu_ptr_zero(ptr, res=None, llopname='ptr_zero'):
     cst = Constant(mutype.NULL)
     cst.mu_type = ptr.mu_type
     return _llop2mu_ptr_eq(ptr, cst, res)
+
+
+# ----------------
+# address operations
+def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
+    return [muops.NATIVE_PIN(ptr, result=res)]
+
+
+def _llop2mu_keepalive(ptr, res=None, llopname='keepalive'):
+    return [muops.NATIVE_UNPIN(ptr, result=res)]
+
+
+def _llop2mu_adr_add(ptr, cnst_offsets, res=None, llopname='adr_add'):
+    ops = _MuOpList()
+    for o in cnst_offsets.value.offsets:
+        if isinstance(o, llmemory.FieldOffset):
+            ptr, _ops = __getfieldiref(ptr, o.fldname)
+            ops.extend(_ops)
+        if isinstance(o, llmemory.ArrayItemsOffset):
+            pass    # assuming the uptr is already at the start of the memarray.
+        if isinstance(o, llmemory.ItemOffset):
+            ptr = ops.append(muops.SHIFTIREF(ptr, _newprimconst(mutype.int64_t, o.repeat)))
+    return ops
 
 # TODO: rest of the operations

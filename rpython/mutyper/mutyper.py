@@ -50,10 +50,20 @@ class MuTyper:
         for op in blk.operations:
             # set up -- process the result and the arguments
             self.proc_arglist(op.args, blk)
-            op.result = self.proc_arg(op.result, blk)
+            if op.opname == 'cast_ptr_to_adr':
+                op.result = self.proc_arg(op.result, blk, llptr_t=op.args[0].concretetype)
+            else:
+                op.result = self.proc_arg(op.result, blk)
             op.result.mu_name = MuName(op.result.name, blk)
             try:
-                muops += ll2mu_op(op)
+                _muops = ll2mu_op(op)
+                for _o in _muops:
+                    for arg in _o._args:
+                        # picking out the generated (must be primitive) constants
+                        if isinstance(arg, Constant):
+                            assert isinstance(arg.mu_type, mutype.MuPrimitive)
+                            self.gblcnsts.add(arg)
+                muops += _muops
             except NotImplementedError:
                 log.warning("Ignoring '%s'." % op)
 
@@ -81,38 +91,39 @@ class MuTyper:
         for i in range(len(args)):
             args[i] = self.proc_arg(args[i], blk)
 
-    def proc_arg(self, arg, blk):
-        arg.mu_type = ll2mu_ty(arg.concretetype)
-        self.gbltypes.add(arg.mu_type)
-        if isinstance(arg, Constant):
-            if isinstance(arg.mu_type, mut.MuRef):
-                if arg not in self._cnst_gcell_dict:
-                    gcell = MuGlobalCell(arg.mu_type, ll2mu_val(arg.value))
-                    self._cnst_gcell_dict[arg] = gcell
-                else:
-                    gcell = self._cnst_gcell_dict[arg]
+    def proc_arg(self, arg, blk, **kwargs):
+        if not hasattr(arg, 'mu_name'):     # has not been processed
+            arg.mu_type = ll2mu_ty(arg.concretetype, **kwargs)
+            self.gbltypes.add(arg.mu_type)
+            if isinstance(arg, Constant):
+                if isinstance(arg.mu_type, mut.MuRef):
+                    if arg not in self._cnst_gcell_dict:
+                        gcell = MuGlobalCell(arg.mu_type, ll2mu_val(arg.value))
+                        self._cnst_gcell_dict[arg] = gcell
+                    else:
+                        gcell = self._cnst_gcell_dict[arg]
 
-                if gcell not in self.ldgcells:
-                    self.ldgcells[gcell] = {}
-                try:
-                    return self.ldgcells[gcell][blk.mu_name.scope]
-                except KeyError:
-                    # A loaded gcell variable, ie. ldgcell = LOAD gcell
-                    ldgcell = Variable('ld' + MuGlobalCell.prefix + arg.mu_type.mu_name._name)
-                    ldgcell.mu_type = arg.mu_type
-                    ldgcell.mu_name = MuName(ldgcell.name, blk)
-                    self.ldgcells[gcell][blk.mu_name.scope] = ldgcell
-                    return ldgcell
-            elif not isinstance(arg.value, mutype._muobject):
-                if isinstance(arg.value, llt.LowLevelType):
-                    arg.value = ll2mu_ty(arg.value)
-                elif not isinstance(arg.value, (str, dict)):
-                    arg.value = ll2mu_val(arg.value, arg.concretetype)
-                    if not isinstance(arg.value, mutype._mufuncref):
-                        self.gblcnsts.add(arg)
-                        arg.mu_name = MuName(str(arg.value))
-        else:
-            arg.mu_name = MuName(arg.name, blk)
+                    if gcell not in self.ldgcells:
+                        self.ldgcells[gcell] = {}
+                    try:
+                        return self.ldgcells[gcell][blk.mu_name.scope]
+                    except KeyError:
+                        # A loaded gcell variable, ie. ldgcell = LOAD gcell
+                        ldgcell = Variable('ld' + MuGlobalCell.prefix + arg.mu_type.mu_name._name)
+                        ldgcell.mu_type = arg.mu_type
+                        ldgcell.mu_name = MuName(ldgcell.name, blk)
+                        self.ldgcells[gcell][blk.mu_name.scope] = ldgcell
+                        return ldgcell
+                elif not isinstance(arg.value, mutype._muobject):
+                    if isinstance(arg.value, llt.LowLevelType):
+                        arg.value = ll2mu_ty(arg.value)
+                    elif not isinstance(arg.value, (str, dict)):
+                        arg.value = ll2mu_val(arg.value, arg.concretetype)
+                        if not isinstance(arg.value, mutype._mufuncref):
+                            self.gblcnsts.add(arg)
+                            arg.mu_name = MuName(str(arg.value))
+            else:
+                arg.mu_name = MuName(arg.name, blk)
 
         return arg
 

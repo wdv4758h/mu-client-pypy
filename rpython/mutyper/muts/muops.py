@@ -291,7 +291,7 @@ def _newcomminst(inst_name, arg_names, rtn_t_fnc, str_fnc):
                 {'__init__': MuOperation.__init__,
                  '_inst_mu_name': MuName(inst_name),
                  '_fnc_rtntype': rtn_t_fnc,
-                 '_fnc_str': lambda op: "COMMINST %s %s" % (op.__class__.__dict__['inst_mu_name'], str_fnc(op)),
+                 '_fnc_str': lambda op: "COMMINST %s %s" % (op.__class__.__dict__['_inst_mu_name'], str_fnc(op)),
                  '_arg_names': arg_names.split(' ')})
 
 THREAD_EXIT = _newcomminst("uvm.thread_exit", "", lambda args: void_t, lambda op: "")
