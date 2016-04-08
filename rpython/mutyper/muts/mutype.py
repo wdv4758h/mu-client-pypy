@@ -680,31 +680,22 @@ class MuFuncSig(MuType):
 
     @property
     def mu_constructor(self):
-        args = ', '.join(map(lambda a: repr(a.mu_name), self.ARGS))
-        if len(self.RTNS) == 1:
-            rtns = repr(self.RTNS[0].mu_name)
-        else:
-            rtns = '(%s)' % ', '.join(map(lambda a: repr(a.mu_name), self.RTNS))
-        return "(%s) -> %s" % (args, rtns)
+        args = ' '.join(map(lambda a: repr(a.mu_name), self.ARGS))
+        rtns = ' '.join(map(lambda a: repr(a.mu_name), self.RTNS))
+        return "(%s) -> (%s)" % (args, rtns)
 
     @property
     def _mu_constructor_expanded(self):
         def _inner():
-            args = ', '.join(map(lambda a: a._mu_constructor_expanded, self.ARGS))
-            if len(self.RTNS) == 1:
-                rtns = self.RTNS[0]._mu_constructor_expanded
-            else:
-                rtns = '( %s )' % ', '.join(map(lambda a: a._mu_constructor_expanded, self.RTNS))
-            return "( %s ) -> %s" % (args, rtns)
+            args = ' '.join(map(lambda a: a._mu_constructor_expanded, self.ARGS))
+            rtns = ' '.join(map(lambda a: a._mu_constructor_expanded, self.RTNS))
+            return "( %s ) -> (%s)" % (args, rtns)
         return saferecursive(_inner, '...')()
 
     def __str__(self):
-        args = ', '.join(map(str, self.ARGS))
-        if len(self.RTNS) == 1:
-            rtns = '%s' % self.RTNS[0]
-        else:
-            rtns = '( %s )' % ', '.join(map(str, self.RTNS))
-        return "( %s ) -> %s" % (args, rtns)
+        args = ' '.join(map(str, self.ARGS))
+        rtns = ' '.join(map(str, self.RTNS))
+        return "( %s ) -> ( %s )" % (args, rtns)
     __str__ = saferecursive(__str__, '...')
 
     def _short_name(self):
@@ -954,6 +945,7 @@ class _muuptr(_muiref):
 
 class MuUFuncPtr(MuFuncRef):
     type_prefix = "fnp"
+    type_constr_name = 'ufuncptr'
     # TODO: Not a perfect definition
 
 

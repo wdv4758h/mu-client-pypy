@@ -1,5 +1,6 @@
 import pytest
-from rpython.mutyper.mutyper import MuTyper
+from rpython.mutyper.muts.muentity import MuName
+from rpython.mutyper.mutyper import MuTyper, muni
 from rpython.translator.mu.preps import prepare
 from ..ll2mu import ll2mu_ty, ll2mu_val, ll2mu_op
 from rpython.rtyper.lltypesystem import lltype as ll
@@ -235,9 +236,10 @@ def test_address():
     t, _, g_f = gengraph(f, [str], backendopt=True)
 
     g = g_f.startblock.operations[0].args[0].value._obj.graph
-    print_graph(g)
+    # print_graph(g)
 
     blk = g.startblock.exits[1].target.exits[1].target
+    blk.mu_name = MuName('blk_4', g)
     # ------------------------------------------------------
     # blk_4
     # input: [dst_0, src_0, length_10, len2_0, s2_3]
@@ -268,21 +270,23 @@ def test_address():
     op = blk.operations[10]     # v104 = cast_ptr_to_adr(src_0)
 
     mutyper = MuTyper()
-    op.args[0] = mutyper.proc_arg(op.args[0], blk)
-    op.result = mutyper.proc_arg(op.result, blk, llptr_t=op.args[0].concretetype)
+    muop = mutyper.specialise_op(op, blk)[0]
     assert isinstance(op.result.mu_type, mu.MuUPtr)
     assert op.result.mu_type.TO == op.args[0].mu_type.TO
-    muop = ll2mu_op(op)[0]
     assert isinstance(muop, muops.NATIVE_PIN)
+    assert mutyper._addrder.find_root(op.result) == op.args[0].concretetype
 
     assert isinstance(ll2mu_op(blk.operations[16])[0], muops.NATIVE_UNPIN)
 
     op = blk.operations[11]     # v105 = adr_add(v104, (< <FieldOffset <GcStru...r> 0> >))
     assert isinstance(op.args[0].mu_type, mu.MuUPtr)
-    oplist = ll2mu_op(op)
+    oplist = mutyper.specialise_op(op, blk)
     assert len(oplist) == 2
     assert 'GETVARPARTIREF PTR' in str(oplist[0])
     assert 'SHIFTIREF PTR' in str(oplist[1])
+
+    for op in blk.operations[12:14]:
+        mutyper.specialise_op(op, blk)
 
     op = blk.operations[14]     # v108 = int_mul((<ItemOffset <Char> 1>), length_10)
     mutyper.proc_arglist(op.args, blk)
@@ -291,3 +295,9 @@ def test_address():
     oplist = ll2mu_op(op)
     assert len(oplist) == 1
     assert 'MUL <@i64> @1 %length' in str(oplist[0])
+
+    op = blk.operations[15]     # v109 = raw_memcopy(v105, v107, v108)
+    assert op.args[0]
+    muop = mutyper.specialise_op(op, blk)[0]
+    assert muop.opname == 'CCALL'
+    assert muop.callee == muni.c_memcpy

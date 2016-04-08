@@ -72,7 +72,7 @@ class MuOperation(object):
         for key, val in kwargs.items():
             setattr(self, key, val)
 
-        self._args = args
+        self._args = list(args)
 
         # also sets the argument names to attributes,
         # so that we can do things like: op.T2 etc.
@@ -191,7 +191,7 @@ RET = _newop("RET", "rv",
 
 THROW = _newop("THROW", "exc",
                lambda args: void_t,
-               lambda op: "%s" % op.exc)
+               lambda op: "%s" % op.exc.mu_name)
 
 
 # ----------------------------------------------------------------

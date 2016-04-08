@@ -1,9 +1,10 @@
-from rpython.mutyper.muts.muentity import MuName
+from rpython.mutyper.muts.muentity import MuName, MuGlobalCell
 from rpython.rtyper.lltypesystem import lltype
 from rpython.rtyper.lltypesystem import llmemory
 from rpython.rtyper.lltypesystem.llmemory import ItemOffset
 from .muts import mutype
 from .muts import muops
+from .muts import muni
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
 from rpython.rlib.rarithmetic import _inttypes
@@ -18,15 +19,14 @@ py.log.setconsumer("ll2mu", ansi_log)
 
 
 # ----------------------------------------------------------
-def ll2mu_ty(llt, llptr_t=None):
+def ll2mu_ty(llt):
     """
     Map LLTS type to MuTS type.
     :param llt: LLType
-    :param llptr_t: when llt is Address, this Ptr type is used to supply the missing type information.
     :return: MuType
     """
     if llt is llmemory.Address:
-        return _lltype2mu_addr(llptr_t)
+        return _lltype2mu_addr(llt)
     elif isinstance(llt, lltype.Primitive):
         return _lltype2mu_prim(llt)
     elif isinstance(llt, lltype.FixedSizeArray):
@@ -124,8 +124,8 @@ def _lltype2mu_funcptr(llt):
     return mutype.MuFuncRef(sig)
 
 
-def _lltype2mu_addr(llptr_t):
-    return mutype.MuUPtr(ll2mu_ty(llptr_t.TO))
+def _lltype2mu_addr(llt):
+    return mutype.MuUPtr(ll2mu_ty(llt.llptr_t.TO))
 
 # ----------------------------------------------------------
 __ll2muval_cache = {}
@@ -451,11 +451,11 @@ for triplet in __spec_cast_map:
 
 # ----------------
 # pointer operations
-def _llop2mu_malloc(T, res=None, llopname='malloc'):
+def _llop2mu_malloc(T, flavor, res=None, llopname='malloc'):
     return [muops.NEW(T.value, result=res)]
 
 
-def _llop2mu_malloc_varsize(T, n, res=None, llopname='malloc_varsize'):
+def _llop2mu_malloc_varsize(T, flavor, n, res=None, llopname='malloc_varsize'):
     return [muops.NEWHYBRID(T.value, n, result=res)]
 
 
@@ -548,7 +548,7 @@ def _llop2mu_getinteriorarraysize(var, *offsets, **kwargs):
 
 
 def _llop2mu_cast_pointer(cst_TYPE, var_ptr, res=None, llopname='cast_pointer'):
-    return [muops.REFCAST(var_ptr, res.mu_typem if res else ll2mu_ty(cst_TYPE.value), result=res)]
+    return [muops.REFCAST(var_ptr, res.mu_type if res else ll2mu_ty(cst_TYPE.value), result=res)]
 
 
 def _llop2mu_ptr_eq(ptr1, ptr2, res=None, llopname='ptr_eq'):
@@ -573,12 +573,26 @@ def _llop2mu_ptr_zero(ptr, res=None, llopname='ptr_zero'):
 
 # ----------------
 # address operations
-def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
-    return [muops.NATIVE_PIN(ptr, result=res)]
-
-
 def _llop2mu_keepalive(ptr, res=None, llopname='keepalive'):
     return [muops.NATIVE_UNPIN(ptr, result=res)]
+
+
+for op in 'malloc free memset memcopy memmove'.split(' '):
+    globals()['_llop2mu_raw_' + op] = \
+        lambda *args, **kwargs: [muops.CCALL(getattr(muni, kwargs['llopname'].replace('raw', 'c')),
+                                             args, result=kwargs['res'])]
+
+
+# def _llop2mu_raw_memclear():
+#     pass
+#
+#
+# def _llop2mu_raw_load():
+#     pass
+#
+#
+# def _llop2mu_raw_store():
+#     pass
 
 
 def _llop2mu_adr_add(ptr, cnst_offsets, res=None, llopname='adr_add'):
@@ -590,7 +604,50 @@ def _llop2mu_adr_add(ptr, cnst_offsets, res=None, llopname='adr_add'):
         if isinstance(o, llmemory.ArrayItemsOffset):
             pass    # assuming the uptr is already at the start of the memarray.
         if isinstance(o, llmemory.ItemOffset):
-            ptr = ops.append(muops.SHIFTIREF(ptr, _newprimconst(mutype.int64_t, o.repeat)))
+            ptr = ops.append(muops.SHIFTIREF(ptr,
+                                             _newprimconst(mutype.int64_t,
+                                                           o.repeat if llopname == 'adr_add' else -o.repeat)))
     return ops
+
+
+def _llop2mu_adr_sub(ptr, cnst_offsets, res=None, llopname='adr_sub'):
+    return _llop2mu_adr_add(ptr, cnst_offsets, res, llopname)
+
+
+def __cast_ptr_to_int(ptr, res=None):
+    return [muops.PTRCAST(ptr, muni.__ptr_int_t, result=res)]
+
+
+def _llop2mu_adr_delta(ptr1, ptr2, res=None, llopname='adr_delta'):
+    ops = _MuOpList()
+    adr1 = ops.extend(__cast_ptr_to_int(ptr1))
+    adr2 = ops.extend(__cast_ptr_to_int(ptr2))
+    ops.extend(_ll2mu_op('int_sub', (adr2, adr1), res))
+    return ops
+
+
+def __adr_cmp(ptr1, ptr2, res=None, llopname=''):
+    ops = _MuOpList()
+    adr1 = ops.extend(__cast_ptr_to_int(ptr1))
+    adr2 = ops.extend(__cast_ptr_to_int(ptr2))
+    ops.extend(_ll2mu_op(llopname.replace('adr', 'int'), (adr1, adr2), res))
+    return ops
+
+for cmpop in "lt le eq ne gt ge".split(' '):
+    globals()['_llop2mu_adr_' + cmpop] = __adr_cmp
+
+
+def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
+    return [muops.NATIVE_PIN(ptr, result=res)]
+
+
+def _llop2mu_cast_adr_to_int(ptr, res=None, llopname='cast_adr_to_int'):
+    return __cast_ptr_to_int(ptr, res)
+
+
+# def _llop2mu_cast_int_to_adr(n, res=None, llopname='cast_adr_to_int'):
+#   NOTE: we need more information on the type of uptr to cast to.
+#     return [muops.PTRCAST(n, )]
+
 
 # TODO: rest of the operations

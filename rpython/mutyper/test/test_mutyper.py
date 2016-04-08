@@ -104,3 +104,48 @@ def test_pick_out_gen_const():
     mutyper = MuTyper()
     mutyper.specialise(g)
     assert len(mutyper.gblcnsts) == 1   # 0
+
+
+def test_externfnc():
+    def f(s):
+        return s + '_suffix'
+
+    t, _, g_f = gengraph(f, [str], backendopt=True)
+
+    g = g_f.startblock.operations[0].args[0].value._obj.graph
+    # print_graph(g)
+
+    blk = g.startblock.exits[1].target.exits[1].target
+    # ------------------------------------------------------
+    # blk_4
+    # input: [dst_0, src_0, length_10, len2_0, s2_3]
+    # operations:
+    #     v94 = debug_assert((True), ('copystrc: negative srcstart'))
+    #     v95 = int_add((0), length_10)
+    #     v96 = getinteriorarraysize(src_0, ('chars'))
+    #     v97 = int_le(v95, v96)
+    #     v98 = debug_assert(v97, ('copystrc: src ovf'))
+    #     v99 = debug_assert((True), ('copystrc: negative dststart'))
+    #     v100 = int_add((0), length_10)
+    #     v101 = getinteriorarraysize(dst_0, ('chars'))
+    #     v102 = int_le(v100, v101)
+    #     v103 = debug_assert(v102, ('copystrc: dst ovf'))
+    #     v104 = cast_ptr_to_adr(src_0)
+    #     v105 = adr_add(v104, (< <FieldOffset <GcStru...r> 0> >))
+    #     v106 = cast_ptr_to_adr(dst_0)
+    #     v107 = adr_add(v106, (< <FieldOffset <GcStru...r> 0> >))
+    #     v108 = int_mul((<ItemOffset <Char> 1>), length_10)
+    #     v109 = raw_memcopy(v105, v107, v108)
+    #     v110 = keepalive(src_0)
+    #     v111 = keepalive(dst_0)
+    #     v112 = int_ge(len2_0, (0))
+    # switch: v112
+    # exits: [('blk_3', [(<* struct object_vtabl...=... }>), (<* struct object { typ...=... }>)]),
+    #           ('blk_5', [dst_0, length_10, s2_3, len2_0])]
+    # ------------------------------------------------------
+    mutyper = MuTyper()
+    blk.mu_name = MuName("blk_4", g)
+    mutyper.specialise(g)
+
+    for op in blk.operations:
+        print op
