@@ -270,7 +270,7 @@ def test_address():
     #           ('blk_5', [dst_0, length_10, s2_3, len2_0])]
     # ------------------------------------------------------
     op = blk.operations[10]     # v104 = cast_ptr_to_adr(src_0)
-    assert ll2mu_ty(op.result.concretetype) == mu.MuUPtr(mu.void_t)
+    assert ll2mu_ty(op.result.concretetype) == mu.int64_t
     assert ll2mu_op(op)[0]._inst_mu_name._name == 'uvm.native.pin'
 
     op = blk.operations[11]

@@ -626,46 +626,10 @@ for op in 'malloc free memset memcopy memmove'.split(' '):
 # def _llop2mu_raw_store():
 #     pass
 
+for op in "add sub lt le eq ne gt ge":
+    globals()['_llop2mu_adr_' + op] = globals()['_llop2mu_int_' + op]
 
-def _llop2mu_adr_add(ptr, ptr2, res=None, llopname='adr_add'):
-    def _proc_offset(ptr, o):
-        ptr.mu_type = mutype.MuUPtr(ll2mu_ty(o.TYPE))
-        if isinstance(o, llmemory.FieldOffset):
-            ptr, _ops = __getfieldiref(ptr, o.fldname)
-            ops.extend(_ops)
-        if isinstance(o, llmemory.ArrayItemsOffset):
-            pass  # assuming the uptr is already at the start of the memarray.
-        if isinstance(o, llmemory.ItemOffset):
-            ptr = ops.append(muops.SHIFTIREF(ptr,
-                                             _newprimconst(mutype.int64_t,
-                                                           o.repeat if llopname == 'adr_add' else -o.repeat)))
-        return ptr
-    ops = _MuOpList()
-    if isinstance(ptr2, Constant):
-        if isinstance(ptr2.value, llmemory.CompositeOffset):
-            for o in ptr2.value.offsets:
-                ptr = _proc_offset(ptr, o)
-        elif isinstance(ptr2.value, llmemory.AddressOffset):
-            ptr = _proc_offset(ptr, ptr2.value)
-        elif isinstance(ptr2.concretetype, lltype.Primitive):
-            adr_src = ops.extend(__cast_ptr_to_int(ptr))
-            adr_res = ops.extend(_ll2mu_op('int_add', (adr_src, ptr2)))
-            ops.extend(_ll2mu_op('cast_int_to_adr', (adr_res,), res))
-
-        if len(ops) > 0:
-            ops[-1].result = res
-    else:
-        adr1 = ops.extend(__cast_ptr_to_int(ptr))
-        adr2 = ops.extend(__cast_ptr_to_int(ptr2))
-        adr = ops.extend(_ll2mu_op('int_add', (adr1, adr2)))
-        ops.extend(_ll2mu_op('cast_int_to_adr', (adr, ), res))
-    return ops
-
-
-def _llop2mu_adr_sub(ptr, cnst_offsets, res=None, llopname='adr_sub'):
-    return _llop2mu_adr_add(ptr, cnst_offsets, res, llopname)
-
-
+# TODO: revise
 def __cast_ptr_to_int(ptr, res=None):
     return [muops.PTRCAST(ptr, muni.__ptr_int_t, result=res)]
 
@@ -690,15 +654,18 @@ for cmpop in "lt le eq ne gt ge".split(' '):
 
 
 def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
-    return [muops.NATIVE_PIN(ptr, result=res)]
+    ops = _MuOpList()
+    adr = ops.append(muops.NATIVE_PIN(ptr))
+    ops.append(muops.PTRCAST(adr, ll2mu_ty(llmemory.Address), result=res))
+    return ops
 
 
 def _llop2mu_cast_adr_to_int(ptr, res=None, llopname='cast_adr_to_int'):
-    return __cast_ptr_to_int(ptr, res)
+    return []
 
 
 def _llop2mu_cast_int_to_adr(n, res=None, llopname='cast_adr_to_int'):
-    return [muops.PTRCAST(n, ll2mu_ty(llmemory.Address), result=res)]
+    return []
 
 
 # TODO: rest of the operations
