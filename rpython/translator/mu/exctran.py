@@ -217,7 +217,9 @@ class ExceptionTransformer(object):
 
             excdataptr = Variable("excdataptr")
             excdataptr.concretetype = self.ptr_excdata_llt
-            blk_catch.operations.append(SpaceOperation('cast_pointer', [excobjptr], excdataptr))
+            blk_catch.operations.append(SpaceOperation('cast_pointer',
+                                                       [Constant(self.ptr_excdata_llt), excobjptr],
+                                                       excdataptr))
 
             return blk_catch, excdataptr
 

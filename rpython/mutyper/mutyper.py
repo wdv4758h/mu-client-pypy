@@ -26,6 +26,7 @@ class MuTyper:
         self._cnst_gcell_dict = {}  # mapping Constant to MuGlobalCell
         self._seen = set()
         self.externfncs = set()
+        self._alias = {}
         pass
 
     def specialise(self, g):
@@ -78,6 +79,8 @@ class MuTyper:
         # translate operation
         try:
             _muops = ll2mu_op(op)
+            if len(_muops) == 0:
+                self._alias[op.result] = op.args[0]     # no op -> result = args[0]
 
             # some post processing
             for _o in _muops:
@@ -85,7 +88,7 @@ class MuTyper:
                     arg = _o._args[i]
                     # picking out the generated (must be primitive) constants
                     if isinstance(arg, Constant):
-                        assert isinstance(arg.mu_type, mutype.MuPrimitive)
+                        assert isinstance(arg.mu_type, mutype.MuPrimitive) or isinstance(arg.value, mutype._munullref)
                         self.gblcnsts.add(arg)
                     if isinstance(arg, MuExternalFunc):
                         # Addresses of some C functions stored in global cells need to be processed.
@@ -105,6 +108,8 @@ class MuTyper:
 
     def proc_arglist(self, args, blk):
         for i in range(len(args)):
+            if args[i] in self._alias:
+                args[i] = self._alias[args[i]]
             args[i] = self.proc_arg(args[i], blk)
 
     def proc_arg(self, arg, blk):
@@ -125,7 +130,7 @@ class MuTyper:
                     if not isinstance(arg.value, mutype._mufuncref):
                         self.gblcnsts.add(arg)
                         arg.mu_name = MuName(str(arg.value))
-                except (NotImplementedError, AssertionError):
+                except (NotImplementedError, AssertionError, TypeError):
                     if isinstance(arg.value, llt.LowLevelType):
                         arg.value = ll2mu_ty(arg.value)
                     elif isinstance(arg.value, llmemory.CompositeOffset):

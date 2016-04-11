@@ -111,7 +111,7 @@ def test_externfnc():
         return s + '_suffix'
 
     t, _, g_f = gengraph(f, [str], backendopt=True)
-
+    t.graphs = prepare(t.graphs, g_f)   # remove the ({'flavor': 'gc'}) from mallocs
     g = g_f.startblock.operations[0].args[0].value._obj.graph
     # print_graph(g)
 

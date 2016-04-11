@@ -452,6 +452,7 @@ class _muhybrid(_muparentable, _mucontainer):
                 value = typ._allocate(parent=self, parentindex=fld)
 
             setattr(self, fld, value)
+        self.length = n
 
     def __setattr__(self, key, value):
         if hasattr(self, key) and key in self._TYPE._flds:
