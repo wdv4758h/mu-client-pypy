@@ -25,6 +25,8 @@ def ll2mu_ty(llt):
     :param llt: LLType
     :return: MuType
     """
+    if isinstance(llt, mutype.MuType):
+        return llt
     if llt is llmemory.Address:
         return _lltype2mu_addr(llt)
     elif isinstance(llt, lltype.Primitive):
@@ -125,7 +127,7 @@ def _lltype2mu_funcptr(llt):
 
 
 def _lltype2mu_addr(llt):
-    return mutype.MuUPtr(ll2mu_ty(llt.llptr_t.TO))
+    return mutype.MuUPtr(mutype.void_t)     # all Address types are translated into uptr<void>
 
 # ----------------------------------------------------------
 __ll2muval_cache = {}
@@ -133,6 +135,8 @@ __ll2muval_cache_ptr = {}
 
 
 def ll2mu_val(llv):
+    if isinstance(llv, mutype._muobject):
+        return llv
     if isinstance(llv, CDefinedIntSymbolic):
         llv = llv.default
     elif isinstance(llv, TotalOrderSymbolic):
@@ -172,7 +176,7 @@ def _ll2mu_val(llv):
     elif isinstance(llv, lltype._ptr):
         return _llval2mu_ptr(llv)
     else:
-        raise NotImplementedError("Don't know how to specialise value type %r." % llv)
+        raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
 
 
 def _llval2mu_prim(llv):
@@ -454,7 +458,7 @@ def _llop2mu_malloc_varsize(T, flavor, n, res=None, llopname='malloc_varsize'):
 
 def __getfieldiref(var, fld):
     ops = _MuOpList()
-    iref = var if isinstance(var.mu_type, mutype.MuIRef) else ops.append(muops.GETIREF(var))
+    iref = var if isinstance(var.mu_type, (mutype.MuIRef, mutype.MuUPtr)) else ops.append(muops.GETIREF(var))
     mu_t = iref.mu_type.TO
     if isinstance(mu_t, mutype.MuHybrid) and fld == mu_t._varfld:
         iref_fld = ops.append(muops.GETVARPARTIREF(iref))
@@ -502,7 +506,7 @@ def _llop2mu_getarraysize(var, res=None, llopname='getarraysize'):
 
 def __getinterioriref(var, offsets):
     ops = _MuOpList()
-    iref = var if isinstance(var.mu_type, mutype.MuIRef) else ops.append(muops.GETIREF(var))
+    iref = var if isinstance(var.mu_type, (mutype.MuIRef, mutype.MuUPtr)) else ops.append(muops.GETIREF(var))
     for o in offsets:
         if o.concretetype == lltype.Void:
             assert isinstance(o.value, str)
@@ -588,18 +592,26 @@ for op in 'malloc free memset memcopy memmove'.split(' '):
 #     pass
 
 
-def _llop2mu_adr_add(ptr, cnst_offsets, res=None, llopname='adr_add'):
+def _llop2mu_adr_add(ptr, ptr2, res=None, llopname='adr_add'):
     ops = _MuOpList()
-    for o in cnst_offsets.value.offsets:
-        if isinstance(o, llmemory.FieldOffset):
-            ptr, _ops = __getfieldiref(ptr, o.fldname)
-            ops.extend(_ops)
-        if isinstance(o, llmemory.ArrayItemsOffset):
-            pass    # assuming the uptr is already at the start of the memarray.
-        if isinstance(o, llmemory.ItemOffset):
-            ptr = ops.append(muops.SHIFTIREF(ptr,
-                                             _newprimconst(mutype.int64_t,
-                                                           o.repeat if llopname == 'adr_add' else -o.repeat)))
+    if isinstance(ptr2, Constant):
+        for o in ptr2.value.offsets:
+            ptr.mu_type = mutype.MuUPtr(ll2mu_ty(o.TYPE))
+            if isinstance(o, llmemory.FieldOffset):
+                ptr, _ops = __getfieldiref(ptr, o.fldname)
+                ops.extend(_ops)
+            if isinstance(o, llmemory.ArrayItemsOffset):
+                pass    # assuming the uptr is already at the start of the memarray.
+            if isinstance(o, llmemory.ItemOffset):
+                ptr = ops.append(muops.SHIFTIREF(ptr,
+                                                 _newprimconst(mutype.int64_t,
+                                                               o.repeat if llopname == 'adr_add' else -o.repeat)))
+        ops[-1].result = res
+    else:
+        adr1 = ops.extend(__cast_ptr_to_int(ptr))
+        adr2 = ops.extend(__cast_ptr_to_int(ptr2))
+        adr = ops.extend(_ll2mu_op('int_add', (adr1, adr2)))
+        ops.extend(_ll2mu_op('cast_int_to_adr', (adr, ), res))
     return ops
 
 
@@ -638,9 +650,8 @@ def _llop2mu_cast_adr_to_int(ptr, res=None, llopname='cast_adr_to_int'):
     return __cast_ptr_to_int(ptr, res)
 
 
-# def _llop2mu_cast_int_to_adr(n, res=None, llopname='cast_adr_to_int'):
-#   NOTE: we need more information on the type of uptr to cast to.
-#     return [muops.PTRCAST(n, )]
+def _llop2mu_cast_int_to_adr(n, res=None, llopname='cast_adr_to_int'):
+    return [muops.PTRCAST(n, ll2mu_ty(llmemory.Address), result=res)]
 
 
 # TODO: rest of the operations

@@ -244,60 +244,46 @@ def test_address():
     # blk_4
     # input: [dst_0, src_0, length_10, len2_0, s2_3]
     # operations:
-    #     v94 = debug_assert((True), ('copystrc: negative srcstart'))
-    #     v95 = int_add((0), length_10)
-    #     v96 = getinteriorarraysize(src_0, ('chars'))
-    #     v97 = int_le(v95, v96)
-    #     v98 = debug_assert(v97, ('copystrc: src ovf'))
-    #     v99 = debug_assert((True), ('copystrc: negative dststart'))
-    #     v100 = int_add((0), length_10)
-    #     v101 = getinteriorarraysize(dst_0, ('chars'))
-    #     v102 = int_le(v100, v101)
-    #     v103 = debug_assert(v102, ('copystrc: dst ovf'))
-    #     v104 = cast_ptr_to_adr(src_0)
-    #     v105 = adr_add(v104, (< <FieldOffset <GcStru...r> 0> >))
-    #     v106 = cast_ptr_to_adr(dst_0)
-    #     v107 = adr_add(v106, (< <FieldOffset <GcStru...r> 0> >))
-    #     v108 = int_mul((<ItemOffset <Char> 1>), length_10)
-    #     v109 = raw_memcopy(v105, v107, v108)
-    #     v110 = keepalive(src_0)
-    #     v111 = keepalive(dst_0)
-    #     v112 = int_ge(len2_0, (0))
+    #   0   v94 = debug_assert((True), ('copystrc: negative srcstart'))
+    #   1   v95 = int_add((0), length_10)
+    #   2   v96 = getinteriorarraysize(src_0, ('chars'))
+    #   3   v97 = int_le(v95, v96)
+    #   4   v98 = debug_assert(v97, ('copystrc: src ovf'))
+    #   5   v99 = debug_assert((True), ('copystrc: negative dststart'))
+    #   6   v100 = int_add((0), length_10)
+    #   7   v101 = getinteriorarraysize(dst_0, ('chars'))
+    #   8   v102 = int_le(v100, v101)
+    #   9   v103 = debug_assert(v102, ('copystrc: dst ovf'))
+    #  10   v104 = cast_ptr_to_adr(src_0)
+    #  11   v105 = adr_add(v104, (< <FieldOffset <GcStru...r> 0> >))
+    #  12   v106 = cast_ptr_to_adr(dst_0)
+    #  13   v107 = adr_add(v106, (< <FieldOffset <GcStru...r> 0> >))
+    #  14   v108 = int_mul((<ItemOffset <Char> 1>), length_10)
+    #  15   v109 = raw_memcopy(v105, v107, v108)
+    #  16   v110 = keepalive(src_0)
+    #  17   v111 = keepalive(dst_0)
+    #  18   v112 = int_ge(len2_0, (0))
     # switch: v112
     # exits: [('blk_3', [(<* struct object_vtabl...=... }>), (<* struct object { typ...=... }>)]),
     #           ('blk_5', [dst_0, length_10, s2_3, len2_0])]
     # ------------------------------------------------------
     op = blk.operations[10]     # v104 = cast_ptr_to_adr(src_0)
+    assert ll2mu_ty(op.result.concretetype) == mu.MuUPtr(mu.void_t)
+    assert ll2mu_op(op)[0]._inst_mu_name._name == 'uvm.native.pin'
 
-    mutyper = MuTyper()
-    muop = mutyper.specialise_op(op, blk)[0]
-    assert isinstance(op.result.mu_type, mu.MuUPtr)
-    assert op.result.mu_type.TO == op.args[0].mu_type.TO
-    assert isinstance(muop, muops.NATIVE_PIN)
-    assert mutyper._addrder.find_root(op.result) == op.args[0].concretetype
+    op = blk.operations[11]
+    op.args[0].mu_name = MuName(op.args[0].name, blk)
+    op.result.mu_name = MuName(op.result.name, blk)
+    muoplst = ll2mu_op(op)
+    assert len(muoplst) == 2
+    assert muoplst[0].opnd.mu_type.TO == ll2mu_ty(op.args[1].value.offsets[0].TYPE)
 
     assert isinstance(ll2mu_op(blk.operations[16])[0], muops.NATIVE_UNPIN)
 
-    op = blk.operations[11]     # v105 = adr_add(v104, (< <FieldOffset <GcStru...r> 0> >))
-    assert isinstance(op.args[0].mu_type, mu.MuUPtr)
-    oplist = mutyper.specialise_op(op, blk)
-    assert len(oplist) == 2
-    assert 'GETVARPARTIREF PTR' in str(oplist[0])
-    assert 'SHIFTIREF PTR' in str(oplist[1])
-
-    for op in blk.operations[12:14]:
-        mutyper.specialise_op(op, blk)
-
     op = blk.operations[14]     # v108 = int_mul((<ItemOffset <Char> 1>), length_10)
-    mutyper.proc_arglist(op.args, blk)
-    assert op.args[0].value == mu.int64_t(1)
-    op.result = mutyper.proc_arg(op.result, blk)
-    oplist = ll2mu_op(op)
-    assert len(oplist) == 1
-    assert 'MUL <@i64> @1 %length' in str(oplist[0])
+    assert ll2mu_val(op.args[0].value) == mu.int64_t(1)
 
     op = blk.operations[15]     # v109 = raw_memcopy(v105, v107, v108)
-    assert op.args[0]
-    muop = mutyper.specialise_op(op, blk)[0]
-    assert muop.opname == 'CCALL'
-    assert muop.callee == muni.c_memcpy
+    muoplst = ll2mu_op(op)
+    assert muoplst[0].opname == 'CCALL'
+    assert muoplst[0].callee == muni.c_memcpy

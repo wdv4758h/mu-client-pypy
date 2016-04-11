@@ -10,7 +10,6 @@ from .muts import mutype as mut
 from .muts import muops as muop
 from .ll2mu import *
 from .ll2mu import _MuOpList
-from.adrderv import AddressDerivationTracker
 import py
 from rpython.tool.ansi_print import ansi_log
 
@@ -26,7 +25,6 @@ class MuTyper:
         self.gbltypes = set()   # Types that need to be defined on the global level
         self._cnst_gcell_dict = {}  # mapping Constant to MuGlobalCell
         self._seen = set()
-        self._addrder = AddressDerivationTracker()
         self._externfncs = {}   # MuExternalFunc -> {FunctionGraph: [MuOperation]}
         pass
 
@@ -41,8 +39,6 @@ class MuTyper:
 
         for idx, blk in enumerate(g.iterblocks()):
             blk.mu_name = MuName("blk%d" % idx, g)
-
-        self._addrder.analyse(g)    # tag the Address types
 
         for blk in g.iterblocks():
             self.specialise_block(blk)
@@ -182,7 +178,7 @@ class MuTyper:
         blk_init = g.startblock
         ops = _MuOpList()
         for extfnc, dic in self._externfncs.items():
-            if g in callsites:
+            if g in dic:
                 callsites = dic[g]
                 adr = ops.append(muops.LOAD(extfnc.gcl_adr))
                 ptr = ops.append(muops.PTRCAST(adr, extfnc))
