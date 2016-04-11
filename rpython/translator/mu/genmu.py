@@ -25,17 +25,20 @@ class MuTextIRGenerator:
         for t in self.mutyper.gbltypes:
             if isinstance(t, MuFuncRef):
                 fp_ir.write(".funcsig %s = %s\n" % (t.Sig.mu_name, t.Sig.mu_constructor))
-                fp_ir.write(".funcdecl %s <%s>\n" % (t.mu_name, t.Sig.mu_name))
-            fp_ir.write(".typedef %s = %s\n" % (t.mu_name, t.mu_constructor))
+            else:
+                fp_ir.write(".typedef %s = %s\n" % (t.mu_name, t.mu_constructor))
 
         for c in self.mutyper.gblcnsts:
-            fp_ir.write(".const %s = %s\n" % (c.mu_name, c.value))
+            fp_ir.write(".const %s <%s> = %s\n" % (c.mu_name, c.mu_type.mu_name, c.value))
 
         hailgen = HAILGenerator()
         for gcell in self.mutyper.ldgcells:
             fp_ir.write(".global %s <%s>\n" % (gcell.mu_name, gcell._T.mu_name))
             hailgen.add_gcell(gcell)
         hailgen.codegen(fp_hail)
+
+        for gcl in self.mutyper.externfncs:
+            fp_ir.write(".global %s <%s>\n" % (gcl.mu_name, gcl._T.mu_name))
 
         for g in self.graphs:
             fp_ir.write(".funcdef %s VERSION %s <%s> {\n" % (g.mu_name, g.mu_version.mu_name,

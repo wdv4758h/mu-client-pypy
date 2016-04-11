@@ -1,6 +1,11 @@
+from rpython.mutyper.muts.muentity import MuName, MuGlobalCell
 from rpython.rtyper.lltypesystem import lltype
+from rpython.rtyper.lltypesystem import llmemory
+from rpython.rtyper.lltypesystem.llmemory import ItemOffset
 from .muts import mutype
 from .muts import muops
+from .muts import muni
+from rpython.translator.mu import mem as mumem
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
 from rpython.rlib.rarithmetic import _inttypes
@@ -21,7 +26,11 @@ def ll2mu_ty(llt):
     :param llt: LLType
     :return: MuType
     """
-    if isinstance(llt, lltype.Primitive):
+    if isinstance(llt, mutype.MuType):
+        return llt
+    if llt is llmemory.Address:
+        return _lltype2mu_addr(llt)
+    elif isinstance(llt, lltype.Primitive):
         return _lltype2mu_prim(llt)
     elif isinstance(llt, lltype.FixedSizeArray):
         return _lltype2mu_arrfix(llt)
@@ -118,43 +127,52 @@ def _lltype2mu_funcptr(llt):
     return mutype.MuFuncRef(sig)
 
 
+def _lltype2mu_addr(llt):
+    # return mutype.MuUPtr(mutype.void_t)     # all Address types are translated into uptr<void>
+    return mutype.int64_t           # Assume Addresses are 64 bit.
+
 # ----------------------------------------------------------
 __ll2muval_cache = {}
 __ll2muval_cache_ptr = {}
 
 
-def ll2mu_val(llv, llt=None):
+def ll2mu_val(llv):
+    if isinstance(llv, mutype._muobject):
+        return llv
     if isinstance(llv, CDefinedIntSymbolic):
         llv = llv.default
     elif isinstance(llv, TotalOrderSymbolic):
         llv = llv.compute_fn()
+    elif isinstance(llv, ItemOffset):
+        llv = mumem.mu_sizeOf(ll2mu_ty(llv.TYPE))
 
     cache, v = (__ll2muval_cache_ptr, llv._obj) if isinstance(llv, lltype._ptr) else (__ll2muval_cache, llv)
     try:
         return cache[v]
     except KeyError:
-        muv = _ll2mu_val(llv, llt)
+        muv = _ll2mu_val(llv)
         cache[v] = muv
         return muv
+    except TypeError, e:
+        if isinstance(llv, llmemory.AddressOffset):
+            return _ll2mu_val(llv)
+        else:
+            raise e
 
 
-def _ll2mu_val(llv, llt=None):
+def _ll2mu_val(llv):
     """
     Map LLTS value types to MuTS value types
     :param llv: LLTS value
     :param llt: optional LLType, if the type information cannot be obtained from llv (Primitives)
     :return: _muobject
     """
-    if isinstance(llv, (int, float)):
-        if not isinstance(llt, lltype.Primitive):
-            raise TypeError("Wrong type information '%r' for specialising %r" % (llt, llv))
-        return _llval2mu_prim(llv, llt)
+    llt = lltype.typeOf(llv)
+    if isinstance(llv, llmemory.AddressOffset):
+        return _llval2mu_adrofs(llv)
 
-    elif isinstance(llv, CDefinedIntSymbolic):
-        return _llval2mu_prim(llv.default, llt)
-
-    elif isinstance(llv, TotalOrderSymbolic):
-        return _llval2mu_prim(llv.compute_fn(), llt)
+    elif isinstance(llt, lltype.Primitive):
+        return _llval2mu_prim(llv)
 
     elif isinstance(llv, lltype._fixedsizearray):
         return _llval2mu_arrfix(llv)
@@ -167,18 +185,18 @@ def _ll2mu_val(llv, llt=None):
 
     elif isinstance(llv, lltype._ptr):
         return _llval2mu_ptr(llv)
-    elif llt == lltype.Char and len(llv) == 1:
-        return _llval2mu_prim(ord(llv), llt)
     else:
-        raise NotImplementedError("Don't know how to specialise value type %r." % llv)
+        raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
 
 
-def _llval2mu_prim(llv, llt):
-    mut = ll2mu_ty(llt)
+def _llval2mu_prim(llv):
+    mut = ll2mu_ty(lltype.typeOf(llv))
     if isinstance(llv, TotalOrderSymbolic):
         llv = llv.compute_fn()
     elif isinstance(llv, CDefinedIntSymbolic):
         llv = llv.default
+    elif isinstance(llv, str):  # char
+        llv = ord(llv)
 
     return mutype._muprimitive(mut, llv)
 
@@ -187,7 +205,7 @@ def _llval2mu_arrfix(llv):
     mut = ll2mu_ty(llv._TYPE)
     arr = mutype._muarray(mut)
     for i in range(llv.getlength()):
-        arr[i] = ll2mu_val(llv.getitem(i), llv._TYPE.OF)
+        arr[i] = ll2mu_val(llv.getitem(i))
 
     return arr
 
@@ -199,7 +217,7 @@ def _llval2mu_stt(llv):
     mut = ll2mu_ty(llv._TYPE)
     stt = mutype._mustruct(mut)
     for fld in mut._names:
-        setattr(stt, fld, ll2mu_val(getattr(llv, fld), getattr(llv._TYPE, fld)))
+        setattr(stt, fld, ll2mu_val(getattr(llv, fld)))
 
     return stt
 
@@ -210,23 +228,22 @@ def _llval2mu_varstt(llv):
     hyb = mutype._muhybrid(mut, mut.length(arr.getlength()))
 
     for fld in llv._TYPE._names[:-1]:
-        setattr(hyb, fld, ll2mu_val(getattr(llv, fld), getattr(llv._TYPE, fld)))
+        setattr(hyb, fld, ll2mu_val(getattr(llv, fld)))
 
     for i in range(arr.getlength()):
-        getattr(hyb, mut._varfld)[i] = ll2mu_val(arr.getitem(i), arr._TYPE.OF)
+        getattr(hyb, mut._varfld)[i] = ll2mu_val(arr.getitem(i))
 
-    hyb.length = ll2mu_val(arr.getlength(), lltype.Signed)
+    hyb.length = ll2mu_val(arr.getlength())
 
     return hyb
 
 
 def _llval2mu_arr(llv):
     mut = ll2mu_ty(llv._TYPE)
-    hyb = mutype._muhybrid(mut, llv.getlength())
+    hyb = mutype._muhybrid(mut, ll2mu_val(llv.getlength()))
 
-    hyb.length = ll2mu_val(llv.getlength(), mut.length)    # Hybrids converted from Array should have a 'length' field
-    for i in range(hyb.length):
-        hyb[i] = ll2mu_val(llv.getitem(i), llv._TYPE.OF)
+    for i in range(hyb.length.val):
+        hyb[i] = ll2mu_val(llv.getitem(i))
 
     return hyb
 
@@ -246,6 +263,25 @@ def _llval2mu_funcptr(llv):
                           graph=getattr(llv._obj, 'graph', None),
                           fncname=getattr(llv._obj, '_name', ''),
                           compilation_info=getattr(llv._obj, 'compilation_info', None))
+
+
+def _llval2mu_adrofs(llv):
+    def rec(llv):
+        if isinstance(llv, llmemory.CompositeOffset):
+            ofs = 0
+            for llv2 in llv.offsets:
+                ofs += rec(llv2)
+            return ofs
+        elif isinstance(llv, llmemory.ItemOffset):
+            return mumem.mu_offsetOf(mutype.MuArray(ll2mu_ty(llv.TYPE), llv.repeat), llv.repeat)
+        elif isinstance(llv, llmemory.FieldOffset):
+            return mumem.mu_offsetOf(ll2mu_ty(llv.TYPE), llv.fldname)
+        elif isinstance(llv, llmemory.ArrayItemsOffset):
+            return 0
+        else:
+            raise AssertionError("Value {:r} of type {:r} shouldn't appear.".format(llv, type(llv)))
+
+    return ll2mu_ty(lltype.typeOf(llv))(rec(llv))
 
 
 # ----------------------------------------------------------
@@ -271,6 +307,7 @@ def _ll2mu_op(opname, args, result=None):
 def _newprimconst(mut, primval):
     c = Constant(mut(primval))
     c.mu_type = mut
+    c.mu_name = MuName(str(primval))
     return c
 
 
@@ -449,7 +486,7 @@ def _llop2mu_malloc_varsize(T, n, res=None, llopname='malloc_varsize'):
 
 def __getfieldiref(var, fld):
     ops = _MuOpList()
-    iref = var if isinstance(var.mu_type, mutype.MuIRef) else ops.append(muops.GETIREF(var))
+    iref = var if isinstance(var.mu_type, (mutype.MuIRef, mutype.MuUPtr)) else ops.append(muops.GETIREF(var))
     mu_t = iref.mu_type.TO
     if isinstance(mu_t, mutype.MuHybrid) and fld == mu_t._varfld:
         iref_fld = ops.append(muops.GETVARPARTIREF(iref))
@@ -497,7 +534,7 @@ def _llop2mu_getarraysize(var, res=None, llopname='getarraysize'):
 
 def __getinterioriref(var, offsets):
     ops = _MuOpList()
-    iref = var if isinstance(var.mu_type, mutype.MuIRef) else ops.append(muops.GETIREF(var))
+    iref = var if isinstance(var.mu_type, (mutype.MuIRef, mutype.MuUPtr)) else ops.append(muops.GETIREF(var))
     for o in offsets:
         if o.concretetype == lltype.Void:
             assert isinstance(o.value, str)
@@ -520,7 +557,7 @@ def _llop2mu_getinteriorfield(var, *offsets, **kwargs):
 def _llop2mu_setinteriorfield(var, *offsets_val, **kwards):
     offsets, val = offsets_val[:-1], offsets_val[-1]
     iref, ops = __getinterioriref(var, offsets)
-    ops.extend(muops.STORE(iref, val))
+    ops.append(muops.STORE(iref, val))
     return ops
 
 
@@ -536,7 +573,7 @@ def _llop2mu_getinteriorarraysize(var, *offsets, **kwargs):
 
 
 def _llop2mu_cast_pointer(cst_TYPE, var_ptr, res=None, llopname='cast_pointer'):
-    return [muops.REFCAST(var_ptr, res.mu_typem if res else ll2mu_ty(cst_TYPE.value), result=res)]
+    return [muops.REFCAST(var_ptr, res.mu_type if res else ll2mu_ty(cst_TYPE.value), result=res)]
 
 
 def _llop2mu_ptr_eq(ptr1, ptr2, res=None, llopname='ptr_eq'):
@@ -548,14 +585,74 @@ def _llop2mu_ptr_ne(ptr1, ptr2, res=None, llopname='ptr_eq'):
 
 
 def _llop2mu_ptr_nonzero(ptr, res=None, llopname='ptr_nonzero'):
-    cst = Constant(mutype.NULL)
+    cst = Constant(mutype._munullref(ptr.mu_type))
     cst.mu_type = ptr.mu_type
+    cst.mu_name = MuName("NULL_%s" % ptr.mu_type.mu_name._name)
     return _llop2mu_ptr_ne(ptr, cst, res)
 
 
 def _llop2mu_ptr_zero(ptr, res=None, llopname='ptr_zero'):
-    cst = Constant(mutype.NULL)
+    cst = Constant(mutype._munullref(ptr.mu_type))
     cst.mu_type = ptr.mu_type
+    cst.mu_name = MuName("NULL_%s" % ptr.mu_type.mu_name._name)
     return _llop2mu_ptr_eq(ptr, cst, res)
+
+
+# ----------------
+# address operations
+def _llop2mu_keepalive(ptr, res=None, llopname='keepalive'):
+    return [muops.NATIVE_UNPIN(ptr, result=res)]
+
+
+def __raw2ccall(*args, **kwargs):
+    ops = _MuOpList()
+    externfnc = getattr(muni, kwargs['llopname'].replace('raw', 'c'))
+    fnp = ops.append(muops.LOAD(externfnc))
+    sig = externfnc._T.Sig
+    args = list(args)
+    for i, arg_t in enumerate(sig.ARGS):
+        if isinstance(arg_t, mutype.MuUPtr):
+            args[i] = ops.append(muops.PTRCAST(args[i], mutype.MuUPtr(mutype.void_t)))    # cast to uptr<void>
+    ops.append(muops.CCALL(fnp, args, result=kwargs['res']))
+    return ops
+
+for op in 'malloc free memset memcopy memmove'.split(' '):
+    globals()['_llop2mu_raw_' + op] = __raw2ccall
+
+
+# def _llop2mu_raw_memclear():
+#     pass
+#
+#
+# def _llop2mu_raw_load():
+#     pass
+#
+#
+# def _llop2mu_raw_store():
+#     pass
+
+for op in "add sub lt le eq ne gt ge".split(' '):
+    globals()['_llop2mu_adr_' + op] = lambda adr1, adr2, res, llopname:\
+        _ll2mu_op(llopname.replace('adr', 'int'), (adr1, adr2), res)
+
+
+def _llop2mu_adr_delta(adr1, adr2, res=None, llopname='adr_delta'):
+    return _ll2mu_op('int_sub', (adr2, adr1), res)
+
+
+def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
+    ops = _MuOpList()
+    adr = ops.append(muops.NATIVE_PIN(ptr))
+    ops.append(muops.PTRCAST(adr, ll2mu_ty(llmemory.Address), result=res))
+    return ops
+
+
+def _llop2mu_cast_adr_to_int(ptr, res=None, llopname='cast_adr_to_int'):
+    return []
+
+
+def _llop2mu_cast_int_to_adr(n, res=None, llopname='cast_adr_to_int'):
+    return []
+
 
 # TODO: rest of the operations

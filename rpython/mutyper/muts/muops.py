@@ -72,7 +72,7 @@ class MuOperation(object):
         for key, val in kwargs.items():
             setattr(self, key, val)
 
-        self._args = args
+        self._args = list(args)
 
         # also sets the argument names to attributes,
         # so that we can do things like: op.T2 etc.
@@ -191,7 +191,7 @@ RET = _newop("RET", "rv",
 
 THROW = _newop("THROW", "exc",
                lambda args: void_t,
-               lambda op: "%s" % op.exc)
+               lambda op: "%s" % op.exc.mu_name)
 
 
 # ----------------------------------------------------------------
@@ -291,7 +291,7 @@ def _newcomminst(inst_name, arg_names, rtn_t_fnc, str_fnc):
                 {'__init__': MuOperation.__init__,
                  '_inst_mu_name': MuName(inst_name),
                  '_fnc_rtntype': rtn_t_fnc,
-                 '_fnc_str': lambda op: "COMMINST %s %s" % (op.__class__.__dict__['inst_mu_name'], str_fnc(op)),
+                 '_fnc_str': lambda op: "%s %s" % (op.__class__.__dict__['_inst_mu_name'], str_fnc(op)),
                  '_arg_names': arg_names.split(' ')})
 
 THREAD_EXIT = _newcomminst("uvm.thread_exit", "", lambda args: void_t, lambda op: "")
@@ -301,7 +301,8 @@ NATIVE_PIN = _newcomminst("uvm.native.pin", "opnd",
                           lambda (opnd, ): MuUPtr(opnd.mu_type.TO),
                           lambda op: "<%s> (%s)" % (op.opnd.mu_type.mu_name, op.opnd.mu_name))
 NATIVE_UNPIN = _newcomminst("uvm.native.unpin", "opnd",
-                            lambda args: void_t, NATIVE_PIN.__dict__['_fnc_str'])
+                            lambda args: void_t,
+                            lambda op: "<%s> (%s)" % (op.opnd.mu_type.mu_name, op.opnd.mu_name))
 
 NATIVE_EXPOSE = _newcomminst("uvm.native.expose", "func cookie",
                              lambda (func, cookie): MuUFuncPtr(func.mu_type.Sig),

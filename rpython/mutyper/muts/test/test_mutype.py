@@ -7,8 +7,8 @@ from ..mutype import (
     MuFuncSig, MuFuncRef, _mufuncref,
     MuRef, MuIRef, _muref, _muiref,
     MuUPtr, _muuptr,
-    new, newhybrid
-)
+    new, newhybrid,
+    mu_sizeOf)
 from ..muentity import MuName
 
 
@@ -247,3 +247,16 @@ def test_memalloc():
     rh = newhybrid(H, int64_t(10))
     assert rh._getiref().chars._obj == int8_t(0)
 
+
+def test_sizeOf():
+    A = MuArray(int8_t, 3)
+    assert mu_sizeOf(A) == 3
+
+    PA = MuRef(A)
+    assert mu_sizeOf(PA) == 8
+
+    S = MuStruct("test", ('arr', A), ('n', int64_t))
+    assert mu_sizeOf(S) == 16
+
+    EX = MuStruct("MixedData", ('data1', char_t), ('data2', int16_t), ('data3', int32_t), ('data4', char_t))
+    assert mu_sizeOf(EX) == 12

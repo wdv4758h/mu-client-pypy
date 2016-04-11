@@ -89,6 +89,11 @@ def prepare(graphs, entry_graph):
 
         for _, op in g.iterblockops():
             op.args = [arg for arg in op.args if _keep_arg(arg)]
+            if op.opname == 'cast_pointer':     # fix problem with some cast_pointer ops that don't have CAST_TYPE
+                try:
+                    assert isinstance(op.args[0], Constant) and isinstance(op.args[0].value, LowLevelType)
+                except AssertionError:
+                    op.args.insert(0, Constant(op.result.concretetype, Void))
 
         # Remove the Void inputarg in return block and (None) constants in links.
         if g.returnblock.inputargs[0].concretetype == Void:

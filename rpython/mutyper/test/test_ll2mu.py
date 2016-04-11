@@ -1,9 +1,11 @@
 import pytest
-from rpython.mutyper.mutyper import MuTyper
+from rpython.mutyper.muts.muentity import MuName
+from rpython.mutyper.mutyper import MuTyper, muni
 from rpython.translator.mu.preps import prepare
 from ..ll2mu import ll2mu_ty, ll2mu_val, ll2mu_op
 from rpython.rtyper.lltypesystem import lltype as ll
 from rpython.mutyper.muts import mutype as mu
+from rpython.mutyper.muts import muops
 from rpython.rtyper.lltypesystem.rstr import STR
 from rpython.rtyper.rclass import OBJECT
 from rpython.rtyper.test.test_llinterp import gengraph
@@ -37,13 +39,15 @@ def test_ll2mu_ty():
 
 
 def test_ll2mu_val():
-    assert ll2mu_val(1, ll.Signed) == mu._muprimitive(mu.int64_t, 1)
+    assert ll2mu_val(1) == mu._muprimitive(mu.int64_t, 1)
 
     string = "hello"
     ll_ps = ll.malloc(STR, len(string))
     ll_ps.hash = hash(string)
     for i in range(len(string)):
         ll_ps.chars[i] = string[i]
+
+    assert ll2mu_val('h') == mu.int8_t(ord('h'))
 
     mu_rs = ll2mu_val(ll_ps)
     assert isinstance(mu_rs, mu._muref)
@@ -225,3 +229,88 @@ def test_crush():
     print v, v._TYPE
     with pytest.raises(NotImplementedError):
         ll2mu_val(v)
+
+
+def test_address():
+    def f(s):
+        return s + '_suffix'
+
+    t, _, g_f = gengraph(f, [str], backendopt=True)
+
+    g = g_f.startblock.operations[0].args[0].value._obj.graph
+    # print_graph(g)
+
+    blk = g.startblock.exits[1].target.exits[1].target
+    blk.mu_name = MuName('blk_4', g)
+    # ------------------------------------------------------
+    # blk_4
+    # input: [dst_0, src_0, length_10, len2_0, s2_3]
+    # operations:
+    #   0   v94 = debug_assert((True), ('copystrc: negative srcstart'))
+    #   1   v95 = int_add((0), length_10)
+    #   2   v96 = getinteriorarraysize(src_0, ('chars'))
+    #   3   v97 = int_le(v95, v96)
+    #   4   v98 = debug_assert(v97, ('copystrc: src ovf'))
+    #   5   v99 = debug_assert((True), ('copystrc: negative dststart'))
+    #   6   v100 = int_add((0), length_10)
+    #   7   v101 = getinteriorarraysize(dst_0, ('chars'))
+    #   8   v102 = int_le(v100, v101)
+    #   9   v103 = debug_assert(v102, ('copystrc: dst ovf'))
+    #  10   v104 = cast_ptr_to_adr(src_0)
+    #  11   v105 = adr_add(v104, (< <FieldOffset <GcStru...r> 0> >))
+    #  12   v106 = cast_ptr_to_adr(dst_0)
+    #  13   v107 = adr_add(v106, (< <FieldOffset <GcStru...r> 0> >))
+    #  14   v108 = int_mul((<ItemOffset <Char> 1>), length_10)
+    #  15   v109 = raw_memcopy(v105, v107, v108)
+    #  16   v110 = keepalive(src_0)
+    #  17   v111 = keepalive(dst_0)
+    #  18   v112 = int_ge(len2_0, (0))
+    # switch: v112
+    # exits: [('blk_3', [(<* struct object_vtabl...=... }>), (<* struct object { typ...=... }>)]),
+    #           ('blk_5', [dst_0, length_10, s2_3, len2_0])]
+    # ------------------------------------------------------
+    op = blk.operations[10]     # v104 = cast_ptr_to_adr(src_0)
+    op.args[0].mu_type = ll2mu_ty(op.args[0].concretetype)
+    op.args[0].mu_name = MuName(op.args[0].name)
+    assert ll2mu_ty(op.result.concretetype) == mu.int64_t
+    op.result.mu_type = ll2mu_ty(op.result.concretetype)
+    op.result.mu_name = MuName(op.result.name)
+    assert ll2mu_op(op)[0]._inst_mu_name._name == 'uvm.native.pin'
+
+    op = blk.operations[11]
+    op.args[0].mu_name = MuName(op.args[0].name, blk)
+    op.result.mu_name = MuName(op.result.name, blk)
+    muoplst = ll2mu_op(op)
+    assert len(muoplst) == 1
+    assert muoplst[0].opname == 'ADD'
+
+    assert isinstance(ll2mu_op(blk.operations[16])[0], muops.NATIVE_UNPIN)
+
+    op = blk.operations[14]     # v108 = int_mul((<ItemOffset <Char> 1>), length_10)
+    assert ll2mu_val(op.args[0].value) == mu.int64_t(1)
+
+    op = blk.operations[15]     # v109 = raw_memcopy(v105, v107, v108)
+    for arg in op.args:
+        arg.mu_name = MuName(arg.name, blk)
+    muoplst = ll2mu_op(op)
+    assert muoplst[0].opname == 'LOAD'
+    assert muoplst[0].loc == muni.c_memcpy
+
+
+def test_adrofs():
+    def f(s):
+        return s + '_suffix'
+
+    t, _, g_f = gengraph(f, [str], backendopt=True)
+
+    g = g_f.startblock.operations[0].args[0].value._obj.graph
+    # print_graph(g)
+    blk = g.startblock.exits[1].target.exits[1].target
+
+    op = blk.operations[14]  # v108 = int_mul((<ItemOffset <Char> 1>), length_10)
+    ofs = op.args[0].value
+    assert ll2mu_val(ofs) == mu.int64_t(1)
+
+    op = blk.operations[11]
+    ofs = op.args[1].value
+    assert ll2mu_val(ofs) == mu.int64_t(16)
