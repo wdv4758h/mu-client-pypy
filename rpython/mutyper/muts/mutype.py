@@ -191,8 +191,7 @@ class MuStruct(MuContainerType):
         """
         self._name = name
         MuType.__init__(self, MuStruct.type_prefix + name)
-        if fields:
-            self._setfields(fields)
+        self._setfields(fields)
 
     def _setfields(self, fields):
         flds = {}
@@ -1012,48 +1011,3 @@ def muint_type(intval):
         maxsint = (1 << (int_t.bits - 1)) - 1
         if -maxsint - 1 <= intval <= maxuint:
             return int_t
-
-
-def mu_sizeOf(mutype):
-    def alignUp(n, sz):
-        return n if n % sz == 0 else (n/sz + 1) * sz
-
-    if isinstance(mutype, MuHybrid):
-        raise TypeError("Cannot get size of MuHybrid type.")
-
-    if not isinstance(mutype, MuContainerType):
-        return _mu_alignOf(mutype)
-
-    if isinstance(mutype, MuStruct):
-        return alignUp(reduce(lambda n, ty: alignUp(n, _mu_alignOf(ty)) + mu_sizeOf(ty),
-                              map(lambda fld: getattr(mutype, fld), mutype._names),
-                              0),
-                       _mu_alignOf(mutype))
-
-    if isinstance(mutype, MuArray):
-        return alignUp(mu_sizeOf(mutype.OF), _mu_alignOf(mutype.OF)) * mutype.length
-
-
-def _mu_alignOf(mutype):
-    _prim_map = {
-        int1_t: 1,
-        int8_t: 1,
-        int16_t: 2,
-        int32_t: 4,
-        int64_t: 8,
-        float_t: 4,
-        double_t: 8
-    }
-    try:
-        return _prim_map[mutype]
-    except KeyError:
-        pass
-
-    if isinstance(mutype, MuRefType):
-        return 8
-
-    if isinstance(mutype, MuStruct):
-        return max(*[_mu_alignOf(getattr(mutype, fld)) for fld in mutype._names])
-
-    if isinstance(mutype, MuArray):
-        return _mu_alignOf(mutype.OF)

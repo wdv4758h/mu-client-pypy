@@ -5,6 +5,7 @@ from rpython.rtyper.lltypesystem.llmemory import ItemOffset
 from .muts import mutype
 from .muts import muops
 from .muts import muni
+from rpython.translator.mu import mem as mumem
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
 from rpython.rlib.rarithmetic import _inttypes
@@ -127,7 +128,8 @@ def _lltype2mu_funcptr(llt):
 
 
 def _lltype2mu_addr(llt):
-    return mutype.MuUPtr(mutype.void_t)     # all Address types are translated into uptr<void>
+    # return mutype.MuUPtr(mutype.void_t)     # all Address types are translated into uptr<void>
+    return mutype.int64_t           # Assume Addresses are 64 bit.
 
 # ----------------------------------------------------------
 __ll2muval_cache = {}
@@ -142,7 +144,7 @@ def ll2mu_val(llv):
     elif isinstance(llv, TotalOrderSymbolic):
         llv = llv.compute_fn()
     elif isinstance(llv, ItemOffset):
-        llv = mutype.mu_sizeOf(ll2mu_ty(llv.TYPE))
+        llv = mumem.mu_sizeOf(ll2mu_ty(llv.TYPE))
 
     cache, v = (__ll2muval_cache_ptr, llv._obj) if isinstance(llv, lltype._ptr) else (__ll2muval_cache, llv)
     try:
@@ -151,6 +153,11 @@ def ll2mu_val(llv):
         muv = _ll2mu_val(llv)
         cache[v] = muv
         return muv
+    except TypeError, e:
+        if isinstance(llv, llmemory.AddressOffset):
+            return _ll2mu_val(llv)
+        else:
+            raise e
 
 
 def _ll2mu_val(llv):
@@ -161,7 +168,10 @@ def _ll2mu_val(llv):
     :return: _muobject
     """
     llt = lltype.typeOf(llv)
-    if isinstance(llt, lltype.Primitive):
+    if isinstance(llv, llmemory.AddressOffset):
+        return _llval2mu_adrofs(llv)
+
+    elif isinstance(llt, lltype.Primitive):
         return _llval2mu_prim(llv)
 
     elif isinstance(llv, lltype._fixedsizearray):
@@ -253,6 +263,25 @@ def _llval2mu_funcptr(llv):
                           graph=getattr(llv._obj, 'graph', None),
                           fncname=getattr(llv._obj, '_name', ''),
                           compilation_info=getattr(llv._obj, 'compilation_info', None))
+
+
+def _llval2mu_adrofs(llv):
+    def rec(llv):
+        if isinstance(llv, llmemory.CompositeOffset):
+            ofs = 0
+            for llv2 in llv.offsets:
+                ofs += rec(llv2)
+            return ofs
+        elif isinstance(llv, llmemory.ItemOffset):
+            return mumem.mu_offsetOf(mutype.MuArray(ll2mu_ty(llv.TYPE), llv.repeat), llv.repeat)
+        elif isinstance(llv, llmemory.FieldOffset):
+            return mumem.mu_offsetOf(ll2mu_ty(llv.TYPE), llv.fldname)
+        elif isinstance(llv, llmemory.ArrayItemsOffset):
+            return 0
+        else:
+            raise AssertionError("Value {:r} of type {:r} shouldn't appear.".format(llv, type(llv)))
+
+    return ll2mu_ty(lltype.typeOf(llv))(rec(llv))
 
 
 # ----------------------------------------------------------

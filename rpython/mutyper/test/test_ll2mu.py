@@ -289,3 +289,22 @@ def test_address():
     muoplst = ll2mu_op(op)
     assert muoplst[0].opname == 'LOAD'
     assert muoplst[0].loc == muni.c_memcpy
+
+
+def test_adrofs():
+    def f(s):
+        return s + '_suffix'
+
+    t, _, g_f = gengraph(f, [str], backendopt=True)
+
+    g = g_f.startblock.operations[0].args[0].value._obj.graph
+    # print_graph(g)
+    blk = g.startblock.exits[1].target.exits[1].target
+
+    op = blk.operations[14]  # v108 = int_mul((<ItemOffset <Char> 1>), length_10)
+    ofs = op.args[0].value
+    assert ll2mu_val(ofs) == mu.int64_t(1)
+
+    op = blk.operations[11]
+    ofs = op.args[1].value
+    assert ll2mu_val(ofs) == mu.int64_t(16)

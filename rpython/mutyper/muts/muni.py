@@ -3,7 +3,7 @@ Some native interface stuff.
 """
 from .mutype import *
 from .muentity import MuGlobalCell
-
+from rpython.translator.mu.mem import mu_sizeOf
 
 __voidptr_t = MuUPtr(void_t)
 __ptr_int_t = MuInt(mu_sizeOf(__voidptr_t) * 8)     # the corresponding int type for pointers.
