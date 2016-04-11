@@ -270,15 +270,19 @@ def test_address():
     #           ('blk_5', [dst_0, length_10, s2_3, len2_0])]
     # ------------------------------------------------------
     op = blk.operations[10]     # v104 = cast_ptr_to_adr(src_0)
+    op.args[0].mu_type = ll2mu_ty(op.args[0].concretetype)
+    op.args[0].mu_name = MuName(op.args[0].name)
     assert ll2mu_ty(op.result.concretetype) == mu.int64_t
+    op.result.mu_type = ll2mu_ty(op.result.concretetype)
+    op.result.mu_name = MuName(op.result.name)
     assert ll2mu_op(op)[0]._inst_mu_name._name == 'uvm.native.pin'
 
     op = blk.operations[11]
     op.args[0].mu_name = MuName(op.args[0].name, blk)
     op.result.mu_name = MuName(op.result.name, blk)
     muoplst = ll2mu_op(op)
-    assert len(muoplst) == 2
-    assert muoplst[0].opnd.mu_type.TO == ll2mu_ty(op.args[1].value.offsets[0].TYPE)
+    assert len(muoplst) == 1
+    assert muoplst[0].opname == 'ADD'
 
     assert isinstance(ll2mu_op(blk.operations[16])[0], muops.NATIVE_UNPIN)
 
@@ -286,6 +290,8 @@ def test_address():
     assert ll2mu_val(op.args[0].value) == mu.int64_t(1)
 
     op = blk.operations[15]     # v109 = raw_memcopy(v105, v107, v108)
+    for arg in op.args:
+        arg.mu_name = MuName(arg.name, blk)
     muoplst = ll2mu_op(op)
     assert muoplst[0].opname == 'LOAD'
     assert muoplst[0].loc == muni.c_memcpy

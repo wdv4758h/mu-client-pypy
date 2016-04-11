@@ -608,6 +608,11 @@ def __raw2ccall(*args, **kwargs):
     ops = _MuOpList()
     externfnc = getattr(muni, kwargs['llopname'].replace('raw', 'c'))
     fnp = ops.append(muops.LOAD(externfnc))
+    sig = externfnc._T.Sig
+    args = list(args)
+    for i, arg_t in enumerate(sig.ARGS):
+        if isinstance(arg_t, mutype.MuUPtr):
+            args[i] = ops.append(muops.PTRCAST(args[i], mutype.MuUPtr(mutype.void_t)))    # cast to uptr<void>
     ops.append(muops.CCALL(fnp, args, result=kwargs['res']))
     return ops
 
@@ -626,31 +631,13 @@ for op in 'malloc free memset memcopy memmove'.split(' '):
 # def _llop2mu_raw_store():
 #     pass
 
-for op in "add sub lt le eq ne gt ge":
-    globals()['_llop2mu_adr_' + op] = globals()['_llop2mu_int_' + op]
-
-# TODO: revise
-def __cast_ptr_to_int(ptr, res=None):
-    return [muops.PTRCAST(ptr, muni.__ptr_int_t, result=res)]
+for op in "add sub lt le eq ne gt ge".split(' '):
+    globals()['_llop2mu_adr_' + op] = lambda adr1, adr2, res, llopname:\
+        _ll2mu_op(llopname.replace('adr', 'int'), (adr1, adr2), res)
 
 
-def _llop2mu_adr_delta(ptr1, ptr2, res=None, llopname='adr_delta'):
-    ops = _MuOpList()
-    adr1 = ops.extend(__cast_ptr_to_int(ptr1))
-    adr2 = ops.extend(__cast_ptr_to_int(ptr2))
-    ops.extend(_ll2mu_op('int_sub', (adr2, adr1), res))
-    return ops
-
-
-def __adr_cmp(ptr1, ptr2, res=None, llopname=''):
-    ops = _MuOpList()
-    adr1 = ops.extend(__cast_ptr_to_int(ptr1))
-    adr2 = ops.extend(__cast_ptr_to_int(ptr2))
-    ops.extend(_ll2mu_op(llopname.replace('adr', 'int'), (adr1, adr2), res))
-    return ops
-
-for cmpop in "lt le eq ne gt ge".split(' '):
-    globals()['_llop2mu_adr_' + cmpop] = __adr_cmp
+def _llop2mu_adr_delta(adr1, adr2, res=None, llopname='adr_delta'):
+    return _ll2mu_op('int_sub', (adr2, adr1), res)
 
 
 def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
