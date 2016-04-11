@@ -132,7 +132,7 @@ __ll2muval_cache = {}
 __ll2muval_cache_ptr = {}
 
 
-def ll2mu_val(llv, llt=None):
+def ll2mu_val(llv):
     if isinstance(llv, CDefinedIntSymbolic):
         llv = llv.default
     elif isinstance(llv, TotalOrderSymbolic):
@@ -144,28 +144,21 @@ def ll2mu_val(llv, llt=None):
     try:
         return cache[v]
     except KeyError:
-        muv = _ll2mu_val(llv, llt)
+        muv = _ll2mu_val(llv)
         cache[v] = muv
         return muv
 
 
-def _ll2mu_val(llv, llt=None):
+def _ll2mu_val(llv):
     """
     Map LLTS value types to MuTS value types
     :param llv: LLTS value
     :param llt: optional LLType, if the type information cannot be obtained from llv (Primitives)
     :return: _muobject
     """
-    if isinstance(llv, (int, float)):
-        if not isinstance(llt, lltype.Primitive):
-            raise TypeError("Wrong type information '%r' for specialising %r" % (llt, llv))
-        return _llval2mu_prim(llv, llt)
-
-    elif isinstance(llv, CDefinedIntSymbolic):
-        return _llval2mu_prim(llv.default, llt)
-
-    elif isinstance(llv, TotalOrderSymbolic):
-        return _llval2mu_prim(llv.compute_fn(), llt)
+    llt = lltype.typeOf(llv)
+    if isinstance(llt, lltype.Primitive):
+        return _llval2mu_prim(llv)
 
     elif isinstance(llv, lltype._fixedsizearray):
         return _llval2mu_arrfix(llv)
@@ -178,18 +171,18 @@ def _ll2mu_val(llv, llt=None):
 
     elif isinstance(llv, lltype._ptr):
         return _llval2mu_ptr(llv)
-    elif llt == lltype.Char and len(llv) == 1:
-        return _llval2mu_prim(ord(llv), llt)
     else:
         raise NotImplementedError("Don't know how to specialise value type %r." % llv)
 
 
-def _llval2mu_prim(llv, llt):
-    mut = ll2mu_ty(llt)
+def _llval2mu_prim(llv):
+    mut = ll2mu_ty(lltype.typeOf(llv))
     if isinstance(llv, TotalOrderSymbolic):
         llv = llv.compute_fn()
     elif isinstance(llv, CDefinedIntSymbolic):
         llv = llv.default
+    elif isinstance(llv, str):  # char
+        llv = ord(llv)
 
     return mutype._muprimitive(mut, llv)
 
@@ -198,7 +191,7 @@ def _llval2mu_arrfix(llv):
     mut = ll2mu_ty(llv._TYPE)
     arr = mutype._muarray(mut)
     for i in range(llv.getlength()):
-        arr[i] = ll2mu_val(llv.getitem(i), llv._TYPE.OF)
+        arr[i] = ll2mu_val(llv.getitem(i))
 
     return arr
 
@@ -210,7 +203,7 @@ def _llval2mu_stt(llv):
     mut = ll2mu_ty(llv._TYPE)
     stt = mutype._mustruct(mut)
     for fld in mut._names:
-        setattr(stt, fld, ll2mu_val(getattr(llv, fld), getattr(llv._TYPE, fld)))
+        setattr(stt, fld, ll2mu_val(getattr(llv, fld)))
 
     return stt
 
@@ -221,12 +214,12 @@ def _llval2mu_varstt(llv):
     hyb = mutype._muhybrid(mut, mut.length(arr.getlength()))
 
     for fld in llv._TYPE._names[:-1]:
-        setattr(hyb, fld, ll2mu_val(getattr(llv, fld), getattr(llv._TYPE, fld)))
+        setattr(hyb, fld, ll2mu_val(getattr(llv, fld)))
 
     for i in range(arr.getlength()):
-        getattr(hyb, mut._varfld)[i] = ll2mu_val(arr.getitem(i), arr._TYPE.OF)
+        getattr(hyb, mut._varfld)[i] = ll2mu_val(arr.getitem(i))
 
-    hyb.length = ll2mu_val(arr.getlength(), lltype.Signed)
+    hyb.length = ll2mu_val(arr.getlength())
 
     return hyb
 
@@ -235,9 +228,9 @@ def _llval2mu_arr(llv):
     mut = ll2mu_ty(llv._TYPE)
     hyb = mutype._muhybrid(mut, llv.getlength())
 
-    hyb.length = ll2mu_val(llv.getlength(), mut.length)    # Hybrids converted from Array should have a 'length' field
+    hyb.length = ll2mu_val(llv.getlength())    # Hybrids converted from Array should have a 'length' field
     for i in range(hyb.length):
-        hyb[i] = ll2mu_val(llv.getitem(i), llv._TYPE.OF)
+        hyb[i] = ll2mu_val(llv.getitem(i))
 
     return hyb
 

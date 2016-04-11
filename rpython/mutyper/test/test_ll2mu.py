@@ -39,7 +39,7 @@ def test_ll2mu_ty():
 
 
 def test_ll2mu_val():
-    assert ll2mu_val(1, ll.Signed) == mu._muprimitive(mu.int64_t, 1)
+    assert ll2mu_val(1) == mu._muprimitive(mu.int64_t, 1)
 
     string = "hello"
     ll_ps = ll.malloc(STR, len(string))

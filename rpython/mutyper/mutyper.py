@@ -141,7 +141,7 @@ class MuTyper:
             elif isinstance(arg.value, llmemory.CompositeOffset):
                 pass    # ignore AddressOffsets; they will be dealt with in ll2mu_op.
             elif not isinstance(arg.value, (str, dict)):
-                arg.value = ll2mu_val(arg.value, arg.concretetype)
+                arg.value = ll2mu_val(arg.value)
                 if not isinstance(arg.value, mutype._mufuncref):
                     self.gblcnsts.add(arg)
                     arg.mu_name = MuName(str(arg.value))
