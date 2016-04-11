@@ -25,7 +25,7 @@ class MuTyper:
         self.gbltypes = set()   # Types that need to be defined on the global level
         self._cnst_gcell_dict = {}  # mapping Constant to MuGlobalCell
         self._seen = set()
-        self._externfncs = {}   # MuExternalFunc -> {FunctionGraph: [MuOperation]}
+        self.externfncs = set()
         pass
 
     def specialise(self, g):
@@ -44,7 +44,6 @@ class MuTyper:
             self.specialise_block(blk)
 
         self.proc_gcells(g)
-        self.proc_externfuncs(g)
 
     def specialise_block(self, blk):
         muops = []
@@ -90,19 +89,7 @@ class MuTyper:
                         self.gblcnsts.add(arg)
                     if isinstance(arg, MuExternalFunc):
                         # Addresses of some C functions stored in global cells need to be processed.
-                        try:
-                            d = self._externfncs[arg]
-                        except KeyError:
-                            d = {}
-                        g = blk.mu_name.scope
-                        try:
-                            l = d[g]
-                        except KeyError:
-                            l = []
-                        l.append(_o)
-                        d[g] = l
-                        self._externfncs[arg] = d
-                        # needs more processing (LOAD, PTRCAST)
+                        self.externfncs.add(arg)
             muops += _muops
         except NotImplementedError:
             log.warning("Ignoring '%s'." % op)
@@ -132,15 +119,20 @@ class MuTyper:
                     gcell = self._cnst_gcell_dict[arg]
 
                 return self._get_ldgcell_var(gcell, blk)
-            elif isinstance(arg.value, llt.LowLevelType):
-                arg.value = ll2mu_ty(arg.value)
-            elif isinstance(arg.value, llmemory.CompositeOffset):
-                pass    # ignore AddressOffsets; they will be dealt with in ll2mu_op.
-            elif not isinstance(arg.value, (str, dict)):
-                arg.value = ll2mu_val(arg.value)
-                if not isinstance(arg.value, mutype._mufuncref):
-                    self.gblcnsts.add(arg)
-                    arg.mu_name = MuName(str(arg.value))
+            else:
+                try:
+                    arg.value = ll2mu_val(arg.value)
+                    if not isinstance(arg.value, mutype._mufuncref):
+                        self.gblcnsts.add(arg)
+                        arg.mu_name = MuName(str(arg.value))
+                except (NotImplementedError, AssertionError):
+                    if isinstance(arg.value, llt.LowLevelType):
+                        arg.value = ll2mu_ty(arg.value)
+                    elif isinstance(arg.value, llmemory.CompositeOffset):
+                        pass    # ignore AddressOffsets; they will be dealt with in ll2mu_op.
+                    elif isinstance(arg.value, (str, dict)):
+                        pass
+
         else:
             arg.mu_name = MuName(arg.name, blk)
         return arg
@@ -166,22 +158,16 @@ class MuTyper:
                 ops.append(muop.LOAD(gcell, result=ldgcell))
 
         if len(ops) > 0:
-            blk = Block([])
-            blk.operations = tuple(ops)
-            blk.mu_name = MuName("blk_load", g)
-            blk.inputargs = g.startblock.inputargs
-            blk.exits = (Link(g.startblock.inputargs, g.startblock),)
-            blk.operations += (muop.BRANCH(DEST.from_link(blk.exits[0])),)
-            g.startblock = blk
+            _create_initblock(g, tuple(ops))
 
-    def proc_externfuncs(self, g):
-        blk_init = g.startblock
-        ops = _MuOpList()
-        for extfnc, dic in self._externfncs.items():
-            if g in dic:
-                callsites = dic[g]
-                adr = ops.append(muops.LOAD(extfnc.gcl_adr))
-                ptr = ops.append(muops.PTRCAST(adr, extfnc))
-                for ccall in callsites:
-                    ccall.callee = ptr
-                blk_init.operations += tuple(ops)
+
+def _create_initblock(g, ops=()):
+    blk = Block([])
+    blk.operations = ops
+    blk.mu_name = MuName("blk_muinit", g)
+    blk.inputargs = g.startblock.inputargs
+    blk.exits = (Link(g.startblock.inputargs, g.startblock),)
+    blk.operations += (muop.BRANCH(DEST.from_link(blk.exits[0])),)
+    g.mu_initblock = blk
+    g.startblock = blk
+    return blk

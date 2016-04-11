@@ -47,6 +47,8 @@ def test_ll2mu_val():
     for i in range(len(string)):
         ll_ps.chars[i] = string[i]
 
+    assert ll2mu_val('h') == mu.int8_t(ord('h'))
+
     mu_rs = ll2mu_val(ll_ps)
     assert isinstance(mu_rs, mu._muref)
     mu_irs = mu_rs._getiref()
@@ -285,5 +287,5 @@ def test_address():
 
     op = blk.operations[15]     # v109 = raw_memcopy(v105, v107, v108)
     muoplst = ll2mu_op(op)
-    assert muoplst[0].opname == 'CCALL'
-    assert muoplst[0].callee == muni.c_memcpy
+    assert muoplst[0].opname == 'LOAD'
+    assert muoplst[0].loc == muni.c_memcpy

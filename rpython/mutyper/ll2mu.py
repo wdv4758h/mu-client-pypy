@@ -574,10 +574,15 @@ def _llop2mu_keepalive(ptr, res=None, llopname='keepalive'):
     return [muops.NATIVE_UNPIN(ptr, result=res)]
 
 
+def __raw2ccall(*args, **kwargs):
+    ops = _MuOpList()
+    externfnc = getattr(muni, kwargs['llopname'].replace('raw', 'c'))
+    fnp = ops.append(muops.LOAD(externfnc))
+    ops.append(muops.CCALL(fnp, args, result=kwargs['res']))
+    return ops
+
 for op in 'malloc free memset memcopy memmove'.split(' '):
-    globals()['_llop2mu_raw_' + op] = \
-        lambda *args, **kwargs: [muops.CCALL(getattr(muni, kwargs['llopname'].replace('raw', 'c')),
-                                             args, result=kwargs['res'])]
+    globals()['_llop2mu_raw_' + op] = __raw2ccall
 
 
 # def _llop2mu_raw_memclear():

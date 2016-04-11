@@ -1,10 +1,12 @@
+from StringIO import StringIO
+
 from rpython.mutyper.mutyper import MuTyper
 from ..genmu import MuTextIRGenerator
 from rpython.rtyper.test.test_llinterp import gengraph
 from ..preps import prepare
 
 
-def test_genmu(tmpdir):
+def test_genmu():
     def main(argv):
         return int(argv[0]) * 10
 
@@ -18,10 +20,15 @@ def test_genmu(tmpdir):
 
     gen = MuTextIRGenerator(t.graphs, mutyper, g)
 
-    fp = open("%s/bundle.uir" % tmpdir, 'w')
-    gen.codegen(fp)
-    fp.close()
+    strio_uir = StringIO()
+    strio_hail = StringIO()
 
-    fp = open("%s/bundle.uir" % tmpdir, 'r')
-    code = fp.read()
-    print code
+    gen.codegen(strio_uir, strio_hail)
+
+    uir = strio_uir.getvalue()
+    strio_uir.close()
+    hail = strio_hail.getvalue()
+    strio_hail.close()
+
+    print uir
+    print hail
