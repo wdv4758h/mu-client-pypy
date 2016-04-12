@@ -7,9 +7,9 @@ from ..mutype import (
     MuFuncSig, MuFuncRef, _mufuncref,
     MuRef, MuIRef, _muref, _muiref,
     MuUPtr, _muuptr,
-    new, newhybrid,
-    mu_sizeOf)
+    new, newhybrid)
 from ..muentity import MuName
+from rpython.translator.mu.mem import mu_sizeOf
 
 
 def test_primitives():
@@ -121,9 +121,9 @@ def test_arrays():
 def test_funcsig():
     Sig = MuFuncSig((int64_t, double_t), (MuStruct("packed", ('i', int64_t), ('f', double_t)),))
 
-    assert str(Sig) == "( int64_t, double_t ) -> MuStruct packed { i, f }"
-    assert Sig.mu_constructor == "(@i64, @dbl) -> @sttpacked"
-    assert Sig._mu_constructor_expanded == "( int<64>, double ) -> struct<int<64> double>"
+    assert str(Sig) == "( int64_t double_t ) -> ( MuStruct packed { i, f } )"
+    assert Sig.mu_constructor == "(@i64 @dbl) -> (@sttpacked)"
+    assert Sig._mu_constructor_expanded == "( int<64> double ) -> ( struct<int<64> double> )"
     assert repr(Sig.mu_name) == "@sig_i64dbl_sttpacked"
 
     Sig2 = MuFuncSig((int64_t, double_t), (MuStruct("packed", ('i', int64_t), ('f', double_t)),))
@@ -137,10 +137,10 @@ def test_funcref():
     assert repr(Sig.mu_name) == "@sig_dbldbl_dbl"
 
     R = MuFuncRef(Sig)
-    assert str(R) == "MuFuncRef ( double_t, double_t ) -> double_t"
+    assert str(R) == "MuFuncRef ( double_t double_t ) -> ( double_t )"
     assert repr(R.mu_name) == "@fnrsig_dbldbl_dbl"
     assert R.mu_constructor == "funcref<@sig_dbldbl_dbl>"
-    assert R._mu_constructor_expanded == "funcref<( double, double ) -> double>"
+    assert R._mu_constructor_expanded == "funcref<( double double ) -> ( double )>"
 
     R2 = MuFuncRef(Sig)
 
@@ -247,16 +247,3 @@ def test_memalloc():
     rh = newhybrid(H, int64_t(10))
     assert rh._getiref().chars._obj == int8_t(0)
 
-
-def test_sizeOf():
-    A = MuArray(int8_t, 3)
-    assert mu_sizeOf(A) == 3
-
-    PA = MuRef(A)
-    assert mu_sizeOf(PA) == 8
-
-    S = MuStruct("test", ('arr', A), ('n', int64_t))
-    assert mu_sizeOf(S) == 16
-
-    EX = MuStruct("MixedData", ('data1', char_t), ('data2', int16_t), ('data3', int32_t), ('data4', char_t))
-    assert mu_sizeOf(EX) == 12

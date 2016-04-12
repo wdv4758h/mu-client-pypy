@@ -689,7 +689,7 @@ class MuFuncSig(MuType):
         def _inner():
             args = ' '.join(map(lambda a: a._mu_constructor_expanded, self.ARGS))
             rtns = ' '.join(map(lambda a: a._mu_constructor_expanded, self.RTNS))
-            return "( %s ) -> (%s)" % (args, rtns)
+            return "( %s ) -> ( %s )" % (args, rtns)
         return saferecursive(_inner, '...')()
 
     def __str__(self):
