@@ -115,7 +115,7 @@ class MuTyper:
 
     def proc_arg(self, arg, blk):
         arg.mu_type = ll2mu_ty(arg.concretetype)
-        self.gbltypes.add(arg.mu_type)
+        _recursive_addtype(self.gbltypes, arg.mu_type)
         if isinstance(arg, Constant):
             if isinstance(arg.mu_type, mut.MuRef):
                 if arg not in self._cnst_gcell_dict:
@@ -178,3 +178,20 @@ def _create_initblock(g, ops=()):
     g.mu_initblock = blk
     g.startblock = blk
     return blk
+
+
+def _recursive_addtype(s_types, mut):
+    if mut not in s_types:
+        s_types.add(mut)
+        if isinstance(mut, (mutype.MuStruct, mutype.MuHybrid)):
+            fld_ts = tuple(getattr(mut, fld) for fld in mut._names)
+            for t in fld_ts:
+                _recursive_addtype(s_types, t)
+        elif isinstance(mut, mutype.MuArray):
+            _recursive_addtype(s_types, mut.OF)
+        elif isinstance(mut, mutype.MuRef):
+            _recursive_addtype(s_types, mut.TO)
+        elif isinstance(mut, mutype.MuFuncRef):
+            ts = mut.Sig.ARGS + mut.Sig.RTNS
+            for t in ts:
+                _recursive_addtype(s_types, t)
