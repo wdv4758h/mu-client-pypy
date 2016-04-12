@@ -5,10 +5,9 @@ import py
 from rpython.mutyper.muts.muentity import MuName
 from rpython.rtyper.lltypesystem.lltype import Void, LowLevelType
 from rpython.flowspace.model import Constant
-from rpython.tool.ansi_print import ansi_log
+from rpython.tool.ansi_print import AnsiLogger
 
-log = py.log.Producer("preps")
-py.log.setconsumer("preps", ansi_log)
+log = AnsiLogger("preps")
 
 
 def chop(graphs, g_entry):

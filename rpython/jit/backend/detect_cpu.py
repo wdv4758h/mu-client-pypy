@@ -66,6 +66,7 @@ def detect_model_from_host_platform():
             'x86_64': MODEL_X86,
             'amd64': MODEL_X86,    # freebsd
             'AMD64': MODEL_X86,    # win64
+            'armv8l': MODEL_ARM,   # 32-bit ARMv8
             'armv7l': MODEL_ARM,
             'armv6l': MODEL_ARM,
             'arm': MODEL_ARM,      # freebsd
@@ -145,7 +146,7 @@ def getcpufeatures(backend_name="auto"):
         MODEL_X86_64: ['floats', 'singlefloats'],
         MODEL_X86_64_SSE4: ['floats', 'singlefloats'],
         MODEL_ARM: ['floats', 'singlefloats', 'longlong'],
-        MODEL_PPC_64: [], # we don't even have PPC directory, so no
+        MODEL_PPC_64: ['floats'],
         MODEL_S390_64: ['floats'],
     }[backend_name]
 
