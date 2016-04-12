@@ -89,6 +89,7 @@ class MuTyper:
                     # picking out the generated (must be primitive) constants
                     if isinstance(arg, Constant):
                         assert isinstance(arg.mu_type, mutype.MuPrimitive) or isinstance(arg.value, mutype._munullref)
+                        arg.__init__(arg.value)     # re-initialise it to rehash it.
                         self.gblcnsts.add(arg)
                     if isinstance(arg, MuExternalFunc):
                         # Addresses of some C functions stored in global cells need to be processed.
@@ -128,6 +129,7 @@ class MuTyper:
                 try:
                     arg.value = ll2mu_val(arg.value)
                     if not isinstance(arg.value, mutype._mufuncref):
+                        arg.__init__(arg.value)     # re-initialise it to rehash it.
                         self.gblcnsts.add(arg)
                         arg.mu_name = MuName(str(arg.value))
                 except (NotImplementedError, AssertionError, TypeError):

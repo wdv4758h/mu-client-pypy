@@ -143,6 +143,8 @@ class _muprimitive(_muobject):
     def __repr__(self):
         return "%s" % self
 
+    def __hash__(self):
+        return hash(self.val)
 
 # ----------------------------------------------------------
 class MuContainerType(MuType):
