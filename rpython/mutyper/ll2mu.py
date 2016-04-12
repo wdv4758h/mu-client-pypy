@@ -332,9 +332,22 @@ def _llop2mu_mu_throw(exc, res=None, llopname='mu_throw'):
 # ----------------
 # call ops
 def _llop2mu_direct_call(cst_fnc, *args, **kwargs):
+    def _ref2uptrvoid(t):
+        return mutype.MuUPtr(mutype.void_t) if isinstance(t, mutype.MuRef) else t
+    ops = _MuOpList()
     g = cst_fnc.value.graph
+    if g is None:
+        fr = cst_fnc.value
+        fnc_sig = fr._TYPE.Sig
+        extfnc = muni.MuExternalFunc(fr.fncname, tuple(map(_ref2uptrvoid, fnc_sig.ARGS)),
+                                  _ref2uptrvoid(fnc_sig.RTNS[0]), fr.compilation_info.includes)
+        ldfncptr = ops.append(muops.LOAD(extfnc))
+        callee = ldfncptr
+    else:
+        callee = g
     res = kwargs['res'] if 'res' in kwargs else None
-    return [muops.CALL(g, args, result=res)]
+    ops.append(muops.CALL(callee, args, result=res))
+    return ops
 
 
 def _llop2mu_indirect_call(var_callee, *args, **kwargs):
