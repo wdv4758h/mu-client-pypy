@@ -18,9 +18,9 @@ from .mu.exctran import ExceptionTransformer
 from .mu.genmu import MuTextIRGenerator
 
 import py
-from rpython.tool.ansi_print import ansi_log
-log = py.log.Producer("translation")
-py.log.setconsumer("translation", ansi_log)
+from rpython.tool.ansi_print import AnsiLogger
+
+log = AnsiLogger("translation")
 
 
 def taskdef(deps, title, new_state=None, expected_states=[],
@@ -506,10 +506,12 @@ class TranslationDriver(SimpleTaskEngine):
                     # for pypy, the import library is renamed and moved to
                     # libs/python27.lib, according to the pragma in pyconfig.h
                     libname = self.config.translation.libname
-                    libname = libname or soname.new(ext='lib').basename
-                    libname = str(newsoname.dirpath().join(libname))
-                    shutil.copyfile(str(soname.new(ext='lib')), libname)
-                    self.log.info("copied: %s" % (libname,))
+                    oldlibname = soname.new(ext='lib')
+                    if not libname:
+                        libname = oldlibname.basename
+                        libname = str(newsoname.dirpath().join(libname))
+                    shutil.copyfile(str(oldlibname), libname)
+                    self.log.info("copied: %s to %s" % (oldlibname, libname,))
                     # the pdb file goes in the same place as pypy(w).exe
                     ext_to_copy = ['pdb',]
                     for ext in ext_to_copy:
@@ -540,7 +542,6 @@ class TranslationDriver(SimpleTaskEngine):
     @taskdef([STACKCHECKINSERTION, '?'+BACKENDOPT, RTYPE], "LLInterpreting")
     def task_llinterpret_lltype(self):
         from rpython.rtyper.llinterp import LLInterpreter
-        py.log.setconsumer("llinterp operation", None)
 
         translator = self.translator
         interp = LLInterpreter(translator.rtyper)
@@ -550,7 +551,7 @@ class TranslationDriver(SimpleTaskEngine):
                               self.extra.get('get_llinterp_args',
                                              lambda: [])())
 
-        log.llinterpret.event("result -> %s" % v)
+        log.llinterpret("result -> %s" % v)
 
     @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
     def task_mutype_mu(self):

@@ -11,11 +11,10 @@ from .muts import muops as muop
 from .ll2mu import *
 from .ll2mu import _MuOpList
 import py
-from rpython.tool.ansi_print import ansi_log
+from rpython.tool.ansi_print import AnsiLogger
 
 
-log = py.log.Producer("MuTyper")
-py.log.setconsumer("MuTyper", ansi_log)
+log = AnsiLogger("MuTyper")
 
 
 class MuTyper:

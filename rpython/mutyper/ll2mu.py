@@ -12,11 +12,10 @@ from rpython.rlib.rarithmetic import _inttypes
 from rpython.flowspace.model import Constant
 
 import py
-from rpython.tool.ansi_print import ansi_log
+from rpython.tool.ansi_print import AnsiLogger
 
 
-log = py.log.Producer("ll2mu")
-py.log.setconsumer("ll2mu", ansi_log)
+log = AnsiLogger("ll2mu")
 
 
 # ----------------------------------------------------------
