@@ -110,13 +110,18 @@ def _lltype2mu_varstt(llt):
 
 
 def _lltype2mu_arr(llt):
-    return mutype.MuHybrid("%s" % llt.OF.__name__, ('length', mutype.int64_t), ('items', ll2mu_ty(llt.OF)))
+    if llt._hints.get('nolength', False):
+        flds = ('items', ll2mu_ty(llt.OF)),
+    else:
+        flds = ('length', mutype.int64_t), ('items', ll2mu_ty(llt.OF))
+    return mutype.MuHybrid("%s" % llt.OF.__name__, *flds)
 
 
 def _lltype2mu_ptr(llt):
     if isinstance(llt.TO, lltype.FuncType):
         return _lltype2mu_funcptr(llt)
-    return mutype.MuRef(ll2mu_ty(llt.TO))
+    cls = mutype.MuRef if llt.TO._gckind == 'gc' else mutype.MuUPtr
+    return cls(ll2mu_ty(llt.TO))
 
 
 def _lltype2mu_funcptr(llt):
