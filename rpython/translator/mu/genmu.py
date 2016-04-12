@@ -5,10 +5,21 @@ from rpython.flowspace.model import FunctionGraph, Block
 from rpython.mutyper.muts.muops import CALL
 from rpython.mutyper.muts.mutype import MuFuncRef
 from .hail import HAILGenerator
+from StringIO import StringIO
+import zipfile
+import json
+
+
+try:
+    import zlib
+    zip_compression = zipfile.ZIP_DEFLATED
+except ImportError:
+    zip_compression = zipfile.ZIP_STORED
 
 
 class MuTextIRGenerator:
     BUNDLE_ENTRY_NAME = '_mu_bundle_entry'
+    bundle_suffix = '.mu'
 
     def __init__(self, graphs, mutyper, entry_graph):
         self.graphs = graphs
@@ -18,7 +29,27 @@ class MuTextIRGenerator:
         self.bundle_entry = FunctionGraph(MuTextIRGenerator.BUNDLE_ENTRY_NAME, Block(self.prog_entry.startblock.inputargs))
         self.bundle_entry.operations = (CALL(self.prog_entry, *self.bundle_entry.startblock.inputargs),)
 
-    def codegen(self, fp_ir, fp_hail):
+    def bundlegen(self, bdlpath):
+        strio_ir = StringIO()
+        strio_hail = StringIO()
+        strio_exfn = StringIO()
+        self.codegen(strio_ir, strio_hail, strio_exfn)
+
+        zf = zipfile.ZipFile(bdlpath, mode="w", compression=zip_compression)
+
+        def _writefrom(entry_name, strio):
+            s = strio.getvalue()
+            strio.close()
+            print s
+            zf.writestr(entry_name, s)
+
+        _writefrom(bdlpath.replace('.mu', '.ir'), strio_ir)
+        _writefrom(bdlpath.replace('.mu', '.hail'), strio_hail)
+        _writefrom(bdlpath.replace('.mu', '.exfn'), strio_exfn)
+
+        zf.close()
+
+    def codegen(self, fp_ir, fp_hail, fp_exfn):
         """
         Generate bundle code to a writable file fp.
         """
@@ -37,8 +68,11 @@ class MuTextIRGenerator:
             hailgen.add_gcell(gcell)
         hailgen.codegen(fp_hail)
 
+        fncs = []
         for gcl in self.mutyper.externfncs:
             fp_ir.write(".global %s <%s>\n" % (gcl.mu_name, gcl._T.mu_name))
+            fncs.append((gcl.c_name, str(gcl.mu_name), gcl.c_libs))
+        fp_exfn.write(json.dumps(fncs))
 
         for g in self.graphs:
             fp_ir.write(".funcdef %s VERSION %s <%s> {\n" % (g.mu_name, g.mu_version.mu_name,

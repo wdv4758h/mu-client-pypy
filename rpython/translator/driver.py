@@ -571,12 +571,9 @@ class TranslationDriver(SimpleTaskEngine):
     def task_compile_mu(self):
         self.log.info("Task compile_mu")
         target_name = self.compute_exe_name()
-        bundle_name = target_name + '.uir'
-        hail_name = target_name + '.hail'
-        with bundle_name.open('w') as fp_bundle:
-            with hail_name.open('w') as fp_hail:
-                irgen = MuTextIRGenerator(self.translator.graphs, self.mutyper, self.entry_graph)
-                irgen.codegen(fp_bundle, fp_hail)
+        bundle_name = target_name + MuTextIRGenerator.bundle_suffix
+        irgen = MuTextIRGenerator(self.translator.graphs, self.mutyper, self.entry_graph)
+        irgen.bundlegen(bundle_name.strpath)
 
     def proceed(self, goals):
         if not goals:
