@@ -119,7 +119,10 @@ def _lltype2mu_arr(llt):
 def _lltype2mu_ptr(llt):
     if isinstance(llt.TO, lltype.FuncType):
         return _lltype2mu_funcptr(llt)
-    cls = mutype.MuRef if llt.TO._gckind == 'gc' else mutype.MuUPtr
+    if llt.TO._gckind == 'gc' or (hasattr(llt.TO, '_hints') and llt.TO._hints.get("mu_ptr_as_ref", False)):
+        cls = mutype.MuRef
+    else:
+        cls = mutype.MuUPtr
     return cls(ll2mu_ty(llt.TO))
 
 
