@@ -27,17 +27,6 @@ def extract_bundle(bdl):
     return ir, hail, json.loads(exfn)
 
 
-def open_context():
-    libc = ctypes.CDLL(ctypes.util.find_library("c"))
-    libc.write.restype = ctypes.c_ssize_t
-    libc.write.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t]
-
-    dll = MuRefImpl2StartDLL("libmurefimpl2start.so")
-    mu = dll.mu_refimpl2_new()
-
-    return mu.new_context()
-
-
 def build_arglist(ctx, argv):
     _id = ctx.id_of
 
@@ -98,7 +87,14 @@ def build_arglist(ctx, argv):
 
 
 def launch(ir, hail, exfn, args):
-    with open_context() as ctx:
+    # libc = ctypes.CDLL(ctypes.util.find_library("c"))
+    # libc.write.restype = ctypes.c_ssize_t
+    # libc.write.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t]
+
+    dll = MuRefImpl2StartDLL("libmurefimpl2start.so")
+    mu = dll.mu_refimpl2_new()
+
+    with mu.new_context() as ctx:
         ctx.load_bundle(ir)
         ctx.load_hail(hail)
 
@@ -106,7 +102,18 @@ def launch(ir, hail, exfn, args):
 
         refstt_arglst = build_arglist(ctx, args)
 
-        rtnbox = ctx.new_fixed(ctx.id_of("@i64"))
+        refrtnbox = ctx.new_fixed(ctx.id_of("@i64"))
+        bundle_entry = ctx.handle_from_func(ctx.id_of("@_mu_bundle_entry"))
+        st = ctx.new_stack(bundle_entry)
+        th = ctx.new_thread(st, PassValues(refstt_arglst, refrtnbox))
+
+        mu.execute()
+
+        irefrtnbox = ctx.get_iref(refrtnbox)
+        hrtnval = ctx.load(irefrtnbox).cast(MuIntValue)
+        rtnval = ctx.handle_to_sint(hrtnval)
+
+        print("Program exited with value {}".format(rtnval))
 
 
 def main(argv):

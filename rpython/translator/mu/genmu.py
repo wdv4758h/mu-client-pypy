@@ -4,8 +4,8 @@ Mu IR text-form generation code
 from rpython.flowspace.model import FunctionGraph, Block, Variable
 from rpython.mutyper.ll2mu import ll2mu_ty, _MuOpList
 from rpython.mutyper.muts.muentity import MuName
-from rpython.mutyper.muts.muops import CALL, THREAD_EXIT, STORE
-from rpython.mutyper.muts.mutype import MuFuncRef, MuFuncSig, int64_t
+from rpython.mutyper.muts.muops import CALL, THREAD_EXIT, STORE, GETIREF
+from rpython.mutyper.muts.mutype import MuFuncRef, MuFuncSig, int64_t, MuRef
 from .hail import HAILGenerator
 from StringIO import StringIO
 import zipfile
@@ -42,13 +42,14 @@ class MuTextIRGenerator:
 
         rtnbox = Variable('rtnbox')
         rtnbox.mu_name = MuName(rtnbox.name, be.startblock)
-        rtnbox.mu_type = pe.mu_type.Sig.RTNS[0]
+        rtnbox.mu_type = MuRef(pe.mu_type.Sig.RTNS[0])
         blk.inputargs = pe.startblock.inputargs + [rtnbox]
 
         be.mu_type = MuFuncRef(MuFuncSig(map(lambda arg: arg.mu_type, blk.inputargs), ()))
         ops = _MuOpList()
         rtn = ops.append(CALL(pe, tuple(pe.startblock.inputargs)))
-        ops.append(STORE(rtnbox, rtn))
+        irfrtnbox = ops.append(GETIREF(rtnbox))
+        ops.append(STORE(irfrtnbox, rtn))
         ops.append(THREAD_EXIT())
         blk.operations = tuple(ops)
         return be
