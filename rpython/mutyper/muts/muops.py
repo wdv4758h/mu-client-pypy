@@ -106,7 +106,7 @@ def _newop(opname, arg_names, rtn_t_fnc, str_fnc):
                 {'__init__': MuOperation.__init__,
                  '_fnc_rtntype': rtn_t_fnc,
                  '_fnc_str': str_fnc,
-                 '_arg_names': arg_names.split(' ')})
+                 '_arg_names': arg_names.split(' ') if arg_names else []})
 
 
 # ----------------------------------------------------------------
@@ -292,7 +292,7 @@ def _newcomminst(inst_name, arg_names, rtn_t_fnc, str_fnc):
                  '_inst_mu_name': MuName(inst_name),
                  '_fnc_rtntype': rtn_t_fnc,
                  '_fnc_str': lambda op: "%s %s" % (op.__class__.__dict__['_inst_mu_name'], str_fnc(op)),
-                 '_arg_names': arg_names.split(' ')})
+                 '_arg_names': arg_names.split(' ') if arg_names else []})
 
 THREAD_EXIT = _newcomminst("uvm.thread_exit", "", lambda args: void_t, lambda op: "")
 

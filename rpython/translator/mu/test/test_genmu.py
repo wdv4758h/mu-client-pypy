@@ -26,16 +26,19 @@ def test_genmu():
 
     strio_uir = StringIO()
     strio_hail = StringIO()
-
-    gen.codegen(strio_uir, strio_hail)
+    strio_exfn = StringIO()
+    gen.codegen(strio_uir, strio_hail, strio_exfn)
 
     uir = strio_uir.getvalue()
     strio_uir.close()
     hail = strio_hail.getvalue()
     strio_hail.close()
+    exfn = strio_exfn.getvalue()
+    strio_exfn.close()
 
     print uir
     print hail
+    print exfn
 
 
 def test_investigate():
