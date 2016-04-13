@@ -93,6 +93,8 @@ class MuTyper:
                     if isinstance(arg, MuExternalFunc):
                         # Addresses of some C functions stored in global cells need to be processed.
                         self.externfncs.add(arg)
+                if _o.opname in "CALL TAILCALL CCALL".split(' '):
+                    _o.result.mu_name.scope = blk       # Correct the scope of return value of calls.
             muops += _muops
         except NotImplementedError:
             log.warning("Ignoring '%s'." % op)

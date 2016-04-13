@@ -48,6 +48,7 @@ class MuTextIRGenerator:
         be.mu_type = MuFuncRef(MuFuncSig(map(lambda arg: arg.mu_type, blk.inputargs), ()))
         ops = _MuOpList()
         rtn = ops.append(CALL(pe, tuple(pe.startblock.inputargs)))
+        rtn.mu_name.scope = blk
         irfrtnbox = ops.append(GETIREF(rtnbox))
         ops.append(STORE(irfrtnbox, rtn))
         ops.append(THREAD_EXIT())
