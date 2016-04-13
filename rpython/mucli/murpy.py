@@ -1,5 +1,4 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
-
 import sys
 
 import ctypes, ctypes.util
@@ -39,29 +38,63 @@ def open_context():
     return mu.new_context()
 
 
-def prep_args(ctx, argv):
+def build_arglist(ctx, argv):
     _id = ctx.id_of
-    def build_string(s, x=DelayedDisposer()):
-        with DelayedDisposer() as x:
+
+    def build_string(s):
+        with DelayedDisposer() as dd:
             length = len(s)
-            hlength = x << ctx.handle_from_int(length, 64)
-            hstr = x << ctx.new_hybrid(_id("@hybrpy_string"), hlength)
-            ir = x << ctx.get_iref(hstr)
+            hlength = dd << ctx.handle_from_int(length, 64)
+            hstr = ctx.new_hybrid(_id("@hybrpy_string"), hlength)   # don't add handle to dd
+            ir = dd << ctx.get_iref(hstr)
 
             # hash
-            hir_hash = ctx.get_field_iref(ir, 0)
-            ctx.store(hir_hash, x << ctx.handle_from_int(hash(s)))
+            hir_hash = dd << ctx.get_field_iref(ir, 0)
+            ctx.store(hir_hash, dd << ctx.handle_from_int(hash(s)))
 
             # length
-            hir_length = ctx.get_field_iref(ir, 1)
+            hir_length = dd << ctx.get_field_iref(ir, 1)
             ctx.store(hir_length, hlength)
 
             # chars
-            # TODO: finish rest.
+            hir_var = dd << ctx.get_var_part_iref(ir)
+            for i, ch in enumerate(s):
+                with DelayedDisposer() as _dd:
+                    hi = _dd << ctx.handle_from_int(i, 64)
+                    hir_elm = _dd << ctx.shift_iref(hir_var, hi)
+                    hch = _dd << ctx.handle_from_int(ord(ch), 8)
+                    ctx.store(hir_elm, hch)
+            return hstr
 
-    nargs = len(argv)
-    hnargs = ctx.handle_from_int(nargs, 64)
-    args = ctx.new_hybrid(_id("@array_ref_string"), hnargs)
+    with DelayedDisposer() as dd:
+        # Create new list
+        refstt = ctx.new_fixed(_id("@sttlist"))     # don't add to dd
+        irefstt = dd << ctx.get_iref(refstt)
+
+        # Set the length of the list
+        ireffld_len = dd << ctx.get_field_iref(irefstt, 0)
+        hlen = dd << ctx.handle_from_int(len(argv), 64)
+        ctx.store(ireffld_len, hlen)
+
+        # Create the hybrid items
+        ireffld_items = dd << ctx.get_field_iref(irefstt, 1)
+        refhyb_items = dd << ctx.new_hybrid(_id("@hybrpy_stringPtr"))
+        ctx.store(ireffld_items, refhyb_items)
+
+        # Set the length field of the hybrid type.
+        irefhyb = dd << ctx.get_iref(refhyb_items)
+        irefhyblen = dd << ctx.get_field_iref(irefhyb, 0)
+        ctx.store(irefhyblen, hlen)
+
+        # Store the strings
+        irefvar = dd << ctx.get_var_part_iref(irefhyb)
+        for i, s in enumerate(argv):
+            hidx = dd << ctx.handle_from_int(i, 64)
+            irefelm = ctx.shift_iref(irefvar, hidx)
+            refhyb = build_string(s)
+            ctx.store(irefelm, refhyb)
+
+    return refstt
 
 
 def launch(ir, hail, exfn, args):
@@ -70,6 +103,10 @@ def launch(ir, hail, exfn, args):
         ctx.load_hail(hail)
 
         # TODO: prepare extern functions.
+
+        refstt_arglst = build_arglist(ctx, args)
+
+        rtnbox = ctx.new_fixed(ctx.id_of("@i64"))
 
 
 def main(argv):

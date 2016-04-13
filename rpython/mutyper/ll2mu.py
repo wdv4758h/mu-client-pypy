@@ -87,8 +87,8 @@ def _lltype2mu_stt(llt):
         stt = mutype.MuStruct(llt._name)
         _sttcache[llt] = stt
         lst = []
-        for n, t in llt._flds.items():
-            t_mu = ll2mu_ty(t)
+        for n in llt._names:
+            t_mu = ll2mu_ty(llt._flds[n])
             if not (t_mu is mutype.void_t or (isinstance(t_mu, mutype.MuRef) and t_mu.TO is mutype.void_t)):
                 lst.append((n, t_mu))
         stt._setfields(lst)

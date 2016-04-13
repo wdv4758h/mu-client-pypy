@@ -1,9 +1,11 @@
 """
 Mu IR text-form generation code
 """
-from rpython.flowspace.model import FunctionGraph, Block
-from rpython.mutyper.muts.muops import CALL
-from rpython.mutyper.muts.mutype import MuFuncRef
+from rpython.flowspace.model import FunctionGraph, Block, Variable
+from rpython.mutyper.ll2mu import ll2mu_ty
+from rpython.mutyper.muts.muentity import MuName
+from rpython.mutyper.muts.muops import CALL, THREAD_EXIT
+from rpython.mutyper.muts.mutype import MuFuncRef, MuFuncSig, int64_t
 from .hail import HAILGenerator
 from StringIO import StringIO
 import zipfile
@@ -22,12 +24,30 @@ class MuTextIRGenerator:
     bundle_suffix = '.mu'
 
     def __init__(self, graphs, mutyper, entry_graph):
-        self.graphs = graphs
         self.mutyper = mutyper
         self.prog_entry = entry_graph
+        graphs.append(MuTextIRGenerator._create_bundle_entry(self.prog_entry))
+        self.graphs = graphs
 
-        self.bundle_entry = FunctionGraph(MuTextIRGenerator.BUNDLE_ENTRY_NAME, Block(self.prog_entry.startblock.inputargs))
-        self.bundle_entry.operations = (CALL(self.prog_entry, *self.bundle_entry.startblock.inputargs),)
+    @staticmethod
+    def _create_bundle_entry(pe):
+        blk = Block([])
+
+        be = FunctionGraph(MuTextIRGenerator.BUNDLE_ENTRY_NAME, blk)
+        be.mu_name = MuName(be.name)
+        ver = Variable('_ver')
+        ver.mu_name = MuName(ver.name, be)
+        be.mu_version = ver
+        blk.mu_name = MuName("entry", be)
+
+        rtnbox = Variable('rtnbox')
+        rtnbox.mu_name = MuName(rtnbox.name, be.startblock)
+        rtnbox.mu_type = pe.mu_type.Sig.RTNS[0]
+        blk.inputargs = pe.startblock.inputargs + [rtnbox]
+
+        be.mu_type = MuFuncRef(MuFuncSig(map(lambda arg: arg.mu_type, blk.inputargs), ()))
+        be.operations = (CALL(pe, tuple(pe.startblock.inputargs)), THREAD_EXIT())
+        return be
 
     def bundlegen(self, bdlpath):
         strio_ir = StringIO()
