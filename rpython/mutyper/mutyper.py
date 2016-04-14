@@ -44,7 +44,7 @@ class MuTyper:
         for blk in g.iterblocks():
             self.specialise_block(blk)
 
-        self.proc_gcells(g)
+        self.proc_gcells()
 
     def specialise_block(self, blk):
         muops = []
@@ -150,36 +150,20 @@ class MuTyper:
         if gcell not in self.ldgcells:
             self.ldgcells[gcell] = {}
         try:
-            return self.ldgcells[gcell][blk.mu_name.scope]
+            return self.ldgcells[gcell][blk]
         except KeyError:
             # A loaded gcell variable, ie. ldgcell = LOAD gcell
             ldgcell = Variable('ld' + MuGlobalCell.prefix + gcell._T.mu_name._name)
             ldgcell.mu_type = gcell._T
             ldgcell.mu_name = MuName(ldgcell.name, blk)
-            self.ldgcells[gcell][blk.mu_name.scope] = ldgcell
+            self.ldgcells[gcell][blk] = ldgcell
             return ldgcell
 
-    def proc_gcells(self, g):
-        ops = []
+    def proc_gcells(self):
         for gcell, dic in self.ldgcells.items():
-            if g in dic:
-                ldgcell = dic[g]
-                ops.append(muop.LOAD(gcell, result=ldgcell))
-
-        if len(ops) > 0:
-            _create_initblock(g, tuple(ops))
-
-
-def _create_initblock(g, ops=()):
-    blk = Block([])
-    blk.operations = ops
-    blk.mu_name = MuName("blk_muinit", g)
-    blk.inputargs = g.startblock.inputargs
-    blk.exits = (Link(g.startblock.inputargs, g.startblock),)
-    blk.operations += (muop.BRANCH(DEST.from_link(blk.exits[0])),)
-    g.mu_initblock = blk
-    g.startblock = blk
-    return blk
+            for blk, ldgcell in dic.items():
+                blk.operations = (muop.LOAD(gcell, result=ldgcell), ) + blk.operations
+                del dic[blk]
 
 
 def _recursive_addtype(s_types, mut):

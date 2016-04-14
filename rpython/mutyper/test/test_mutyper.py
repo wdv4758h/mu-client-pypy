@@ -15,11 +15,13 @@ def test_ldgcell():
         return s + "hello"
 
     _, _, g = gengraph(f, [str])
+    print_graph(g)
     typer = MuTyper()
     typer.specialise(g)
     op = g.startblock.operations[0]
     assert op.opname == 'LOAD'
     assert isinstance(op.loc, MuGlobalCell)
+    assert g.startblock.operations[1].opname == 'CALL'
 
 
 def test_gcellnodup():

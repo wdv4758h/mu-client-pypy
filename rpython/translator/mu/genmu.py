@@ -70,7 +70,7 @@ class MuTextIRGenerator:
             print s
             zf.writestr(entry_name, s)
 
-        _writefrom(bdlpath.replace('.mu', '.ir'), strio_ir)
+        _writefrom(bdlpath.replace('.mu', '.uir'), strio_ir)
         _writefrom(bdlpath.replace('.mu', '.hail'), strio_hail)
         _writefrom(bdlpath.replace('.mu', '.exfn'), strio_exfn)
 
