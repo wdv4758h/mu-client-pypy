@@ -65,7 +65,7 @@ class MuTyper:
                 muops.append(muop.BRANCH(DEST.from_link(blk.exits[0])))
             elif len(blk.exits) == 2:
                 blk.exitswitch = self.proc_arg(blk.exitswitch, blk)
-                muops.append(muop.BRANCH2(blk.exitswitch, DEST.from_link(blk.exits[0]), DEST.from_link(blk.exits[1])))
+                muops.append(muop.BRANCH2(blk.exitswitch, DEST.from_link(blk.exits[1]), DEST.from_link(blk.exits[0])))
         blk.operations = tuple(muops)
 
     def specialise_op(self, op, blk):

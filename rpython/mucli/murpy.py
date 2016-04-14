@@ -39,7 +39,7 @@ def build_arglist(ctx, argv):
 
             # hash
             hir_hash = dd << ctx.get_field_iref(ir, 0)
-            ctx.store(hir_hash, dd << ctx.handle_from_int(hash(s)))
+            ctx.store(hir_hash, dd << ctx.handle_from_int(hash(s), 64))
 
             # length
             hir_length = dd << ctx.get_field_iref(ir, 1)
@@ -67,7 +67,7 @@ def build_arglist(ctx, argv):
 
         # Create the hybrid items
         ireffld_items = dd << ctx.get_field_iref(irefstt, 1)
-        refhyb_items = dd << ctx.new_hybrid(_id("@hybrpy_stringPtr"))
+        refhyb_items = dd << ctx.new_hybrid(_id("@hybrpy_stringPtr"), hlen)
         ctx.store(ireffld_items, refhyb_items)
 
         # Set the length field of the hybrid type.
