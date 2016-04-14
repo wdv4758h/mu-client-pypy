@@ -36,10 +36,12 @@ def test_linkedlist():
     hailgen.add_gcell(gcell1)
     assert len(hailgen._refs) == 2
     assert isinstance(hailgen._refs[nd2._obj0], _HAILName)
+    assert hailgen.gcells[gcell1] == hailgen._refs[nd1._obj0]
 
     hailgen.add_gcell(gcell2)
     assert len(hailgen._refs) == 2
-    assert hailgen._refs[nd2._obj0] == gcell2.mu_name
+    assert isinstance(hailgen._refs[nd2._obj0], _HAILName)
+    assert hailgen.gcells[gcell2] == hailgen._refs[nd2._obj0]
 
     strio = StringIO()
     hailgen.codegen(strio)
@@ -47,10 +49,12 @@ def test_linkedlist():
     strio.close()
 
     print out
-    assert '.new @gclrefsttNode_0 <@sttNode>' in out
-    assert '.new @gclrefsttNode_1 <@sttNode>' in out
-    assert '.init @gclrefsttNode_0 = {1 *@gclrefsttNode_1}' in out
-    assert '.init @gclrefsttNode_1 = {2 *@gclrefsttNode_0}' in out
+    assert '.new $refsttNode_0 <@sttNode>' in out
+    assert '.new $refsttNode_1 <@sttNode>' in out
+    assert '.init $refsttNode_0 = {1 $refsttNode_1}' in out
+    assert '.init $refsttNode_1 = {2 $refsttNode_0}' in out
+    assert '.init @gclrefsttNode_0 = $refsttNode_0' in out
+    assert '.init @gclrefsttNode_1 = $refsttNode_1' in out
 
 
 def test_string():
@@ -74,10 +78,12 @@ def test_string():
     strio.close()
 
     print out
-    alloc_str = '.newhybrid %s <%s> 5' % (gcell.mu_name, mu_t.TO.mu_name)
+    ref_name = hailgen.gcells[gcell]
+    alloc_str = '.newhybrid %s <%s> 5' % (ref_name, mu_t.TO.mu_name)
     assert alloc_str in out
-    init_str = '.init %s = {%d 5 {%s}}' % (gcell.mu_name, ll_ps.hash, ' '.join(map(lambda c: str(ord(c)), ll_ps.chars)))
+    init_str = '.init %s = {%d 5 {%s}}' % (ref_name, ll_ps.hash, ' '.join(map(lambda c: str(ord(c)), ll_ps.chars)))
     assert init_str in out
+    assert ".init %s = %s" % (gcell.mu_name, ref_name)
 
 
 def test_excobj():

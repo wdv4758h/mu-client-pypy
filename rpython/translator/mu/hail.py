@@ -23,21 +23,18 @@ class _HAILName:
 
 class HAILGenerator:
     def __init__(self):
-        self.gcells = []
+        self.gcells = {}
         self._refs = {}
 
     def add_gcell(self, gcell):
-        self.gcells.append(gcell)
+        self._find_refs(gcell._obj)
+        self.gcells[gcell] = self._refs[gcell._obj._obj0]     # Get the HAILName that was assigned to the content of gcell.
 
-        self._find_refs(gcell._obj, gcell)
-
-    def _find_refs(self, obj, gcell=None):
+    def _find_refs(self, obj):
         if isinstance(obj, (mutype._muref, mutype._muiref)):
             refnt = obj._obj0
             if refnt not in self._refs:
-                self._refs[refnt] = gcell.mu_name if gcell else _HAILName(mutype.mu_typeOf(obj).mu_name._name)
-            elif isinstance(self._refs[refnt], _HAILName) and gcell:
-                self._refs[refnt] = gcell.mu_name
+                self._refs[refnt] = _HAILName(mutype.mu_typeOf(obj).mu_name._name)
             else:
                 return
             self._find_refs(refnt)
@@ -62,6 +59,9 @@ class HAILGenerator:
 
         for r, n in self._refs.items():
             fp.write(".init %s = %s\n" % (n, self._getinitstr(r)))
+
+        for gcl, n in self.gcells.items():
+            fp.write(".init %s = %s\n" % (gcl.mu_name, n))
 
     def _getinitstr(self, obj):
         if isinstance(obj, (mutype._muprimitive, mutype._munullref)):
