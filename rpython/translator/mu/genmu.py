@@ -97,7 +97,7 @@ class MuTextIRGenerator:
         fncs = []
         for gcl in self.mutyper.externfncs:
             fp_ir.write(".global %s <%s>\n" % (gcl.mu_name, gcl._T.mu_name))
-            fncs.append((gcl.c_name, str(gcl.mu_name), gcl.c_libs))
+            fncs.append((gcl.c_name, str(gcl._T.mu_name), str(gcl.mu_name), gcl.c_libs))
         fp_exfn.write(json.dumps(fncs))
 
         for g in self.graphs:
@@ -112,7 +112,7 @@ class MuTextIRGenerator:
             fp.write('%s%s(%s)%s:\n' % (
                 ' ' * idt, blk.mu_name,
                 ' '.join(["<%s> %s" % (arg.mu_type.mu_name, arg.mu_name) for arg in blk.inputargs]),
-                '[%s]' % blk.mu_excparam if hasattr(blk, 'mu_excparam') else ''
+                '[%s]' % blk.mu_excparam.mu_name if hasattr(blk, 'mu_excparam') else ''
             ))
             for op in blk.operations:
                 fp.write("%s%s\n" % (' ' * idt * 2, op))

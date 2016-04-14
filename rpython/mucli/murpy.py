@@ -86,11 +86,20 @@ def build_arglist(ctx, argv):
     return refstt
 
 
-def launch(ir, hail, exfn, args):
-    # libc = ctypes.CDLL(ctypes.util.find_library("c"))
-    # libc.write.restype = ctypes.c_ssize_t
-    # libc.write.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t]
+def load_extfncs(ctx, exfns):
+    libc = ctypes.CDLL(ctypes.util.find_library("c"))
+    for c_name, fncptr_name, gcl_name, hdrs in exfns:
+        with DelayedDisposer() as dd:
+            try:
+                adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
+                hadr = dd << ctx.handle_from_fp(ctx.id_of(fncptr_name), adr)
+                hgcl = dd << ctx.handle_from_global(ctx.id_of(gcl_name))
+                ctx.store(hgcl, hadr)
+            except AttributeError:
+                print("Failed to find function '{c_name}s' in libc." % locals())
 
+
+def launch(ir, hail, exfns, args):
     dll = MuRefImpl2StartDLL("libmurefimpl2start.so")
     mu = dll.mu_refimpl2_new()
 
@@ -101,7 +110,7 @@ def launch(ir, hail, exfn, args):
         # TODO: prepare extern functions.
 
         refstt_arglst = build_arglist(ctx, args)
-
+        load_extfncs(ctx, exfns)
         refrtnbox = ctx.new_fixed(ctx.id_of("@i64"))
         bundle_entry = ctx.handle_from_func(ctx.id_of("@_mu_bundle_entry"))
         st = ctx.new_stack(bundle_entry)

@@ -19,12 +19,18 @@ log = AnsiLogger("ll2mu")
 
 
 # ----------------------------------------------------------
+_type_cache = {}
 def ll2mu_ty(llt):
     """
     Map LLTS type to MuTS type.
     :param llt: LLType
     :return: MuType
     """
+    try:
+        return _type_cache[llt]
+    except KeyError:
+        pass
+
     if isinstance(llt, mutype.MuType):
         return llt
     if llt is llmemory.Address:
@@ -75,23 +81,22 @@ def _lltype2mu_prim(llt):
 def _lltype2mu_arrfix(llt):
     return mutype.MuArray(ll2mu_ty(llt.OF), llt.length)
 
-_sttcache = {}
+_name_cache = {}
 
 
 def _lltype2mu_stt(llt):
     if llt._is_varsize():
-        return _lltype2mu_varstt(llt)
-    try:
-        return _sttcache[llt]
-    except KeyError:
+        hyb = _lltype2mu_varstt(llt)
+        return hyb
+    else:
         stt = mutype.MuStruct(llt._name)
-        _sttcache[llt] = stt
         lst = []
         for n in llt._names:
             t_mu = ll2mu_ty(llt._flds[n])
             if not (t_mu is mutype.void_t or (isinstance(t_mu, mutype.MuRef) and t_mu.TO is mutype.void_t)):
                 lst.append((n, t_mu))
         stt._setfields(lst)
+        stt._update_name()
         return stt
 
 

@@ -215,6 +215,10 @@ class MuStruct(MuContainerType):
         self._flds = frozendict(flds)
         self._names = tuple(names)
 
+    def _update_name(self):
+        self._name += ''.join([str(self._flds[fld].mu_name._name) for fld in self._names])
+        MuType.__init__(self, MuStruct.type_prefix + self._name)
+
     def _index_of(self, fld):
         return self._names.index(fld)
 
