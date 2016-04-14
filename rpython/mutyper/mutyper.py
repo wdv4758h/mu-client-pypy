@@ -33,6 +33,7 @@ class MuTyper:
         get_arg_types = lambda lst: map(ll2mu_ty, map(lambda arg: arg.concretetype, lst))
         g.mu_type = mut.MuFuncRef(mut.MuFuncSig(get_arg_types(g.startblock.inputargs),
                                                 get_arg_types(g.returnblock.inputargs)))
+        _recursive_addtype(self.gbltypes, g.mu_type)
         ver = Variable('_ver')
         ver.mu_name = MuName(ver.name, g)
         g.mu_version = ver

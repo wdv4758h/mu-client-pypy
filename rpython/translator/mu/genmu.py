@@ -6,6 +6,7 @@ from rpython.mutyper.ll2mu import ll2mu_ty, _MuOpList
 from rpython.mutyper.muts.muentity import MuName
 from rpython.mutyper.muts.muops import CALL, THREAD_EXIT, STORE, GETIREF
 from rpython.mutyper.muts.mutype import MuFuncRef, MuFuncSig, int64_t, MuRef
+from rpython.mutyper.mutyper import _recursive_addtype
 from .hail import HAILGenerator
 from StringIO import StringIO
 import zipfile
@@ -26,11 +27,10 @@ class MuTextIRGenerator:
     def __init__(self, graphs, mutyper, entry_graph):
         self.mutyper = mutyper
         self.prog_entry = entry_graph
-        graphs.append(MuTextIRGenerator._create_bundle_entry(self.prog_entry))
+        graphs.append(self._create_bundle_entry(self.prog_entry))
         self.graphs = graphs
 
-    @staticmethod
-    def _create_bundle_entry(pe):
+    def _create_bundle_entry(self, pe):
         blk = Block([])
 
         be = FunctionGraph(MuTextIRGenerator.BUNDLE_ENTRY_NAME, blk)
@@ -46,6 +46,7 @@ class MuTextIRGenerator:
         blk.inputargs = pe.startblock.inputargs + [rtnbox]
 
         be.mu_type = MuFuncRef(MuFuncSig(map(lambda arg: arg.mu_type, blk.inputargs), ()))
+        _recursive_addtype(self.mutyper.gbltypes, be.mu_type)
         ops = _MuOpList()
         rtn = ops.append(CALL(pe, tuple(pe.startblock.inputargs)))
         rtn.mu_name.scope = blk
