@@ -20,8 +20,6 @@ log = AnsiLogger("MuTyper")
 class MuTyper:
     def __init__(self):
         self.ldgcells = {}      # MuGlobalCells that need to be LOADed.
-        self.gblcnsts = set()   # Constants that need to be defined on the global level
-        self.gbltypes = set()   # Types that need to be defined on the global level
         self._cnst_gcell_dict = {}  # mapping Constant to MuGlobalCell
         self._seen = set()
         self.externfncs = set()
@@ -33,7 +31,7 @@ class MuTyper:
         get_arg_types = lambda lst: map(ll2mu_ty, map(lambda arg: arg.concretetype, lst))
         g.mu_type = mut.MuFuncRef(mut.MuFuncSig(get_arg_types(g.startblock.inputargs),
                                                 get_arg_types(g.returnblock.inputargs)))
-        _recursive_addtype(self.gbltypes, g.mu_type)
+        # _recursive_addtype(self.gbltypes, g.mu_type)
         ver = Variable('_ver')
         ver.mu_name = MuName(ver.name, g)
         g.mu_version = ver
@@ -89,12 +87,12 @@ class MuTyper:
                     # picking out the generated (must be primitive) constants
                     if isinstance(arg, Constant):
                         assert isinstance(arg.mu_type, mutype.MuPrimitive) or isinstance(arg.value, mutype._munullref)
-                        arg.__init__(arg.value)     # re-initialise it to rehash it.
-                        self.gblcnsts.add(arg)
+                        # arg.__init__(arg.value)     # re-initialise it to rehash it.
+                        # self.gblcnsts.add(arg)
                     if isinstance(arg, MuExternalFunc):
                         # Addresses of some C functions stored in global cells need to be processed.
                         self.externfncs.add(arg)
-                        _recursive_addtype(self.gbltypes, arg._T)
+                        # _recursive_addtype(self.gbltypes, arg._T)
                 if _o.opname in "CALL TAILCALL CCALL".split(' '):
                     _o.result.mu_name.scope = blk       # Correct the scope of return value of calls.
             muops += _muops
@@ -118,7 +116,7 @@ class MuTyper:
 
     def proc_arg(self, arg, blk):
         arg.mu_type = ll2mu_ty(arg.concretetype)
-        _recursive_addtype(self.gbltypes, arg.mu_type)
+        # _recursive_addtype(self.gbltypes, arg.mu_type)
         if isinstance(arg, Constant):
             if isinstance(arg.mu_type, mut.MuRef):
                 if arg not in self._cnst_gcell_dict:
@@ -131,9 +129,12 @@ class MuTyper:
             else:
                 try:
                     arg.value = ll2mu_val(arg.value)
+                    # Correcting type mismatch caused by incomplete type information when calling ll2mu_val.
+                    if isinstance(arg.value, mutype._muprimitive) and arg.value._TYPE != arg.mu_type:
+                        arg.value._TYPE = arg.mu_type
                     if not isinstance(arg.value, mutype._mufuncref):
-                        arg.__init__(arg.value)     # re-initialise it to rehash it.
-                        self.gblcnsts.add(arg)
+                        # arg.__init__(arg.value)     # re-initialise it to rehash it.
+                        # self.gblcnsts.add(arg)
                         arg.mu_name = MuName("%s_%s" % (str(arg.value), arg.mu_type.mu_name._name))
                 except (NotImplementedError, AssertionError, TypeError):
                     if isinstance(arg.value, llt.LowLevelType):
@@ -167,20 +168,3 @@ class MuTyper:
                 del dic[blk]
 
 
-def _recursive_addtype(s_types, mut):
-    if mut not in s_types:
-        s_types.add(mut)
-        if isinstance(mut, (mutype.MuStruct, mutype.MuHybrid)):
-            fld_ts = tuple(getattr(mut, fld) for fld in mut._names)
-            for t in fld_ts:
-                _recursive_addtype(s_types, t)
-        elif isinstance(mut, mutype.MuArray):
-            _recursive_addtype(s_types, mut.OF)
-        elif isinstance(mut, mutype.MuRef):
-            _recursive_addtype(s_types, mut.TO)
-        elif isinstance(mut, mutype.MuFuncRef):
-            _recursive_addtype(s_types, mut.Sig)
-        elif isinstance(mut, mutype.MuFuncSig):
-            ts = mut.ARGS + mut.RTNS
-            for t in ts:
-                _recursive_addtype(s_types, t)
