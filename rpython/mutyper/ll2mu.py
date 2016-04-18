@@ -706,10 +706,10 @@ def _llop2mu_cast_int_to_adr(n, res=None, llopname='cast_adr_to_int'):
 
 
 def _llop2mu_gc_can_move(ptr, res=None, llopname='gc_can_move'):
-    return [], _newprimconst(mutype.int1_t, True)
+    return [], _newprimconst(mutype.int1_t, 1)
 
 
 def _llop2mu_gc_pin(ptr, res=None, llopname='gc_can_move'):
-    return [], _newprimconst(mutype.int1_t, True)
+    return [], _newprimconst(mutype.int1_t, 1)
 
 # TODO: rest of the operations
