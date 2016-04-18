@@ -20,6 +20,8 @@ log = AnsiLogger("ll2mu")
 
 # ----------------------------------------------------------
 _type_cache = {}
+
+
 def ll2mu_ty(llt):
     """
     Map LLTS type to MuTS type.
@@ -29,8 +31,12 @@ def ll2mu_ty(llt):
     try:
         return _type_cache[llt]
     except KeyError:
-        pass
+        mut = _ll2mu_ty(llt)
+        _type_cache[llt] = mut
+        return mut
 
+
+def _ll2mu_ty(llt):
     if isinstance(llt, mutype.MuType):
         return llt
     if llt is llmemory.Address:
@@ -81,22 +87,36 @@ def _lltype2mu_prim(llt):
 def _lltype2mu_arrfix(llt):
     return mutype.MuArray(ll2mu_ty(llt.OF), llt.length)
 
-_name_cache = {}
+
+__name_cache = {}
+def __newtypename(name):
+    if name in __name_cache:
+        n = __name_cache[name] + 1
+    else:
+        n = 0
+    __name_cache[name] = n
+    return "%s_%d" % (name, n)
 
 
+__stt_cache = {}
 def _lltype2mu_stt(llt):
     if llt._is_varsize():
         hyb = _lltype2mu_varstt(llt)
         return hyb
     else:
-        stt = mutype.MuStruct(llt._name)
+        try:
+            return __stt_cache[llt]
+        except KeyError:
+            pass
+        stt = mutype.MuStruct(__newtypename(llt._name))
+        __stt_cache[llt] = stt
         lst = []
         for n in llt._names:
             t_mu = ll2mu_ty(llt._flds[n])
             if not (t_mu is mutype.void_t or (isinstance(t_mu, mutype.MuRef) and t_mu.TO is mutype.void_t)):
                 lst.append((n, t_mu))
         stt._setfields(lst)
-        stt._update_name()
+        # stt._update_name()
         return stt
 
 
@@ -110,7 +130,8 @@ def _lltype2mu_varstt(llt):
     else:
         names = llt._names
         flds = llt._flds
-    return mutype.MuHybrid(llt._name, *([(n, ll2mu_ty(flds[n])) for n in names[:-1]] + [(llt._arrayfld, var_t)]))
+    return mutype.MuHybrid(__newtypename(llt._name),
+                           *([(n, ll2mu_ty(flds[n])) for n in names[:-1]] + [(llt._arrayfld, var_t)]))
 
 
 def _lltype2mu_arr(llt):
@@ -118,7 +139,7 @@ def _lltype2mu_arr(llt):
         flds = ('items', ll2mu_ty(llt.OF)),
     else:
         flds = ('length', mutype.int64_t), ('items', ll2mu_ty(llt.OF))
-    return mutype.MuHybrid("%s" % llt.OF.__name__, *flds)
+    return mutype.MuHybrid(__newtypename("%s" % llt.OF.__name__), *flds)
 
 
 def _lltype2mu_ptr(llt):
