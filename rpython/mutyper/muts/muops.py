@@ -189,9 +189,9 @@ RET = _newop("RET", "rv",
              lambda args: void_t,
              lambda op: "(%s)" % (op.rv.mu_name if op.rv else ''))
 
-THROW = _newop("THROW", "exc",
+THROW = _newop("THROW", "excobj",
                lambda args: void_t,
-               lambda op: "%s" % op.exc.mu_name)
+               lambda op: "%s" % op.excobj.mu_name)
 
 
 # ----------------------------------------------------------------

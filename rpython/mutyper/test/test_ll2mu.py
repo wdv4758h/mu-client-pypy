@@ -95,7 +95,7 @@ def test_ll2mu_fncptr():
             operations[0].args[0].value._obj.graph.startblock.operations[0].args[0].value._obj.graph. \
             startblock.operations[13].args[0].value._obj.graph.startblock.exits[0].target.exits[0].target. \
             exits[0].target.exits[0].target.exits[0].target.exits[0].target.exits[0].target.exits[0].target. \
-            operations[12].args[0].value._obj.graph.startblock.operations[2].args[0].value
+            operations[12].args[0].value._obj.graph.startblock.operations[1].args[0].value
     muv = ll2mu_val(fncptr_write)
     assert muv.fncname == "write"
     assert muv.graph is None
