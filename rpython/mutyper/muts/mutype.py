@@ -123,7 +123,8 @@ class _muprimitive(_muobject):
     def __init__(self, TYPE, val):
         assert TYPE in _MU_INTS or TYPE in _MU_FLOATS
         if TYPE in _MU_INTS:
-            assert isinstance(val, int)
+            if not isinstance(val, int):
+                val = int(val)     # castable to int
             assert muint_type(val).bits <= TYPE.bits
 
         _muobject.__init__(self, TYPE)

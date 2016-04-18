@@ -180,7 +180,7 @@ def ll2mu_val(llv):
         llv = mumem.mu_sizeOf(ll2mu_ty(llv.TYPE))
 
     cache, v = (__ll2muval_cache_ptr, llv._obj) if isinstance(llv, lltype._ptr) else (__ll2muval_cache, llv)
-    key = lltype.typeOf(v), v
+    key = (lltype.typeOf(v), v)
     try:
         return cache[key]
     except KeyError:

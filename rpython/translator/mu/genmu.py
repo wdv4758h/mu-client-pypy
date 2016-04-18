@@ -124,6 +124,7 @@ class MuTextIRGenerator:
             if hasattr(v, 'mu_type'):
                 _recursive_addtype(self.gbltypes, v.mu_type)
             if isinstance(v, Constant):
+                assert isinstance(v.value, mutype._muobject)
                 v.__init__(v.value)     # rehash
                 self.gblcnsts.add(v)
 
