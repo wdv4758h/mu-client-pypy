@@ -76,9 +76,9 @@ class MuTyper:
 
         # translate operation
         try:
-            _muops = ll2mu_op(op)
+            _muops, res = ll2mu_op(op)
             if len(_muops) == 0:
-                self._alias[op.result] = op.args[0]     # no op -> result = args[0]
+                self._alias[op.result] = res     # no op -> result = args[0]
 
             # some post processing
             for _o in _muops:
@@ -110,11 +110,13 @@ class MuTyper:
 
     def proc_arglist(self, args, blk):
         for i in range(len(args)):
-            if args[i] in self._alias:
-                args[i] = self._alias[args[i]]
+
             args[i] = self.proc_arg(args[i], blk)
 
     def proc_arg(self, arg, blk):
+        if arg in self._alias:
+            return self._alias[arg]
+
         arg.mu_type = ll2mu_ty(arg.concretetype)
         # _recursive_addtype(self.gbltypes, arg.mu_type)
         if isinstance(arg, Constant):

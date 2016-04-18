@@ -34,7 +34,7 @@ def build_arglist(ctx, argv):
         with DelayedDisposer() as dd:
             length = len(s)
             hlength = dd << ctx.handle_from_int(length, 64)
-            hstr = ctx.new_hybrid(_id("@hybrpy_string"), hlength)   # don't add handle to dd
+            hstr = ctx.new_hybrid(_id("@hybrpy_string_0"), hlength)   # don't add handle to dd
             ir = dd << ctx.get_iref(hstr)
 
             # hash
@@ -57,7 +57,7 @@ def build_arglist(ctx, argv):
 
     with DelayedDisposer() as dd:
         # Create new list
-        refstt = ctx.new_fixed(_id("@sttlist"))     # don't add to dd
+        refstt = ctx.new_fixed(_id("@sttlist_0"))     # don't add to dd
         irefstt = dd << ctx.get_iref(refstt)
 
         # Set the length of the list
@@ -67,7 +67,7 @@ def build_arglist(ctx, argv):
 
         # Create the hybrid items
         ireffld_items = dd << ctx.get_field_iref(irefstt, 1)
-        refhyb_items = dd << ctx.new_hybrid(_id("@hybrpy_stringPtr"), hlen)
+        refhyb_items = dd << ctx.new_hybrid(_id("@hybrpy_stringPtr_0"), hlen)
         ctx.store(ireffld_items, refhyb_items)
 
         # Set the length field of the hybrid type.

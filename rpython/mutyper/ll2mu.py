@@ -320,7 +320,10 @@ def _llval2mu_adrofs(llv):
 
 # ----------------------------------------------------------
 def ll2mu_op(llop):
-    return _ll2mu_op(llop.opname, llop.args, llop.result)
+    tmp = _ll2mu_op(llop.opname, llop.args, llop.result)
+    if isinstance(tmp, list):
+        return tmp, tmp[-1].result
+    return tmp
 
 
 def _ll2mu_op(opname, args, result=None):
@@ -695,11 +698,18 @@ def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
 
 
 def _llop2mu_cast_adr_to_int(ptr, res=None, llopname='cast_adr_to_int'):
-    return []
+    return [], ptr
 
 
 def _llop2mu_cast_int_to_adr(n, res=None, llopname='cast_adr_to_int'):
-    return []
+    return [], n
 
+
+def _llop2mu_gc_can_move(ptr, res=None, llopname='gc_can_move'):
+    return [], _newprimconst(mutype.int1_t, True)
+
+
+def _llop2mu_gc_pin(ptr, res=None, llopname='gc_can_move'):
+    return [], _newprimconst(mutype.int1_t, True)
 
 # TODO: rest of the operations
