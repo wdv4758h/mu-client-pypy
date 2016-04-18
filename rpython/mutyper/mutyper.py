@@ -94,6 +94,7 @@ class MuTyper:
                     if isinstance(arg, MuExternalFunc):
                         # Addresses of some C functions stored in global cells need to be processed.
                         self.externfncs.add(arg)
+                        _recursive_addtype(self.gbltypes, arg._T)
                 if _o.opname in "CALL TAILCALL CCALL".split(' '):
                     _o.result.mu_name.scope = blk       # Correct the scope of return value of calls.
             muops += _muops
@@ -133,7 +134,7 @@ class MuTyper:
                     if not isinstance(arg.value, mutype._mufuncref):
                         arg.__init__(arg.value)     # re-initialise it to rehash it.
                         self.gblcnsts.add(arg)
-                        arg.mu_name = MuName(str(arg.value))
+                        arg.mu_name = MuName("%s_%s" % (str(arg.value), arg.mu_type.mu_name._name))
                 except (NotImplementedError, AssertionError, TypeError):
                     if isinstance(arg.value, llt.LowLevelType):
                         arg.value = ll2mu_ty(arg.value)
@@ -178,6 +179,8 @@ def _recursive_addtype(s_types, mut):
         elif isinstance(mut, mutype.MuRef):
             _recursive_addtype(s_types, mut.TO)
         elif isinstance(mut, mutype.MuFuncRef):
-            ts = mut.Sig.ARGS + mut.Sig.RTNS
+            _recursive_addtype(s_types, mut.Sig)
+        elif isinstance(mut, mutype.MuFuncSig):
+            ts = mut.ARGS + mut.RTNS
             for t in ts:
                 _recursive_addtype(s_types, t)

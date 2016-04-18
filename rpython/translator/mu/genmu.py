@@ -81,9 +81,8 @@ class MuTextIRGenerator:
         Generate bundle code to a writable file fp.
         """
         for t in self.mutyper.gbltypes:
-            if isinstance(t, MuFuncRef):
-                fp_ir.write(".funcsig %s = %s\n" % (t.Sig.mu_name, t.Sig.mu_constructor))
-            fp_ir.write(".typedef %s = %s\n" % (t.mu_name, t.mu_constructor))
+            fp_ir.write("%s %s = %s\n" % (".funcsig" if isinstance(t, MuFuncSig) else ".typedef",
+                                          t.mu_name, t.mu_constructor))
 
         for c in self.mutyper.gblcnsts:
             fp_ir.write(".const %s <%s> = %s\n" % (c.mu_name, c.mu_type.mu_name, c.value))
