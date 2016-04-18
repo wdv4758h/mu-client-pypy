@@ -180,11 +180,12 @@ def ll2mu_val(llv):
         llv = mumem.mu_sizeOf(ll2mu_ty(llv.TYPE))
 
     cache, v = (__ll2muval_cache_ptr, llv._obj) if isinstance(llv, lltype._ptr) else (__ll2muval_cache, llv)
+    key = lltype.typeOf(v), v
     try:
-        return cache[v]
+        return cache[key]
     except KeyError:
         muv = _ll2mu_val(llv)
-        cache[v] = muv
+        cache[key] = muv
         return muv
     except TypeError, e:
         if isinstance(llv, llmemory.AddressOffset):
