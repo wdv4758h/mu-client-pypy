@@ -66,3 +66,22 @@ def test_exctran_gcbench():
     assert exc.exc.blk is exclnk.target
     assert exc.exc.args is exclnk.args
     assert isinstance(exclnk.target.mu_excparam, Variable)
+
+
+def test_exctran_write():
+    def fac(n):
+        if n in (0, 1):
+            v = 1
+        else:
+            v = n * fac(n - 1)
+        print v
+        return v
+
+    _, _, g2 = gengraph(fac, [int])
+
+    fncptr_write = \
+        g2.startblock.exits[1].target.operations[2].args[0].value._obj.graph.startblock.exits[0].target. \
+            operations[0].args[0].value._obj.graph.startblock.operations[0].args[0].value._obj.graph. \
+            startblock.operations[13].args[0].value._obj.graph.startblock.exits[0].target.exits[0].target. \
+            exits[0].target.exits[0].target.exits[0].target.exits[0].target.exits[0].target.exits[0].target. \
+            operations[12].args[0].value._obj.graph.startblock.operations[1].args[0].value

@@ -64,6 +64,8 @@ class MuTyper:
             elif len(blk.exits) == 2:
                 blk.exitswitch = self.proc_arg(blk.exitswitch, blk)
                 muops.append(muop.BRANCH2(blk.exitswitch, DEST.from_link(blk.exits[1]), DEST.from_link(blk.exits[0])))
+        else:
+            muops[-1].exc = muop.EXCEPT(DEST.from_link(blk.exits[0]), DEST.from_link(blk.exits[1]))
         blk.operations = tuple(muops)
 
     def specialise_op(self, op, blk):
@@ -99,12 +101,12 @@ class MuTyper:
         except NotImplementedError:
             log.warning("Ignoring '%s'." % op)
 
-        # process the potential exception clause
-        exc = getattr(op, 'mu_exc', None)
-        if exc:
-            self.proc_arglist(exc.nor.args, blk)
-            self.proc_arglist(exc.exc.args, blk)
-            muops[-1].exc = exc
+        # # process the potential exception clause
+        # exc = getattr(op, 'mu_exc', None)
+        # if exc:
+        #     self.proc_arglist(exc.nor.args, blk)
+        #     self.proc_arglist(exc.exc.args, blk)
+        #     muops[-1].exc = exc
 
         return muops
 
