@@ -114,7 +114,7 @@ class MuExceptionTransformer:
             if blk.exitswitch is c_last_exception:
                 self.exctran_block(blk, g)
 
-    def exctran_block(self, excblk, g):
+    def exctran_block(self, excblk):
         def _create_catch_block(args):
             blk_catch = Block(args)
             ops = []
