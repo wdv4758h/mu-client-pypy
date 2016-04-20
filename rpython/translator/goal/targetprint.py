@@ -5,7 +5,7 @@ def fac(n):
 
 
 def main_fac(argv):
-    print fac(int(argv[0]))
+    print fac(int(argv[1]))
     return 0
 
 
