@@ -100,6 +100,7 @@ class MuTyper:
             muops += _muops
         except NotImplementedError:
             log.warning("Ignoring '%s'." % op)
+            self._alias[op.result] = op.args[0]
 
         # # process the potential exception clause
         # exc = getattr(op, 'mu_exc', None)
@@ -112,7 +113,6 @@ class MuTyper:
 
     def proc_arglist(self, args, blk):
         for i in range(len(args)):
-
             args[i] = self.proc_arg(args[i], blk)
 
     def proc_arg(self, arg, blk):

@@ -659,6 +659,9 @@ class _munullref(_mugenref):
     def __eq__(self, other):
         return isinstance(other, _munullref)
 
+    def __hash__(self):
+        return hash((self._TYPE, 'NULL'))
+
 
 # ----------------------------------------------------------
 class MuFuncSig(MuType):

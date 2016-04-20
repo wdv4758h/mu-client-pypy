@@ -15,4 +15,4 @@ def main_argv(argv):
 
 
 def target(*args):
-    return main_fac, None
+    return main_argv, None
