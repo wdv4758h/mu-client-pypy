@@ -4,10 +4,15 @@ def fac(n):
     return n * fac(n - 1)
 
 
-def main(argv):
+def main_fac(argv):
     print fac(int(argv[0]))
     return 0
 
 
+def main_argv(argv):
+    print argv
+    return 0
+
+
 def target(*args):
-    return main, None
+    return main_fac, None

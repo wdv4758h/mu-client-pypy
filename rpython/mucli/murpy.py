@@ -126,7 +126,7 @@ def launch(ir, hail, exfns, args):
 
 
 def main(argv):
-    launch(*extract_bundle(argv[1]), args=argv[2:])
+    launch(*extract_bundle(argv[1]), args=argv[1:])
 
 
 if __name__ == "__main__":
