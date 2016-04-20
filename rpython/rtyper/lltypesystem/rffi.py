@@ -99,8 +99,12 @@ def llexternal(name, args, result, _callable=None,
     """
     #################################
     # Mu backend temporary decision
+    # ----
     # ignore GIL for now.
     releasegil = False
+    # ----
+    # also don't save error number -> avoid the messy threadlocalref stuff
+    save_err = RFFI_ERR_NONE
     #################################
     if _callable is not None:
         assert callable(_callable)

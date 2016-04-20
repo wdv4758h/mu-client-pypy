@@ -355,7 +355,9 @@ def replace_os_function(name):
 def handle_posix_error(name, result):
     result = widen(result)
     if result < 0:
-        raise OSError(get_saved_errno(), '%s failed' % name)
+        # raise OSError(get_saved_errno(), '%s failed' % name)
+        # ignore errno, just report failure -> avoid threadlocal stuff.
+        raise OSError('%s failed' % name)
     return result
 
 @replace_os_function('dup')
