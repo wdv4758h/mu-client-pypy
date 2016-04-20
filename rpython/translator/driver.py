@@ -14,7 +14,7 @@ from rpython.rlib.debug import debug_start, debug_print, debug_stop
 from rpython.rlib.entrypoint import secondary_entrypoints,\
      annotated_jit_entrypoints
 from .mu.preps import prepare
-from .mu.exctran import ExceptionTransformer
+from .mu.exctran import MuExceptionTransformer
 from .mu.genmu import MuTextIRGenerator
 
 import py
@@ -556,7 +556,7 @@ class TranslationDriver(SimpleTaskEngine):
     @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
     def task_mutype_mu(self):
         self.log.info("Task mutype_mu.")
-        exctran = ExceptionTransformer(self.translator)
+        exctran = MuExceptionTransformer(self.translator)
         exctran.transform_all()
 
         bk = self.translator.annotator.bookkeeper

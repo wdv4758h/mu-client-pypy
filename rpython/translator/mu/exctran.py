@@ -92,7 +92,7 @@ class MuExceptionTransformer:
 
         self.helpergraphs = _get_helpergraphs()
         backend_optimizations(translator, self.helpergraphs)
-        translator.graphs.extend(self.helpergraphs)
+        # translator.graphs.extend(self.helpergraphs)
         self.graphs = translator.graphs
 
     def transform_all(self):
@@ -112,7 +112,7 @@ class MuExceptionTransformer:
         # Transform each block that raises exception
         for blk in g.iterblocks():
             if blk.exitswitch is c_last_exception:
-                self.exctran_block(blk, g)
+                self.exctran_block(blk)
 
     def exctran_block(self, excblk):
         def _create_catch_block(args):
@@ -124,7 +124,7 @@ class MuExceptionTransformer:
 
             excdataptr = Variable("excdataptr")
             excdataptr.concretetype = self.ptr_excdata_llt
-            ops.append(SpaceOperation('cast_pointer', [Constant(self.ptr_excdata_llt), excobjptr], excdataptr))
+            ops.append(SpaceOperation('cast_pointer', [Constant(self.ptr_excdata_llt, lltype.Void), excobjptr], excdataptr))
 
             # Unpack it here
             exc_t = Variable('exc_t')
