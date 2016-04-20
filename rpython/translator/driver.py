@@ -575,7 +575,7 @@ class TranslationDriver(SimpleTaskEngine):
         target_name = self.compute_exe_name()
         bundle_name = target_name + MuTextIRGenerator.bundle_suffix
         irgen = MuTextIRGenerator(self.translator.graphs, self.mutyper, self.entry_graph)
-        irgen.bundlegen(bundle_name.strpath)
+        irgen.bundlegen(bundle_name)
 
     def proceed(self, goals):
         if not goals:

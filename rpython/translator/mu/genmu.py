@@ -64,7 +64,7 @@ class MuTextIRGenerator:
         strio_exfn = StringIO()
         self.codegen(strio_ir, strio_hail, strio_exfn)
 
-        zf = zipfile.ZipFile(bdlpath, mode="w", compression=zip_compression)
+        zf = zipfile.ZipFile(bdlpath.strpath, mode="w", compression=zip_compression)
 
         def _writefrom(entry_name, strio):
             s = strio.getvalue()
@@ -72,9 +72,9 @@ class MuTextIRGenerator:
             print s
             zf.writestr(entry_name, s)
 
-        _writefrom(bdlpath.replace('.mu', '.uir'), strio_ir)
-        _writefrom(bdlpath.replace('.mu', '.hail'), strio_hail)
-        _writefrom(bdlpath.replace('.mu', '.exfn'), strio_exfn)
+        _writefrom(bdlpath.basename.replace('.mu', '.uir'), strio_ir)
+        _writefrom(bdlpath.basename.replace('.mu', '.hail'), strio_hail)
+        _writefrom(bdlpath.basename.replace('.mu', '.exfn'), strio_exfn)
 
         zf.close()
 
