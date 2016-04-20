@@ -333,7 +333,7 @@ def _ll2mu_op(opname, args, result=None):
         # try if it's an integer operation that can be redirected.
         contains = lambda s, subs: reduce(lambda a, b: a or b, map(lambda e: e in s, subs), False)
         if contains(opname, ('uint', 'char', 'long')):
-            opname = "int_%s" % opname.split('_')[1]
+            opname = "int_" + opname[5:]
             try:
                 return globals()['_llop2mu_' + opname](*args, res=result, llopname=opname)
             except KeyError:
@@ -524,6 +524,24 @@ for triplet in __spec_cast_map:
             lambda x, res, llopname: [getattr(muops, __spec_cast_map[llopname])(x, res.mu_type, result=res)]
 
 
+def _llop2mu_force_cast(x, res, llopname='force_cast'):
+    SRC_LLTYPE = x.concretetype
+    RES_LLTYPE = res.concretetype
+
+    if isinstance(SRC_LLTYPE, lltype.Ptr) and \
+            (RES_LLTYPE == llmemory.Address or isinstance(RES_LLTYPE, lltype.Primitive)):
+        assert SRC_LLTYPE.TO._gckind == 'raw'
+        return _llop2mu_cast_ptr_to_adr(x, res)
+    elif (SRC_LLTYPE == llmemory.Address or isinstance(SRC_LLTYPE, lltype.Primitive)) and \
+            isinstance(RES_LLTYPE, lltype.Ptr):
+        assert RES_LLTYPE.TO._gckind == 'raw'
+        return _llop2mu_cast_adr_to_ptr(x, res)
+    elif ll2mu_ty(SRC_LLTYPE).__class__ == ll2mu_ty(RES_LLTYPE).__class__:
+        return [], x
+
+_llop2mu_cast_primitive = _llop2mu_force_cast
+
+
 # ----------------
 # pointer operations
 def _llop2mu_malloc(T, res=None, llopname='malloc'):
@@ -674,12 +692,20 @@ for op in 'malloc free memset memcopy memmove'.split(' '):
 #     pass
 #
 #
-# def _llop2mu_raw_load():
-#     pass
-#
-#
-# def _llop2mu_raw_store():
-#     pass
+def _llop2mu_raw_load(adr, ofs, res, llopname='raw_load'):
+    ops = _MuOpList()
+    loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
+    loc_ptr = ops.append(muops.PTRCAST(loc_adr, mutype.MuUPtr(res.mu_type)))
+    ops.append(muops.LOAD(loc_ptr, result=res))
+    return ops
+
+
+def _llop2mu_raw_store(adr, ofs, val, res=None, llopname='raw_store'):
+    ops = _MuOpList()
+    loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
+    loc_ptr = ops.append(muops.PTRCAST(loc_adr, mutype.MuUPtr(val.mu_type)))
+    ops.append(muops.STORE(loc_ptr, val))
+    return ops
 
 for op in "add sub lt le eq ne gt ge".split(' '):
     globals()['_llop2mu_adr_' + op] = lambda adr1, adr2, res, llopname:\
@@ -695,6 +721,11 @@ def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
     adr = ops.append(muops.NATIVE_PIN(ptr))
     ops.append(muops.PTRCAST(adr, ll2mu_ty(llmemory.Address), result=res))
     return ops
+
+
+def _llop2mu_cast_adr_to_ptr(adr, res, llopname='cast_adr_to_ptr'):
+    assert isinstance(res.mu_type, mutype.MuUPtr)
+    return [muops.PTRCAST(adr, res.mu_type, result=res)]
 
 
 def _llop2mu_cast_adr_to_int(ptr, res=None, llopname='cast_adr_to_int'):
