@@ -95,8 +95,10 @@ class MuTyper:
                         # Addresses of some C functions stored in global cells need to be processed.
                         self.externfncs.add(arg)
                         # _recursive_addtype(self.gbltypes, arg._T)
-                if _o.opname in "CALL TAILCALL CCALL".split(' '):
-                    _o.result.mu_name.scope = blk       # Correct the scope of return value of calls.
+
+                if hasattr(_o.result, 'mu_name'):
+                    _o.result.mu_name.scope = blk   # Correct the scope of result variables
+
             muops += _muops
         except NotImplementedError:
             log.warning("Ignoring '%s'." % op)

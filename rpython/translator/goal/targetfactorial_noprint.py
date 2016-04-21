@@ -5,7 +5,8 @@ def fac(n):
 
 
 def main(argv):
-    return fac(int(argv[1]))
+    # return fac(int(argv[1]))
+    return len(str(fac(int(argv[1]))))
 
 
 def target(*args):

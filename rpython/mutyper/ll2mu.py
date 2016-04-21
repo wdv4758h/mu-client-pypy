@@ -380,10 +380,12 @@ def _llop2mu_direct_call(cst_fnc, *args, **kwargs):
                                   _ref2uptrvoid(fnc_sig.RTNS[0]), fr.compilation_info.includes)
         ldfncptr = ops.append(muops.LOAD(extfnc))
         callee = ldfncptr
+        call_op = muops.CCALL
     else:
         callee = g
+        call_op = muops.CALL
     res = kwargs['res'] if 'res' in kwargs else None
-    ops.append(muops.CALL(callee, args, result=res))
+    ops.append(call_op(callee, args, result=res))
     return ops
 
 
@@ -553,12 +555,13 @@ def _llop2mu_malloc(T, res=None, llopname='malloc'):
 
 
 def _llop2mu_malloc_varsize(T, n, res=None, llopname='malloc_varsize'):
+    ops = _MuOpList()
     if T.value._gckind == 'gc':
-        return [muops.NEWHYBRID(ll2mu_ty(T.value), n, result=res)]
+        hyb = ops.append(muops.NEWHYBRID(ll2mu_ty(T.value), n, result=res))
     else:
         # Calculate the size of memory that needs to be allocated
         # see mumem.mu_hybsizeOf for reference.
-        ops = _MuOpList()
+
         hyb_t = ll2mu_ty(T.value)
         fixstt = mutype.MuStruct('fix', *[(f, getattr(hyb_t, f)) for f in hyb_t._names[:-1]])
         fix_sz = mumem.mu_sizeOf(fixstt)
@@ -569,8 +572,16 @@ def _llop2mu_malloc_varsize(T, n, res=None, llopname='malloc_varsize'):
         # sz = f + v * n
         v = ops.extend(_ll2mu_op('int_mul', (_newprimconst(mutype.int64_t, _v), n)))
         sz = ops.extend(_ll2mu_op('int_add', (_newprimconst(mutype.int64_t, _f), v)))
-        ops.extend(_ll2mu_op('raw_malloc', (sz, ), res))
-        return ops
+        hyb = ops.extend(_ll2mu_op('raw_malloc', (sz, ), res))
+
+    # Set the length field
+    try:
+        _rflenfld, _ops = __getfieldiref(hyb, 'length')
+        ops.extend(_ops)
+        ops.append(muops.STORE(_rflenfld, n))
+    except ValueError:  # doesn't have a length field
+        pass
+    return ops
 
 
 def __getfieldiref(var, fld):
@@ -702,7 +713,10 @@ def __raw2ccall(*args, **kwargs):
     for i, arg_t in enumerate(sig.ARGS):
         if isinstance(arg_t, mutype.MuUPtr):
             args[i] = ops.append(muops.PTRCAST(args[i], mutype.MuUPtr(mutype.void_t)))    # cast to uptr<void>
-    ops.append(muops.CCALL(fnp, args, result=kwargs['res']))
+    res = kwargs['res']
+    if res.mu_type == mutype.void_t and len(sig.RTNS) == 1:
+        res.mu_type = sig.RTNS[0]
+    ops.append(muops.CCALL(fnp, args, result=res))
     return ops
 
 for op in 'malloc free memset memcopy memmove'.split(' '):

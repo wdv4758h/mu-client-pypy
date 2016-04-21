@@ -5,8 +5,9 @@ def fac(n):
 
 
 def main_fac(argv):
-    print fac(int(argv[1]))
-    return 0
+    f = fac(int(argv[1]))
+    print str(f) + '_suffix'
+    return len(str(f))
 
 
 def main_argv(argv):
@@ -15,4 +16,4 @@ def main_argv(argv):
 
 
 def target(*args):
-    return main_argv, None
+    return main_fac, None
