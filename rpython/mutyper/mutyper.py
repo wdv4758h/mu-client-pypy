@@ -141,12 +141,13 @@ class MuTyper:
                         # self.gblcnsts.add(arg)
                         arg.mu_name = MuName("%s_%s" % (str(arg.value), arg.mu_type.mu_name._name))
                 except (NotImplementedError, AssertionError, TypeError):
-                    if isinstance(arg.value, llt.LowLevelType):
-                        arg.value = ll2mu_ty(arg.value)
-                    elif isinstance(arg.value, llmemory.CompositeOffset):
-                        pass    # ignore AddressOffsets; they will be dealt with in ll2mu_op.
-                    elif isinstance(arg.value, (str, dict)):
-                        pass
+                    # if isinstance(arg.value, llt.LowLevelType):
+                    #     arg.value = ll2mu_ty(arg.value)
+                    # elif isinstance(arg.value, llmemory.CompositeOffset):
+                    #     pass    # ignore AddressOffsets; they will be dealt with in ll2mu_op.
+                    # elif isinstance(arg.value, (str, dict)):
+                    #     pass
+                    pass
 
         else:
             arg.mu_name = MuName(arg.name, blk)

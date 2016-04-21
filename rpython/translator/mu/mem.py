@@ -8,9 +8,18 @@ def _alignUp(n, sz):
     return n if n % sz == 0 else (n / sz + 1) * sz
 
 
+__prim_map = {
+    int1_t: 1,
+    int8_t: 1,
+    int16_t: 2,
+    int32_t: 4,
+    int64_t: 8,
+    float_t: 4,
+    double_t: 8
+}
+
+
 def mu_sizeOf(mutype):
-
-
     if isinstance(mutype, MuHybrid):
         raise TypeError("Cannot get size of MuHybrid type.")
 
@@ -27,15 +36,16 @@ def mu_sizeOf(mutype):
         return _alignUp(mu_sizeOf(mutype.OF), mu_alignOf(mutype.OF)) * mutype.length
 
 
-__prim_map = {
-    int1_t: 1,
-    int8_t: 1,
-    int16_t: 2,
-    int32_t: 4,
-    int64_t: 8,
-    float_t: 4,
-    double_t: 8
-}
+def mu_hybsizeOf(hyb_t, n):
+    """
+    Return the size of a MuHybrid type with n allocated items.
+    """
+    fixstt = MuStruct('fix', *[(f, getattr(hyb_t, f)) for f in hyb_t._names[:-1]])
+    fix_sz = mu_sizeOf(fixstt)
+    var_t = getattr(hyb_t, hyb_t._varfld)
+    var_align = mu_alignOf(var_t)
+    var_sz = mu_offsetOf(MuArray(var_t, n), n)
+    return _alignUp(fix_sz, var_align) + var_sz
 
 
 def mu_alignOf(mutype):

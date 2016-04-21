@@ -545,11 +545,32 @@ _llop2mu_cast_primitive = _llop2mu_force_cast
 # ----------------
 # pointer operations
 def _llop2mu_malloc(T, res=None, llopname='malloc'):
-    return [muops.NEW(T.value, result=res)]
+    if T.value._gckind == 'gc':
+        return [muops.NEW(ll2mu_ty(T.value), result=res)]
+    else:
+        cst_sz = _newprimconst(mutype.int64_t, mumem.mu_sizeOf(ll2mu_ty(T.value)))
+        return _ll2mu_op('raw_malloc', (cst_sz,), res)
 
 
 def _llop2mu_malloc_varsize(T, n, res=None, llopname='malloc_varsize'):
-    return [muops.NEWHYBRID(T.value, n, result=res)]
+    if T.value._gckind == 'gc':
+        return [muops.NEWHYBRID(ll2mu_ty(T.value), n, result=res)]
+    else:
+        # Calculate the size of memory that needs to be allocated
+        # see mumem.mu_hybsizeOf for reference.
+        ops = _MuOpList()
+        hyb_t = ll2mu_ty(T.value)
+        fixstt = mutype.MuStruct('fix', *[(f, getattr(hyb_t, f)) for f in hyb_t._names[:-1]])
+        fix_sz = mumem.mu_sizeOf(fixstt)
+        var_t = getattr(hyb_t, hyb_t._varfld)
+        var_align = mumem.mu_alignOf(var_t)
+        _f = mumem._alignUp(fix_sz, var_align)
+        _v = mumem._alignUp(mumem.mu_sizeOf(var_t), mumem.mu_alignOf(var_t))
+        # sz = f + v * n
+        v = ops.extend(_ll2mu_op('int_mul', (_newprimconst(mutype.int64_t, _v), n)))
+        sz = ops.extend(_ll2mu_op('int_add', (_newprimconst(mutype.int64_t, _f), v)))
+        ops.extend(_ll2mu_op('raw_malloc', (sz, ), res))
+        return ops
 
 
 def __getfieldiref(var, fld):
@@ -688,6 +709,10 @@ for op in 'malloc free memset memcopy memmove'.split(' '):
     globals()['_llop2mu_raw_' + op] = __raw2ccall
 
 
+def _llop2mu_free(obj, res=None, llopname='free'):
+    return _ll2mu_op('raw_free', (obj, ), res)
+
+
 # def _llop2mu_raw_memclear():
 #     pass
 #
@@ -718,7 +743,11 @@ def _llop2mu_adr_delta(adr1, adr2, res=None, llopname='adr_delta'):
 
 def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
     ops = _MuOpList()
-    adr = ops.append(muops.NATIVE_PIN(ptr))
+    if isinstance(ptr.mu_type, mutype.MuUPtr):
+        adr = ptr
+    else:   # MuRef
+        adr = ops.append(muops.NATIVE_PIN(ptr))
+
     ops.append(muops.PTRCAST(adr, ll2mu_ty(llmemory.Address), result=res))
     return ops
 
