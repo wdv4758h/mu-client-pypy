@@ -30,3 +30,16 @@ def test_remove_None_return():
     graphs = prepare(t.graphs, graph)
     assert graph.returnblock.inputargs == []
     assert graph.startblock.exits[0].args == []
+
+    # ----------------------
+    def main(argv):
+        print argv
+        return 0
+
+    t, _, g = gengraph(main, [str])
+    graphs = prepare(t.graphs, g)
+    op = g.startblock.operations[0]
+    g_ll_str = op.args[0].value._obj.graph
+    print_graph(g_ll_str)
+    assert len(op.args) == 2
+    assert len(g_ll_str.startblock.inputargs) == 1

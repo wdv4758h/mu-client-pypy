@@ -101,4 +101,8 @@ def prepare(graphs, entry_graph):
                 for lnk in blk.exits:
                     if lnk.target is g.returnblock:
                         lnk.args = []
+
+        for blk in g.iterblocks():
+            # remove the input args that are Void as well.
+            blk.inputargs = [arg for arg in blk.inputargs if _keep_arg(arg)]
     return graphs
