@@ -223,7 +223,7 @@ class MuExceptionTransformer:
             cases = []
             for l in lnks:
                 assert isinstance(l.llexitcase, _ptr)
-                cases.append(Constant(l.llexitcase))
+                cases.append(Constant(l.llexitcase, l.llexitcase._TYPE))
 
             cmp_chain = _create_compare_blocks(lnks, cases, args)
             catblk.exits = (_link(catblk, cmp_chain, args),)
