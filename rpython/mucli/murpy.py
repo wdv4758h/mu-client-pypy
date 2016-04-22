@@ -91,6 +91,25 @@ def load_extfncs(ctx, exfns):
     for c_name, fncptr_name, gcl_name, hdrs in exfns:
         with DelayedDisposer() as dd:
             try:
+                # if c_name == "write":
+                #     MY_WRITE_TYPE = ctypes.CFUNCTYPE(ctypes.c_ssize_t, ctypes.c_int,
+                #                                      ctypes.c_void_p, ctypes.c_size_t)
+                #
+                #     def fake_write(fd, buf, sz):
+                #         print(fd, hex(buf), sz)
+                #
+                #         ty = ctypes.c_char * sz
+                #         ary = ty.from_address(buf)
+                #
+                #         for i in range(sz):
+                #             print("ary[{}]={} {}".format(i, ary[i], ord(ary[i])))
+                #
+                #         return sz
+                #
+                #     fp = MY_WRITE_TYPE(fake_write)
+                #     adr = ctypes.cast(fp, ctypes.c_void_p).value
+                # else:
+                #     adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
                 adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
                 hadr = dd << ctx.handle_from_fp(ctx.id_of(fncptr_name), adr)
                 hgcl = dd << ctx.handle_from_global(ctx.id_of(gcl_name))

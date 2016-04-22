@@ -172,12 +172,12 @@ __ll2muval_cache_ptr = {}
 def ll2mu_val(llv):
     if isinstance(llv, mutype._muobject):
         return llv
-    if isinstance(llv, CDefinedIntSymbolic):
-        llv = llv.default
-    elif isinstance(llv, TotalOrderSymbolic):
-        llv = llv.compute_fn()
-    elif isinstance(llv, ItemOffset):
-        llv = mumem.mu_sizeOf(ll2mu_ty(llv.TYPE))
+    # if isinstance(llv, CDefinedIntSymbolic):
+    #     llv = llv.default
+    # elif isinstance(llv, TotalOrderSymbolic):
+    #     llv = llv.compute_fn()
+    # elif isinstance(llv, ItemOffset):
+    #     llv = mumem.mu_sizeOf(ll2mu_ty(llv.TYPE))
 
     cache, v = (__ll2muval_cache_ptr, llv._obj) if isinstance(llv, lltype._ptr) else (__ll2muval_cache, llv)
     key = (lltype.typeOf(v), v)
@@ -189,6 +189,8 @@ def ll2mu_val(llv):
         return muv
     except TypeError, e:
         if isinstance(llv, llmemory.AddressOffset):
+            return _ll2mu_val(llv)
+        elif isinstance(llv, lltype.Symbolic):
             return _ll2mu_val(llv)
         else:
             raise e
@@ -309,9 +311,15 @@ def _llval2mu_adrofs(llv):
         elif isinstance(llv, llmemory.ItemOffset):
             return mumem.mu_offsetOf(mutype.MuArray(ll2mu_ty(llv.TYPE), llv.repeat), llv.repeat)
         elif isinstance(llv, llmemory.FieldOffset):
+            mut = ll2mu_ty(llv.TYPE)
+            if isinstance(mut, mutype.MuHybrid) and llv.fldname == mut._varfld and len(mut._names) > 1:
+                # get the offset of the 'length' field instead of variable part
+                return mumem.mu_offsetOf(mut, mut._names[-2])
             return mumem.mu_offsetOf(ll2mu_ty(llv.TYPE), llv.fldname)
         elif isinstance(llv, llmemory.ArrayItemsOffset):
-            return 0
+            if llv.TYPE._hints.get("nolength", False):
+                return 0
+            return 8    # sizeof(i64)
         else:
             raise AssertionError("Value {:r} of type {:r} shouldn't appear.".format(llv, type(llv)))
 
@@ -485,7 +493,7 @@ for key in __primop_map:
 
 # ----------------
 # primitive cast ops
-__cast_map = {
+__cast_map_pairs = {
     ('bool', 'int'): 'ZEXT',
     ('bool', 'uint'): 'SEXT',
     ('bool', 'float'): 'UITOFP',
@@ -502,12 +510,11 @@ __cast_map = {
     ('float', 'longlong'): 'FPTOSI',
     ('float', 'ulonglong'): 'FPTOUI',
 }
-
-for pair in __cast_map:
+__cast_map = {}
+for pair in __cast_map_pairs:
     if isinstance(pair, tuple):
         name = 'cast_%s_to_%s' % pair
-        __cast_map[name] = __cast_map[pair]
-        del __cast_map[pair]
+        __cast_map[name] = __cast_map_pairs[pair]
         globals()['_llop2mu_' + name] = \
             lambda x, res, llopname: [getattr(muops, __cast_map[llopname])(x, res.mu_type, result=res)]
 
@@ -716,6 +723,10 @@ def __raw2ccall(*args, **kwargs):
     res = kwargs['res']
     if res.mu_type == mutype.void_t and len(sig.RTNS) == 1:
         res.mu_type = sig.RTNS[0]
+
+    # Correct memcpy and memmove argument order
+    if externfnc.c_name in ('memcpy', 'memmove'):
+        args = (args[1], args[0], args[2])
     ops.append(muops.CCALL(fnp, args, result=res))
     return ops
 
