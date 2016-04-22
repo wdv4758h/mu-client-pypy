@@ -485,7 +485,7 @@ for key in __primop_map:
 
 # ----------------
 # primitive cast ops
-__cast_map = {
+__cast_map_pairs = {
     ('bool', 'int'): 'ZEXT',
     ('bool', 'uint'): 'SEXT',
     ('bool', 'float'): 'UITOFP',
@@ -502,12 +502,11 @@ __cast_map = {
     ('float', 'longlong'): 'FPTOSI',
     ('float', 'ulonglong'): 'FPTOUI',
 }
-
-for pair in __cast_map:
+__cast_map = {}
+for pair in __cast_map_pairs:
     if isinstance(pair, tuple):
         name = 'cast_%s_to_%s' % pair
-        __cast_map[name] = __cast_map[pair]
-        del __cast_map[pair]
+        __cast_map[name] = __cast_map_pairs[pair]
         globals()['_llop2mu_' + name] = \
             lambda x, res, llopname: [getattr(muops, __cast_map[llopname])(x, res.mu_type, result=res)]
 
