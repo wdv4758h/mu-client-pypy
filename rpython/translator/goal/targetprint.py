@@ -7,6 +7,7 @@ def fac(n):
 def main_fac(argv):
     f = fac(int(argv[1]))
     print f
+    # return ord(str(f)[int(argv[2])]) - ord('0')
     return 0
 
 
@@ -15,5 +16,10 @@ def main_argv(argv):
     return 0
 
 
+def main_helloworld(argv):
+    print "hellow world"
+    return 0
+
+
 def target(*args):
-    return main_fac, None
+    return main_helloworld, None
