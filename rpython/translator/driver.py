@@ -573,7 +573,10 @@ class TranslationDriver(SimpleTaskEngine):
     def task_compile_mu(self):
         self.log.info("Task compile_mu")
         target_name = self.compute_exe_name()
-        bundle_name = target_name + MuTextIRGenerator.bundle_suffix
+        if target_name.ext != MuTextIRGenerator.bundle_suffix:
+            bundle_name = target_name + MuTextIRGenerator.bundle_suffix
+        else:
+            bundle_name = target_name
         irgen = MuTextIRGenerator(self.translator.graphs, self.mutyper, self.entry_graph)
         irgen.bundlegen(bundle_name)
 

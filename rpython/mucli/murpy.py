@@ -135,7 +135,9 @@ def launch(ir, hail, exfns, args):
         st = ctx.new_stack(bundle_entry)
         th = ctx.new_thread(st, PassValues(refstt_arglst, refrtnbox))
 
+        print("-------------------------------- program output --------------------------------")
         mu.execute()
+        print("--------------------------------------------------------------------------------")
 
         irefrtnbox = ctx.get_iref(refrtnbox)
         hrtnval = ctx.load(irefrtnbox).cast(MuIntValue)
