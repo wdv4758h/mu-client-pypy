@@ -560,17 +560,19 @@ _llop2mu_cast_primitive = _llop2mu_force_cast
 
 # ----------------
 # pointer operations
-def _llop2mu_malloc(T, res=None, llopname='malloc'):
-    if T.value._gckind == 'gc':
+def _llop2mu_malloc(T, _hints, res=None, llopname='malloc'):
+    flavor = _hints.value['flavor']
+    if flavor == 'gc':
         return [muops.NEW(ll2mu_ty(T.value), result=res)]
     else:
         cst_sz = _newprimconst(mutype.int64_t, mumem.mu_sizeOf(ll2mu_ty(T.value)))
         return _ll2mu_op('raw_malloc', (cst_sz,), res)
 
 
-def _llop2mu_malloc_varsize(T, n, res=None, llopname='malloc_varsize'):
+def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
     ops = _MuOpList()
-    if T.value._gckind == 'gc':
+    flavor = _hints.value['flavor']
+    if flavor == 'gc':
         hyb = ops.append(muops.NEWHYBRID(ll2mu_ty(T.value), n, result=res))
     else:
         # Calculate the size of memory that needs to be allocated
@@ -593,7 +595,7 @@ def _llop2mu_malloc_varsize(T, n, res=None, llopname='malloc_varsize'):
         _rflenfld, _ops = __getfieldiref(hyb, 'length')
         ops.extend(_ops)
         ops.append(muops.STORE(_rflenfld, n))
-    except ValueError:  # doesn't have a length field
+    except KeyError:  # doesn't have a length field
         pass
     return ops
 
@@ -605,20 +607,30 @@ def __getfieldiref(var, fld):
     if isinstance(mu_t, mutype.MuHybrid) and fld == mu_t._varfld:
         iref_fld = ops.append(muops.GETVARPARTIREF(iref))
     else:
-        idx = mu_t._index_of(fld)
-        iref_fld = ops.append(muops.GETFIELDIREF(iref, idx))
+        try:
+            idx = mu_t._index_of(fld)
+            iref_fld = ops.append(muops.GETFIELDIREF(iref, idx))
+        except ValueError:
+            log.error("Field '%s' not found in type '%s'." % (fld, mu_t))
+            raise KeyError
     return iref_fld, ops
 
 
 def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
-    iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
-    ops.append(muops.LOAD(iref_fld, result=res))
+    try:
+        iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
+        ops.append(muops.LOAD(iref_fld, result=res))
+    except KeyError:
+        raise NotImplementedError
     return ops
 
 
 def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
-    iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
-    ops.append(muops.STORE(iref_fld, val))
+    try:
+        iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
+        ops.append(muops.STORE(iref_fld, val))
+    except KeyError:
+        raise NotImplementedError
     return ops
 
 

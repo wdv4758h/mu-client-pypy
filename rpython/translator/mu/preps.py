@@ -80,14 +80,21 @@ def prepare(graphs, entry_graph):
                 name_dic[name] = (gs, ctr)
         g.name = "%s_%d" % (name, ctr)
 
-        def _keep_arg(arg):
+        def _keep_arg(arg, opname=''):
             # Returns True if the argument/parameter is to be kept
-            return arg.concretetype != Void or \
-                   (isinstance(arg, Constant) and (isinstance(arg.value, (str, LowLevelType))))
-            # (isinstance(arg.value, str) or arg.value is None))
+            if 'malloc' in opname:
+                return True
+            if 'setfield' in opname:
+                return True
+            if arg.concretetype != Void:
+                return True
+            if isinstance(arg, Constant) and (isinstance(arg.value, (str, LowLevelType))):
+                return True
+
+            return False
 
         for _, op in g.iterblockops():
-            op.args = [arg for arg in op.args if _keep_arg(arg)]
+            op.args = [arg for arg in op.args if _keep_arg(arg, op.opname)]
             if op.opname == 'cast_pointer':     # fix problem with some cast_pointer ops that don't have CAST_TYPE
                 try:
                     assert isinstance(op.args[0], Constant) and isinstance(op.args[0].value, LowLevelType)
@@ -104,5 +111,5 @@ def prepare(graphs, entry_graph):
 
         for blk in g.iterblocks():
             # remove the input args that are Void as well.
-            blk.inputargs = [arg for arg in blk.inputargs if _keep_arg(arg)]
+            blk.inputargs = [arg for arg in blk.inputargs if arg.concretetype != Void]
     return graphs
