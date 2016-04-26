@@ -51,6 +51,8 @@ def _ll2mu_ty(llt):
         return _lltype2mu_arr(llt)
     elif isinstance(llt, lltype.Ptr):
         return _lltype2mu_ptr(llt)
+    elif llt is lltype.RuntimeTypeInfo:
+        return _ll2mu_ty(lltype.Char)       # rtti is defined to be a char in C backend.
     elif isinstance(llt, lltype.OpaqueType):
         log.warning("mapping type %r -> void" % llt)
         return mutype.void_t
@@ -113,7 +115,8 @@ def _lltype2mu_stt(llt):
         lst = []
         for n in llt._names:
             t_mu = ll2mu_ty(llt._flds[n])
-            if not (t_mu is mutype.void_t or (isinstance(t_mu, mutype.MuRef) and t_mu.TO is mutype.void_t)):
+            # if not (t_mu is mutype.void_t or (isinstance(t_mu, mutype.MuRef) and t_mu.TO is mutype.void_t)):
+            if t_mu is not mutype.void_t:
                 lst.append((n, t_mu))
         stt._setfields(lst)
         # stt._update_name()
@@ -221,6 +224,10 @@ def _ll2mu_val(llv):
 
     elif isinstance(llv, lltype._ptr):
         return _llval2mu_ptr(llv)
+
+    elif llv._TYPE is lltype.RuntimeTypeInfo:
+        # Since rtti is of char type in C, we use char_t here as well, with an initialised 0 value
+        return mutype.char_t(0)
     else:
         raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
 
