@@ -54,8 +54,9 @@ def _ll2mu_ty(llt):
     elif llt is lltype.RuntimeTypeInfo:
         return _ll2mu_ty(lltype.Char)       # rtti is defined to be a char in C backend.
     elif isinstance(llt, lltype.OpaqueType):
-        log.warning("mapping type %r -> void" % llt)
-        return mutype.void_t
+        mut = mutype.int64_t    # values of opaque type are translated to be 64-bit integers
+        log.warning("mapping type %r -> %r" % (llt, mut))
+        return mut
     else:
         raise NotImplementedError("Don't know how to specialise %s using MuTS." % llt)
 # ll2mu_ty = ll.saferecursive(_ll2mu_ty, None)
@@ -228,6 +229,11 @@ def _ll2mu_val(llv):
     elif llv._TYPE is lltype.RuntimeTypeInfo:
         # Since rtti is of char type in C, we use char_t here as well, with an initialised 0 value
         return mutype.char_t(0)
+
+    elif isinstance(llv._TYPE, lltype.OpaqueType):
+        muv = mutype.int64_t(0)
+        log.ll2mu_val("WARNING: specialising '%r' to '%r' of type '%s'." % (llv, muv, muv._TYPE))
+        return muv
     else:
         raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
 
@@ -702,6 +708,10 @@ def _llop2mu_cast_pointer(cst_TYPE, var_ptr, res=None, llopname='cast_pointer'):
     return [muops.REFCAST(var_ptr, res.mu_type if res else ll2mu_ty(cst_TYPE.value), result=res)]
 
 
+def _llop2mu_cast_opaque_ptr(var_ptr, res, llopname='cast_opaque_ptr'):
+    return _llop2mu_cast_pointer(Constant(ll2mu_ty(res.concretetype)), var_ptr, res)
+
+
 def _llop2mu_ptr_eq(ptr1, ptr2, res=None, llopname='ptr_eq'):
     return [muops.EQ(ptr1, ptr2, result=res)]
 
@@ -717,7 +727,7 @@ def _llop2mu_ptr_nonzero(ptr, res=None, llopname='ptr_nonzero'):
     return _llop2mu_ptr_ne(ptr, cst, res)
 
 
-def _llop2mu_ptr_zero(ptr, res=None, llopname='ptr_zero'):
+def _llop2mu_ptr_iszero(ptr, res=None, llopname='ptr_zero'):
     cst = Constant(mutype._munullref(ptr.mu_type))
     cst.mu_type = ptr.mu_type
     cst.mu_name = MuName("NULL_%s" % ptr.mu_type.mu_name._name)
