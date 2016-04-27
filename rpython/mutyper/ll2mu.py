@@ -10,6 +10,7 @@ from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
 from rpython.rlib.rarithmetic import _inttypes
 from rpython.flowspace.model import Constant
+from random import randint
 
 import py
 from rpython.tool.ansi_print import AnsiLogger
@@ -230,10 +231,10 @@ def _ll2mu_val(llv):
 
     elif llv._TYPE is lltype.RuntimeTypeInfo:
         # Since rtti is of char type in C, we use char_t here as well, with an initialised 0 value
-        return mutype.char_t(0)
+        return mutype.char_t(randint(0, 0xff))
 
     elif isinstance(llv._TYPE, lltype.OpaqueType):
-        muv = mutype.int64_t(0)
+        muv = mutype.int64_t(randint(0, 0xffffffff))    # randomise it.
         log.ll2mu_val("WARNING: specialising '%r' to '%r' of type '%s'." % (llv, muv, muv._TYPE))
         return muv
     else:
