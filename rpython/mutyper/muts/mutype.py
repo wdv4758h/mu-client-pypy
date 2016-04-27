@@ -22,7 +22,8 @@ class MuType(LowLevelType, MuEntity):
         raise NotImplementedError
 
     def __repr__(self):
-        return self._mu_constructor_expanded
+        # return self._mu_constructor_expanded
+        return self.mu_constructor
 
 
 class _muobject(object):
@@ -71,10 +72,6 @@ class MuPrimitive(MuType):
     @property
     def mu_constructor(self):
         return self._constr
-
-    @property
-    def _mu_constructor_expanded(self):
-        return self.mu_constructor
 
     def __eq__(self, other):
         return isinstance(other, MuPrimitive) and self._constr == other._constr
@@ -255,13 +252,6 @@ class MuStruct(MuContainerType):
     def mu_constructor(self):
         return "struct<%s>" % ' '.join([str(self._flds[name].mu_name) for name in self._names])
 
-    @property
-    def _mu_constructor_expanded(self):
-        def _inner():
-            return "struct<%s>" % ' '.join([self._flds[name]._mu_constructor_expanded
-                                            for name in self._names])
-        return saferecursive(_inner, "...")()
-
     def _allocate(self, initialization=None, parent=None, parentindex=None):
         return _mustruct(self, parent=parent, parentindex=parentindex)
 
@@ -414,13 +404,6 @@ class MuHybrid(MuContainerType):
     def mu_constructor(self):
         return "hybrid<%s>" % ' '.join([str(self._flds[name].mu_name) for name in self._names])
 
-    @property
-    def _mu_constructor_expanded(self):
-        def _inner():
-            return "hybrid<%s>" % ' '.join([self._flds[name]._mu_constructor_expanded
-                                            for name in self._names])
-        return saferecursive(_inner, '...')()
-
     def _container_example(self):
         return _muhybrid(self, int64_t(5))
 
@@ -552,12 +535,6 @@ class MuArray(MuContainerType):
     @property
     def mu_constructor(self):
         return "array<%s %d>" % (self.OF.mu_name, self.length)
-
-    @property
-    def _mu_constructor_expanded(self):
-        def _inner():
-            return "array<%s %d>" % (self.OF._mu_constructor_expanded, self.length)
-        return saferecursive(_inner, "...")()
 
     def _allocate(self, initialization=None, parent=None, parentindex=None):
         return _muarray(self, parent, parentindex)
@@ -694,14 +671,6 @@ class MuFuncSig(MuType):
         rtns = ' '.join(map(lambda a: repr(a.mu_name), self.RTNS))
         return "(%s) -> (%s)" % (args, rtns)
 
-    @property
-    def _mu_constructor_expanded(self):
-        def _inner():
-            args = ' '.join(map(lambda a: a._mu_constructor_expanded, self.ARGS))
-            rtns = ' '.join(map(lambda a: a._mu_constructor_expanded, self.RTNS))
-            return "( %s ) -> ( %s )" % (args, rtns)
-        return saferecursive(_inner, '...')()
-
     def __str__(self):
         args = ' '.join(map(str, self.ARGS))
         rtns = ' '.join(map(str, self.RTNS))
@@ -735,12 +704,6 @@ class MuFuncRef(MuRefType):
     @property
     def mu_constructor(self):
         return "%s<%s>" % (self.__class__.type_constr_name, self.Sig.mu_name)
-
-    @property
-    def _mu_constructor_expanded(self):
-        def _inner():
-            return "%s<%s>" % (self.__class__.type_constr_name, self.Sig._mu_constructor_expanded)
-        return saferecursive(_inner, "...")()
 
     def _allocate(self, initialization=None, parent=None, parentindex=None):
         return _munullref(self)
@@ -776,12 +739,6 @@ class MuRef(MuRefType):
     @property
     def mu_constructor(self):
         return "%s<%s>" % (self.__class__.type_constr_name, self.TO.mu_name)
-
-    @property
-    def _mu_constructor_expanded(self):
-        def _inner():
-            return "%s<%s>" % (self.__class__.type_constr_name, self.TO._mu_constructor_expanded)
-        return saferecursive(_inner, "...")()
 
     def _allocate(self, initialization=None, parent=None, parentindex=None):
         return _munullref(self)
