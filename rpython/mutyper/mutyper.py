@@ -1,7 +1,7 @@
 """
 Converts the LLTS types and operations to MuTS.
 """
-from rpython.flowspace.model import FunctionGraph, Block, Link, Variable, Constant, c_last_exception
+from rpython.flowspace.model import FunctionGraph, Block, Link, Variable, Constant, c_last_exception, SpaceOperation
 from rpython.mutyper.muts.muni import MuExternalFunc
 from rpython.mutyper.muts.muops import DEST
 from .muts.muentity import *
@@ -15,6 +15,24 @@ from rpython.tool.ansi_print import AnsiLogger
 
 
 log = AnsiLogger("MuTyper")
+
+
+class _NeedToLoadParentError(Exception):
+    def __init__(self, cnst):
+        self.cnst = cnst
+
+    @staticmethod
+    def need(cnst):
+        if isinstance(cnst, Constant) and isinstance(cnst.value, lltype._ptr):
+            ptr = cnst.value
+            obj = ptr._obj
+            wrprnt = getattr(obj, '_wrparent', None)
+            if wrprnt:
+                assert isinstance(obj, lltype._struct)
+                prnt = wrprnt()
+                ty = prnt._TYPE
+                return len(ty._names) > 1
+        return False
 
 
 class MuTyper:
@@ -72,7 +90,22 @@ class MuTyper:
         muops = []
 
         # set up -- process the result and the arguments
-        self.proc_arglist(op.args, blk)
+        try:
+            self.proc_arglist(op.args, blk)
+        except _NeedToLoadParentError as e:
+            # effectively insert a 'getfield' operation to get the field from parent structure.
+            prnt = e.cnst.value._obj._wrparent()
+            idx = e.cnst.value._obj._parent_index
+            ty = e.cnst.value._obj._parent_type
+            cnst_prnt = Constant(prnt, ty)
+            _op = SpaceOperation('getfield', [cnst_prnt, Constant(idx, lltype.Void)], Variable())
+            # replace the constant with the result of getfield
+            op.args[op.args.index(e.cnst)] = _op.result
+            # specialise the getfield operation
+            muops += self.specialise_op(_op, blk)
+            # try process the arguments again.
+            self.proc_arglist(op.args, blk)
+
         op.result = self.proc_arg(op.result, blk)
         # op.result.mu_name = MuName(op.result.name, blk)
 
@@ -120,6 +153,14 @@ class MuTyper:
     def proc_arg(self, arg, blk):
         if arg in self._alias:
             return self._alias[arg]
+
+        # replace the constant with the normalised container
+        if isinstance(arg, Constant) and isinstance(arg.value, lltype._ptr) and isinstance(arg.value._obj, lltype._parentable):
+            new_ptr = arg.value._obj._normalizedcontainer()._as_ptr()
+            arg = Constant(new_ptr, new_ptr._TYPE)
+
+        if _NeedToLoadParentError.need(arg):
+            raise _NeedToLoadParentError(arg)
 
         arg.mu_type = ll2mu_ty(arg.concretetype)
         # _recursive_addtype(self.gbltypes, arg.mu_type)
