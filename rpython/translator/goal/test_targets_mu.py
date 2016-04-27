@@ -76,3 +76,15 @@ def test_print_helloworld(tmpdir):
     bundle_file = compile_target(tmpdir, "targetprint.py")
     r, out, err = run_bundle(bundle_file, [])
     assert out == "hello world"
+
+
+def test_warningalone(tmpdir):
+    bundle = compile_target(tmpdir, "targetwarningalone.py")
+    r, out, err = run_bundle(bundle, '0')
+    assert out == '9'
+    r, out, err = run_bundle(bundle, '4')
+    assert out == '1'
+    r, out, err = run_bundle(bundle, '2')
+    assert out == '2'
+    r, out, err = run_bundle(bundle, '1')
+    assert out == '0'

@@ -150,7 +150,6 @@ def launch(ir, hail, exfns, args):
 
 def main():
     args = parse_args()
-    print(args)
     rtnval = launch(*extract_bundle(args.bundle), args=[args.bundle] + args.prog_args)
     return rtnval
 
