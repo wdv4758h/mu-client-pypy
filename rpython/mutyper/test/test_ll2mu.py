@@ -29,6 +29,7 @@ def test_ll2mu_ty():
 
     OBJ = ll2mu_ty(OBJECT)
     assert OBJ.typeptr.TO.instantiate.Sig.RTNS[0].TO == OBJ
+    assert OBJ.typeptr.TO.rtti == mu.MuRef(mu.char_t)
 
     A = ll2mu_ty(ll.Array(ll.Char))
     assert isinstance(A, mu.MuHybrid)
@@ -95,7 +96,7 @@ def test_ll2mu_fncptr():
             operations[0].args[0].value._obj.graph.startblock.operations[0].args[0].value._obj.graph. \
             startblock.operations[13].args[0].value._obj.graph.startblock.exits[0].target.exits[0].target. \
             exits[0].target.exits[0].target.exits[0].target.exits[0].target.exits[0].target.exits[0].target. \
-            operations[12].args[0].value._obj.graph.startblock.operations[1].args[0].value
+            operations[12].args[0].value
     muv = ll2mu_val(fncptr_write)
     assert muv.fncname == "write"
     assert muv.graph is None
@@ -154,7 +155,7 @@ def test_ll2muop_1():
     op.result = typer.proc_arg(op.result, g.startblock)
     typer.proc_arglist(op.args, g.startblock)
 
-    muop = ll2mu_op(op)[0]
+    muop = ll2mu_op(op)[0][0]
     assert muop.opname == 'OR'
     assert muop.op1 == op.args[0]
     assert muop.op2 == op.args[1]
@@ -166,7 +167,7 @@ def test_ll2muop_1():
     op.result = typer.proc_arg(op.result, g.startblock)
     typer.proc_arglist(op.args, g.startblock)
 
-    muop = ll2mu_op(op)[0]
+    muop = ll2mu_op(op)[0][0]
     assert muop.opname == 'CALL'
     assert muop.callee == graph
 
@@ -202,7 +203,7 @@ def test_ll2muop_2():
     op.result = typer.proc_arg(op.result, g.startblock)
     typer.proc_arglist(op.args, g.startblock)
 
-    muops = ll2mu_op(op)
+    muops = ll2mu_op(op)[0]
     assert map(lambda op: op.opname, muops) == ['GETIREF', 'GETVARPARTIREF', 'SHIFTIREF', 'LOAD']
 
     opgen = _search_op(g, 'getinteriorarraysize')
@@ -211,11 +212,11 @@ def test_ll2muop_2():
 
     op.result = typer.proc_arg(op.result, g.startblock)
     typer.proc_arglist(op.args, g.startblock)
-    muops = ll2mu_op(op)
+    muops = ll2mu_op(op)[0]
     assert map(lambda op: op.opname, muops) == ['GETIREF', 'GETFIELDIREF', 'LOAD']
 
 
-def test_crush():
+def test_rtti():
     def main(argv):
         return int(argv[0]) * 10
 
@@ -227,8 +228,8 @@ def test_crush():
     cst = graph.startblock.exits[0].args[0]
     v = cst.value._obj.rtti
     print v, v._TYPE
-    with pytest.raises(NotImplementedError):
-        ll2mu_val(v)
+    muv = ll2mu_val(v)
+    assert muv._obj0 == mu.char_t(0)
 
 
 def test_address():
@@ -275,16 +276,16 @@ def test_address():
     assert ll2mu_ty(op.result.concretetype) == mu.int64_t
     op.result.mu_type = ll2mu_ty(op.result.concretetype)
     op.result.mu_name = MuName(op.result.name)
-    assert ll2mu_op(op)[0]._inst_mu_name._name == 'uvm.native.pin'
+    assert ll2mu_op(op)[0][0]._inst_mu_name._name == 'uvm.native.pin'
 
     op = blk.operations[11]
     op.args[0].mu_name = MuName(op.args[0].name, blk)
     op.result.mu_name = MuName(op.result.name, blk)
-    muoplst = ll2mu_op(op)
+    muoplst = ll2mu_op(op)[0]
     assert len(muoplst) == 1
     assert muoplst[0].opname == 'ADD'
 
-    assert isinstance(ll2mu_op(blk.operations[16])[0], muops.NATIVE_UNPIN)
+    assert isinstance(ll2mu_op(blk.operations[16])[0][0], muops.NATIVE_UNPIN)
 
     op = blk.operations[14]     # v108 = int_mul((<ItemOffset <Char> 1>), length_10)
     assert ll2mu_val(op.args[0].value) == mu.int64_t(1)
@@ -292,7 +293,8 @@ def test_address():
     op = blk.operations[15]     # v109 = raw_memcopy(v105, v107, v108)
     for arg in op.args:
         arg.mu_name = MuName(arg.name, blk)
-    muoplst = ll2mu_op(op)
+    op.result.mu_type = ll2mu_ty(op.result.concretetype)
+    muoplst = ll2mu_op(op)[0]
     assert muoplst[0].opname == 'LOAD'
     assert muoplst[0].loc == muni.c_memcpy
 

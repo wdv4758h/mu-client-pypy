@@ -151,6 +151,8 @@ def _lltype2mu_ptr(llt):
         return _lltype2mu_funcptr(llt)
     if llt.TO._gckind == 'gc' or (hasattr(llt.TO, '_hints') and llt.TO._hints.get("mu_ptr_as_ref", False)):
         cls = mutype.MuRef
+    elif isinstance(llt.TO, lltype.OpaqueType) and llt.TO.hints.get("mu_ptr_as_ref", False):
+        cls = mutype.MuRef
     else:
         cls = mutype.MuUPtr
     return cls(ll2mu_ty(llt.TO))
