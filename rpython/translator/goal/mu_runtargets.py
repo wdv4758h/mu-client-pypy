@@ -14,8 +14,9 @@ def compile_target(tmpdir, target):
     output_file = tmpdir / target.replace('.py', '.mu')
     target_file = targets_dir / target
 
-    p = sp.Popen("rpython -O0 -b mu --output %(output_file)s %(target_file)s" % locals(),
-                 stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
+    cmd = "rpython -O0 -b mu --output %(output_file)s %(target_file)s" % locals()
+    print cmd
+    p = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
     stdout_data, stderr_data = p.communicate()
 
     if p.returncode != 0:
@@ -37,8 +38,9 @@ def run_bundle(bundle, cmdargs):
     env = os.environ
     env['PATH'] = env['uVM'] + "/cbinding:" + env['PATH']
     _pypy_dir = pypy_dir
-    p = sp.Popen("python %(_pypy_dir)s/rpython/mucli/murpy.py %(bundle)s %(cmdargs)s" % locals(),
-                 stdout=sp.PIPE, stderr=sp.PIPE, shell=True, env=env)
+    cmd = "python %(_pypy_dir)s/rpython/mucli/murpy.py %(bundle)s %(cmdargs)s" % locals()
+    print cmd
+    p = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, env=env)
     stdout_data, stderr_data = p.communicate()
 
     # print "-------------------------------- stdout --------------------------------"
@@ -47,7 +49,6 @@ def run_bundle(bundle, cmdargs):
     # print stderr_data
 
     if p.returncode == 0:
-        print "-------------------------------- Program Output --------------------------------"
         lines = stdout_data.split('\n')
         idx_start = lines.index("-------------------------------- program output --------------------------------")
         idx_end = lines.index("--------------------------------------------------------------------------------")
@@ -58,12 +59,20 @@ def run_bundle(bundle, cmdargs):
         output = stdout_data
         print "-------------------------------- stderr --------------------------------"
         print stderr_data
+        print "------------------------------------------------------------------------"
 
-    return p.returncode, stdout_data, stderr_data
+    return p.returncode, output, stderr_data
 
 
 def test_factorial_noprint(tmpdir):
     bundle_file = compile_target(tmpdir, "targetfactorial_noprint.py")
-    rtncode, stdout, stderr = run_bundle(bundle_file, "10")
+    n = 5
+    rtncode, stdout, stderr = run_bundle(bundle_file, str(n))
     from targetfactorial_noprint import fac
-    assert rtncode == fac(10)
+    assert rtncode == fac(n)
+
+
+def test_print_helloworld(tmpdir):
+    bundle_file = compile_target(tmpdir, "targetprint.py")
+    r, out, err = run_bundle(bundle_file, [])
+    assert out == "hello world"

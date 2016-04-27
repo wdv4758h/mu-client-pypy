@@ -17,6 +17,7 @@ def slurp(filename):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('bundle', help="Generated RPython Mu bundle.")
+    parser.add_argument('prog_args', nargs='*', help="Program arguments.")
     return parser.parse_args()
 
 
@@ -144,11 +145,16 @@ def launch(ir, hail, exfns, args):
         rtnval = ctx.handle_to_sint(hrtnval)
 
         print("Program exited with value {}".format(rtnval))
+        return rtnval
 
 
-def main(argv):
-    launch(*extract_bundle(argv[1]), args=argv[1:])
+def main():
+    args = parse_args()
+    print(args)
+    rtnval = launch(*extract_bundle(args.bundle), args=[args.bundle] + args.prog_args)
+    return rtnval
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    exitcode = main()
+    sys.exit(exitcode)
