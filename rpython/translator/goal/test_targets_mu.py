@@ -36,7 +36,7 @@ def run_bundle(bundle, cmdargs):
         cmdargs = ' '.join(cmdargs)
 
     env = os.environ
-    env['PATH'] = env['uVM'] + "/cbinding:" + env['PATH']
+    env['PATH'] = env['MU'] + "/cbinding:" + env['PATH']
     _pypy_dir = pypy_dir
     cmd = "python %(_pypy_dir)s/rpython/mucli/murpy.py %(bundle)s %(cmdargs)s" % locals()
     print cmd
