@@ -350,16 +350,6 @@ class TranslationDriver(SimpleTaskEngine):
         rtyper = self.translator.buildrtyper()
         rtyper.specialize(dont_simplify_again=True)
 
-        for g in self.translator.graphs:
-            for _, op in g.iterblockops():
-                if 'malloc' in op.opname:
-                    try:
-                        assert op.args[1].value['flavor'] == 'gc'
-                    except Exception:
-                        print op
-                        from rpython.mutyper.tools.textgraph import print_graph
-                        print_graph(g)
-
     @taskdef([RTYPE], "JIT compiler generation")
     def task_pyjitpl_lltype(self):
         """ Generate bytecodes for JIT and flow the JIT helper functions
