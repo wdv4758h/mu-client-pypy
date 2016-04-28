@@ -16,7 +16,6 @@ def test_primitives():
     assert str(int8_t) == "int8_t"
     assert int8_t.mu_name == MuName("i8")
     assert int8_t.mu_constructor == "int<8>"
-    assert int8_t._mu_constructor_expanded == int8_t.mu_constructor
     assert repr(int8_t) == int8_t.mu_constructor
     assert int8_t._defl() == int8_t(0)
 
@@ -44,8 +43,7 @@ def test_structs():
     assert S.mu_name == MuName("sttCircle")
     assert str(S) == "MuStruct Circle { radius, origin }"
     assert S.mu_constructor == "struct<%s %s>" % (repr(double_t.mu_name), repr(P.mu_name))
-    assert S._mu_constructor_expanded == "struct<double struct<double double>>"
-    assert repr(S) == S._mu_constructor_expanded
+    assert repr(S) == S.mu_constructor
 
     S2 = MuStruct('Circle', ('radius', double_t), ('origin', P))
     assert hash(S) == hash(S2)  # equal types should have the same hash
@@ -58,6 +56,9 @@ def test_structs():
         s.radius = 2.0
     s.radius = double_t(2.0)
     assert s.radius == double_t(2.0)
+    s[0] = double_t(4.0)
+    assert s[0] == double_t(4.0)
+    assert s.radius == double_t(4.0)
     s.origin.x = double_t(5.0)
     assert s.origin.x == double_t(5.0)
 
@@ -72,8 +73,7 @@ def test_hybrids():
     assert H.mu_name == MuName("hybString")
     assert str(H) == "MuHybrid String { hash, length | chars }"
     assert H.mu_constructor == "hybrid<%s %s %s>" % (int64_t.mu_name, int64_t.mu_name, int8_t.mu_name)
-    assert H._mu_constructor_expanded == "hybrid<int<64> int<64> int<8>>"
-    assert repr(H) == H._mu_constructor_expanded
+    assert repr(H) == H.mu_constructor
 
     H2 = MuHybrid("String", ('hash', int64_t), ('length', int64_t), ('chars', char_t))
     assert hash(H) == hash(H2)
@@ -86,6 +86,9 @@ def test_hybrids():
         h.length = 3
     h.length = int64_t(3)
     assert h.length == int64_t(3)
+    h[1] = int64_t(5)
+    assert h[1] == int64_t(5)
+    assert h.length == int64_t(5)
     assert len(h.chars) == 3
     h.chars[0] = int8_t(ord('a'))
     assert h.chars[0] == int8_t(ord('a'))
@@ -101,8 +104,7 @@ def test_arrays():
     assert A.mu_name == MuName("arr10i64")
     assert str(A) == "MuArray of %d %s" % (10, "int64_t")
     assert A.mu_constructor == "array<%s %d>" % (int64_t.mu_name, 10)
-    assert A._mu_constructor_expanded == "array<int<64> 10>"
-    assert repr(A) == A._mu_constructor_expanded
+    assert repr(A) == A.mu_constructor
 
     A2 = MuArray(int64_t, 10)
     assert hash(A) == hash(A2)
@@ -123,7 +125,6 @@ def test_funcsig():
 
     assert str(Sig) == "( int64_t double_t ) -> ( MuStruct packed { i, f } )"
     assert Sig.mu_constructor == "(@i64 @dbl) -> (@sttpacked)"
-    assert Sig._mu_constructor_expanded == "( int<64> double ) -> ( struct<int<64> double> )"
     assert repr(Sig.mu_name) == "@sig_i64dbl_sttpacked"
 
     Sig2 = MuFuncSig((int64_t, double_t), (MuStruct("packed", ('i', int64_t), ('f', double_t)),))
@@ -140,7 +141,6 @@ def test_funcref():
     assert str(R) == "MuFuncRef ( double_t double_t ) -> ( double_t )"
     assert repr(R.mu_name) == "@fnrsig_dbldbl_dbl"
     assert R.mu_constructor == "funcref<@sig_dbldbl_dbl>"
-    assert R._mu_constructor_expanded == "funcref<( double double ) -> ( double )>"
 
     R2 = MuFuncRef(Sig)
 
@@ -156,7 +156,6 @@ def test_refs():
     assert str(R) == "@ %s" % S
     assert repr(R.mu_name) == "@refsttCircle"
     assert R.mu_constructor == "ref<@sttCircle>"
-    assert R._mu_constructor_expanded == "ref<%s>" % S._mu_constructor_expanded
 
     R2 = MuRef(S)
     assert R == R2
@@ -166,7 +165,6 @@ def test_refs():
     assert str(IR) == "& %s" % S
     assert repr(IR.mu_name) == "@irfsttCircle"
     assert IR.mu_constructor == "iref<@sttCircle>"
-    assert IR._mu_constructor_expanded == "iref<%s>" % S._mu_constructor_expanded
 
     IR2 = MuIRef(S)
     assert IR == IR2

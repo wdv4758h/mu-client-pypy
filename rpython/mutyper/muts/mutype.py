@@ -291,6 +291,12 @@ class _mustruct(_muparentable, _mucontainer):
 
         object.__setattr__(self, key, value)
 
+    def __getitem__(self, idx):
+        return getattr(self, self._TYPE._names[idx])
+
+    def __setitem__(self, key, value):
+        return setattr(self, self._TYPE._names[key], value)
+
     def _str_fields(self):
         fields = []
         names = self._TYPE._names
@@ -449,6 +455,12 @@ class _muhybrid(_muparentable, _mucontainer):
                 raise TypeError("Can only assign Mu values.")
 
         object.__setattr__(self, key, value)
+
+    def __getitem__(self, idx):
+        return getattr(self, self._TYPE._names[idx])
+
+    def __setitem__(self, key, value):
+        return setattr(self, self._TYPE._names[key], value)
 
     def _str_item(self, item):
         if isinstance(mu_typeOf(item), MuStruct):
