@@ -136,6 +136,8 @@ def _lltype2mu_varstt(llt):
 
 
 def _lltype2mu_arr(llt):
+    if llt.OF is lltype.Void:
+        return mutype.MuStruct(__newtypename("%s" % llt.OF.__name__), ('length', mutype.int64_t))
     if llt._hints.get('nolength', False):
         flds = ('items', ll2mu_ty(llt.OF)),
     else:
@@ -191,7 +193,7 @@ def ll2mu_val(llv):
     #     llv = mumem.mu_sizeOf(ll2mu_ty(llv.TYPE))
 
     cache, v = (__ll2muval_cache_ptr, llv._obj) if isinstance(llv, lltype._ptr) else (__ll2muval_cache, llv)
-    key = (lltype.typeOf(v), v)
+    key = (lltype.typeOf(llv), v)
     try:
         return cache[key]
     except KeyError:
@@ -291,12 +293,17 @@ def _llval2mu_varstt(llv):
 
 def _llval2mu_arr(llv):
     mut = ll2mu_ty(llv._TYPE)
-    hyb = mutype._muhybrid(mut, ll2mu_val(llv.getlength()))
-    var = hyb[-1]
-    for i in range(hyb.length.val):
-        var[i] = ll2mu_val(llv.getitem(i))
+    if llv._TYPE.OF is lltype.Void:
+        stt = mutype._mustruct(mut)
+        stt.length = ll2mu_val(llv.getlength())
+        return stt
+    else:
+        hyb = mutype._muhybrid(mut, ll2mu_val(llv.getlength()))
+        var = hyb[-1]
+        for i in range(hyb.length.val):
+            var[i] = ll2mu_val(llv.getitem(i))
 
-    return hyb
+        return hyb
 
 
 def _llval2mu_ptr(llv):
