@@ -88,3 +88,13 @@ def test_warningalone(tmpdir):
     assert out == '2'
     r, out, err = run_bundle(bundle, '1')
     assert out == '0'
+
+
+def test_testlistvsdict(tmpdir):
+    bundle = compile_target(tmpdir, "targettestlistvsdict.py")
+    r, out, err = run_bundle(bundle, ['d', '1234'])
+    assert out == '1234'
+    r, out, err = run_bundle(bundle, ['l', '234'])
+    assert out == '1234'
+    r, out, err = run_bundle(bundle, ['d', '234'])
+    assert r == 1

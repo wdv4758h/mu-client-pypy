@@ -293,9 +293,9 @@ def _llval2mu_varstt(llv):
 def _llval2mu_arr(llv):
     mut = ll2mu_ty(llv._TYPE)
     hyb = mutype._muhybrid(mut, ll2mu_val(llv.getlength()))
-
+    var = hyb[-1]
     for i in range(hyb.length.val):
-        hyb[i] = ll2mu_val(llv.getitem(i))
+        var[i] = ll2mu_val(llv.getitem(i))
 
     return hyb
 
@@ -670,6 +670,14 @@ def _llop2mu_getarraysize(var, res=None, llopname='getarraysize'):
 def __getinterioriref(var, offsets):
     ops = _MuOpList()
     iref = var if isinstance(var.mu_type, (mutype.MuIRef, mutype.MuUPtr)) else ops.append(muops.GETIREF(var))
+
+    # If the outer container is array, and the first index is an integer,
+    # then get the variable part of the corresponding hybrid type first
+    if isinstance(var.concretetype.TO, lltype.Array):
+        assert isinstance(offsets[0].concretetype, lltype.Primitive)
+        assert isinstance(var.mu_type.TO, mutype.MuHybrid)
+        iref = ops.append(muops.GETVARPARTIREF(iref))
+
     for o in offsets:
         if o.concretetype == lltype.Void:
             assert isinstance(o.value, str)
