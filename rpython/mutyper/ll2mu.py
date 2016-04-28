@@ -52,12 +52,8 @@ def _ll2mu_ty(llt):
         return _lltype2mu_arr(llt)
     elif isinstance(llt, lltype.Ptr):
         return _lltype2mu_ptr(llt)
-    elif llt is lltype.RuntimeTypeInfo:
-        return _ll2mu_ty(lltype.Char)       # rtti is defined to be a char in C backend.
     elif isinstance(llt, lltype.OpaqueType):
-        mut = mutype.int64_t    # values of opaque type are translated to be 64-bit integers
-        log.warning("mapping type %r -> %r" % (llt, mut))
-        return mut
+        return _lltype2mu_opq(llt)
     else:
         raise NotImplementedError("Don't know how to specialise %s using MuTS." % llt)
 # ll2mu_ty = ll.saferecursive(_ll2mu_ty, None)
@@ -171,6 +167,14 @@ def _lltype2mu_addr(llt):
     # return mutype.MuUPtr(mutype.void_t)     # all Address types are translated into uptr<void>
     return mutype.int64_t           # Assume Addresses are 64 bit.
 
+
+def _lltype2mu_opq(llt):
+    if llt is lltype.RuntimeTypeInfo:
+        return _ll2mu_ty(lltype.Char)  # rtti is defined to be a char in C backend.
+
+    mut = mutype.int64_t  # values of opaque type are translated to be 64-bit integers
+    log.warning("mapping type %r -> %r" % (llt, mut))
+    return mut
 # ----------------------------------------------------------
 __ll2muval_cache = {}
 __ll2muval_cache_ptr = {}
@@ -229,14 +233,9 @@ def _ll2mu_val(llv):
     elif isinstance(llv, lltype._ptr):
         return _llval2mu_ptr(llv)
 
-    elif llv._TYPE is lltype.RuntimeTypeInfo:
-        # Since rtti is of char type in C, we use char_t here as well, with an initialised 0 value
-        return mutype.char_t(randint(0, 0xff))
+    elif isinstance(llv, lltype._opaque):
+        return _llval2mu_opq(llv)
 
-    elif isinstance(llv._TYPE, lltype.OpaqueType):
-        muv = mutype.int64_t(randint(0, 0xffffffff))    # randomise it.
-        log.ll2mu_val("WARNING: specialising '%r' to '%r' of type '%s'." % (llv, muv, muv._TYPE))
-        return muv
     else:
         raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
 
@@ -341,6 +340,21 @@ def _llval2mu_adrofs(llv):
 
     return ll2mu_ty(lltype.typeOf(llv))(rec(llv))
 
+
+def _llval2mu_opq(llv):
+    if llv._TYPE is lltype.RuntimeTypeInfo:
+        # Since rtti is of char type in C, we use char_t here as well, with an initialised 0 value
+        return mutype.char_t(randint(0, 0xff))
+
+    if hasattr(llv, 'container'):
+        container = llv._normalizedcontainer()
+        muv = _ll2mu_val(container)
+        log.ll2mu_val("%(llv)r really is %(muv)r" % locals())
+        return muv
+
+    muv = mutype.int64_t(randint(0, 0xffffffff))  # randomise it.
+    log.ll2mu_val("WARNING: specialising '%r' to '%r' of type '%s'." % (llv, muv, muv._TYPE))
+    return muv
 
 # ----------------------------------------------------------
 def ll2mu_op(llop):
