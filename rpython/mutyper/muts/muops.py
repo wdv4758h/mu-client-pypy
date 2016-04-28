@@ -20,6 +20,9 @@ class DEST:
     def __str__(self):
         return "%s(%s)" % (self.blk.mu_name, ' '.join([str(arg.mu_name) for arg in self.args]))
 
+    def __repr__(self):
+        return str(self)
+
 
 class KEEPALIVE(object):
     def __init__(self, vs=[]):
@@ -164,8 +167,7 @@ BRANCH2 = _newop("BRANCH2", "cond ifTrue ifFalse",
 
 SWITCH = _newop("SWITCH", "opnd default cases",
                 lambda args: void_t,
-                lambda op: "%s <%s> %s { %s }" % (op.__class__.__name__,
-                                                  op.default.mu_type.mu_name,
+                lambda op: "<%s> %s %s { %s }" % (op.opnd.mu_type.mu_name, op.opnd.mu_name,
                                                   op.default,
                                                   ' '.join(["%s %s" % (v.mu_name, dst) for (v, dst) in op.cases])))
 

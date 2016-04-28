@@ -82,6 +82,15 @@ class MuTyper:
             elif len(blk.exits) == 2:
                 blk.exitswitch = self.proc_arg(blk.exitswitch, blk)
                 muops.append(muop.BRANCH2(blk.exitswitch, DEST.from_link(blk.exits[1]), DEST.from_link(blk.exits[0])))
+            else:   # more than 2 exits -> use SWITCH statement
+                blk.exitswitch = self.proc_arg(blk.exitswitch, blk)
+                solid_exits = filter(lambda e: e.exitcase != 'default', blk.exits)
+                exitcases = [Constant(e.llexitcase, lltype.typeOf(e.llexitcase)) for e in solid_exits]
+                self.proc_arglist(exitcases, blk)
+                cases = zip(exitcases, map(DEST.from_link, solid_exits))
+                defl_exit = next((DEST.from_link(e) for e in blk.exits if e.exitcase == 'default'), cases[-1])
+                muops.append(muop.SWITCH(blk.exitswitch, defl_exit, cases))
+
         else:
             muops[-1].exc = muop.EXCEPT(DEST.from_link(blk.exits[0]), DEST.from_link(blk.exits[1]))
         blk.operations = tuple(muops)
