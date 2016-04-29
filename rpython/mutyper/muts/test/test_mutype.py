@@ -7,7 +7,7 @@ from ..mutype import (
     MuFuncSig, MuFuncRef, _mufuncref,
     MuRef, MuIRef, _muref, _muiref,
     MuUPtr, _muuptr,
-    new, newhybrid)
+    new, newhybrid, bool_t)
 from ..muentity import MuName
 from rpython.translator.mu.mem import mu_sizeOf
 
@@ -26,7 +26,7 @@ def test_primitives():
 
 
 def test_muint_type():
-    assert muint_type(1) == int1_t
+    assert muint_type(1) == bool_t
     assert muint_type(-1) == int8_t
     assert muint_type(0xFF) == int8_t
     assert muint_type(256) == int16_t

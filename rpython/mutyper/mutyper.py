@@ -75,7 +75,8 @@ class MuTyper:
             self.proc_arglist(e.args, blk)
         if blk.exitswitch is not c_last_exception:
             if len(blk.exits) == 0:
-                muops.append(muop.RET(blk.inputargs[0] if len(blk.inputargs) == 1 else None))
+                if not (len(muops) > 0 and muops[-1].opname == 'THROW'):
+                    muops.append(muop.RET(blk.inputargs[0] if len(blk.inputargs) == 1 else None))
             elif len(blk.exits) == 1:
                 muops.append(muop.BRANCH(DEST.from_link(blk.exits[0])))
             elif len(blk.exits) == 2:

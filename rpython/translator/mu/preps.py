@@ -95,11 +95,10 @@ def prepare(graphs, entry_graph):
             if arg.concretetype != Void:
                 return True
             if isinstance(arg, Constant):
-                if isinstance(arg.value, str):
+                if isinstance(arg.value, (str, list)):
                     return True
                 elif isinstance(arg.value, LowLevelType):
                     return opname in _OPS_ALLOW_LLTYPE_ARGS
-
             log.keep_arg("Throwing argument %(arg)r from operation %(opname)s" % locals())
             return False
 

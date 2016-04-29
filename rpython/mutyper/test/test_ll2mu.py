@@ -322,5 +322,5 @@ def test_ll2mu_bool():
     cst = Constant(True, ll.Bool)
     t = ll2mu_ty(cst.concretetype)
     v = ll2mu_val(cst.value)
-    assert t == mu.int1_t
-    assert v == mu.int1_t(1)
+    assert t == mu.bool_t
+    assert v == mu.bool_t(1)

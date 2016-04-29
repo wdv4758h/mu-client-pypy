@@ -108,7 +108,7 @@ float_t = MuPrimitive("float_t", "flt", "float", 0.0)
 double_t = MuPrimitive("double_t", "dbl", "double", 0.0)
 void_t = MuPrimitive("void_t", "void", "void", None)
 
-bool_t = int1_t
+bool_t = int8_t
 char_t = int8_t
 unichar_t = int16_t
 
@@ -643,7 +643,10 @@ class _munullref(_mugenref):
         _mugenref.__init__(self, TYPE)
 
     def __str__(self):
-        return 'NULL'
+        if isinstance(self._TYPE, (MuUPtr, MuUFuncPtr)):
+            return '0'
+        else:
+            return 'NULL'
 
     def __eq__(self, other):
         return isinstance(other, _munullref)
@@ -983,7 +986,7 @@ def muint_type(intval):
     :return: the minimum bits required to represent intval.
     """
     if intval in (0, 1):
-        return int1_t
+        return bool_t
 
     for int_t in _MU_INTS[1:]:
         maxuint = (1 << int_t.bits) - 1

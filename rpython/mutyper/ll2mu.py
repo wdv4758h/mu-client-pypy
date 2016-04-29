@@ -71,10 +71,10 @@ def _lltype2mu_prim(llt):
         lltype.SingleFloat:      mutype.float_t,
         lltype.LongFloat:        mutype.double_t,
 
-        lltype.Char:             mutype.int8_t,
-        lltype.Bool:             mutype.int1_t,
+        lltype.Char:             mutype.char_t,
+        lltype.Bool:             mutype.bool_t,
         lltype.Void:             mutype.void_t,
-        lltype.UniChar:          mutype.int16_t,
+        lltype.UniChar:          mutype.unichar_t,
     }
     try:
         return type_map[llt]
@@ -852,10 +852,10 @@ def _llop2mu_cast_int_to_adr(n, res=None, llopname='cast_adr_to_int'):
 
 
 def _llop2mu_gc_can_move(ptr, res=None, llopname='gc_can_move'):
-    return [], _newprimconst(mutype.int1_t, 1)
+    return [], _newprimconst(mutype.bool_t, 1)
 
 
 def _llop2mu_gc_pin(ptr, res=None, llopname='gc_can_move'):
-    return [], _newprimconst(mutype.int1_t, 1)
+    return [], _newprimconst(mutype.bool_t, 1)
 
 # TODO: rest of the operations
