@@ -79,5 +79,8 @@ class HAILGenerator:
             if isinstance(name, MuName) and 'gcl' in str(name):
                 return "*%s" % name
             return str(name)
+        elif isinstance(obj, mutype._mufuncref):
+            assert hasattr(obj, 'graph')
+            return str(obj.graph.mu_name)
         else:
             raise TypeError("Unknown value '%s' of type '%s'." % (obj, mutype.mu_typeOf(obj)))

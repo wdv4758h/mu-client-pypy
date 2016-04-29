@@ -6,6 +6,7 @@ from rpython.mutyper.muts.muentity import MuName
 from rpython.rtyper.lltypesystem.lltype import Void, LowLevelType
 from rpython.flowspace.model import Constant
 from rpython.tool.ansi_print import AnsiLogger
+from rpython.rtyper.lltypesystem.lloperation import LL_OPERATIONS
 
 log = AnsiLogger("preps")
 
@@ -58,6 +59,11 @@ def chop(graphs, g_entry):
     return [g for g in graphs if ref[g]]
 
 
+_OPS_ALLOW_LLTYPE_ARGS = []
+_OPS_ALLOW_LLTYPE_ARGS += [op for op in LL_OPERATIONS if op.startswith("int_")]
+_OPS_ALLOW_LLTYPE_ARGS += [op for op in LL_OPERATIONS if op.startswith("adr_")]
+
+
 def prepare(graphs, entry_graph):
     # Chop graph
     n0 = len(graphs)
@@ -88,9 +94,13 @@ def prepare(graphs, entry_graph):
                 return True
             if arg.concretetype != Void:
                 return True
-            if isinstance(arg, Constant) and (isinstance(arg.value, (str, LowLevelType))):
-                return True
+            if isinstance(arg, Constant):
+                if isinstance(arg.value, str):
+                    return True
+                elif isinstance(arg.value, LowLevelType):
+                    return opname in _OPS_ALLOW_LLTYPE_ARGS
 
+            log.keep_arg("Throwing argument %(arg)r from operation %(opname)s" % locals())
             return False
 
         for _, op in g.iterblockops():

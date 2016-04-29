@@ -170,39 +170,39 @@ class MuTyper:
 
         if _NeedToLoadParentError.need(arg):
             raise _NeedToLoadParentError(arg)
+        if not hasattr(arg, 'mu_type'):     # has not been processed.
+            arg.mu_type = ll2mu_ty(arg.concretetype)
+            # _recursive_addtype(self.gbltypes, arg.mu_type)
+            if isinstance(arg, Constant):
+                if isinstance(arg.mu_type, mut.MuRef) and arg.value._obj is not None:
+                    if arg not in self._cnst_gcell_dict:
+                        gcell = MuGlobalCell(arg.mu_type, ll2mu_val(arg.value))
+                        self._cnst_gcell_dict[arg] = gcell
+                    else:
+                        gcell = self._cnst_gcell_dict[arg]
 
-        arg.mu_type = ll2mu_ty(arg.concretetype)
-        # _recursive_addtype(self.gbltypes, arg.mu_type)
-        if isinstance(arg, Constant):
-            if isinstance(arg.mu_type, mut.MuRef):
-                if arg not in self._cnst_gcell_dict:
-                    gcell = MuGlobalCell(arg.mu_type, ll2mu_val(arg.value))
-                    self._cnst_gcell_dict[arg] = gcell
+                    return self._get_ldgcell_var(gcell, blk)
                 else:
-                    gcell = self._cnst_gcell_dict[arg]
+                    try:
+                        arg.value = ll2mu_val(arg.value)
+                        # Correcting type mismatch caused by incomplete type information when calling ll2mu_val.
+                        if isinstance(arg.value, mutype._muprimitive) and arg.value._TYPE != arg.mu_type:
+                            arg.value._TYPE = arg.mu_type
+                        if not isinstance(arg.value, mutype._mufuncref):
+                            # arg.__init__(arg.value)     # re-initialise it to rehash it.
+                            # self.gblcnsts.add(arg)
+                            arg.mu_name = MuName("%s_%s" % (str(arg.value), arg.mu_type.mu_name._name))
+                    except (NotImplementedError, AssertionError, TypeError):
+                        # if isinstance(arg.value, llt.LowLevelType):
+                        #     arg.value = ll2mu_ty(arg.value)
+                        # elif isinstance(arg.value, llmemory.CompositeOffset):
+                        #     pass    # ignore AddressOffsets; they will be dealt with in ll2mu_op.
+                        # elif isinstance(arg.value, (str, dict)):
+                        #     pass
+                        pass
 
-                return self._get_ldgcell_var(gcell, blk)
             else:
-                try:
-                    arg.value = ll2mu_val(arg.value)
-                    # Correcting type mismatch caused by incomplete type information when calling ll2mu_val.
-                    if isinstance(arg.value, mutype._muprimitive) and arg.value._TYPE != arg.mu_type:
-                        arg.value._TYPE = arg.mu_type
-                    if not isinstance(arg.value, mutype._mufuncref):
-                        # arg.__init__(arg.value)     # re-initialise it to rehash it.
-                        # self.gblcnsts.add(arg)
-                        arg.mu_name = MuName("%s_%s" % (str(arg.value), arg.mu_type.mu_name._name))
-                except (NotImplementedError, AssertionError, TypeError):
-                    # if isinstance(arg.value, llt.LowLevelType):
-                    #     arg.value = ll2mu_ty(arg.value)
-                    # elif isinstance(arg.value, llmemory.CompositeOffset):
-                    #     pass    # ignore AddressOffsets; they will be dealt with in ll2mu_op.
-                    # elif isinstance(arg.value, (str, dict)):
-                    #     pass
-                    pass
-
-        else:
-            arg.mu_name = MuName(arg.name, blk)
+                arg.mu_name = MuName(arg.name, blk)
         return arg
 
     def _get_ldgcell_var(self, gcell, blk):
