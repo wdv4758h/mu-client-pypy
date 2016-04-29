@@ -49,7 +49,6 @@ class MuTyper:
         get_arg_types = lambda lst: map(ll2mu_ty, map(lambda arg: arg.concretetype, lst))
         g.mu_type = mut.MuFuncRef(mut.MuFuncSig(get_arg_types(g.startblock.inputargs),
                                                 get_arg_types(g.returnblock.inputargs)))
-        # _recursive_addtype(self.gbltypes, g.mu_type)
         ver = Variable('_ver')
         ver.mu_name = MuName(ver.name, g)
         g.mu_version = ver
@@ -116,7 +115,6 @@ class MuTyper:
             self.proc_arglist(op.args, blk)
 
         op.result = self.proc_arg(op.result, blk)
-        # op.result.mu_name = MuName(op.result.name, blk)
 
         # translate operation
         try:
@@ -128,16 +126,9 @@ class MuTyper:
             for _o in _muops:
                 for i in range(len(_o._args)):
                     arg = _o._args[i]
-                    # picking out the generated (must be primitive) constants
-                    if isinstance(arg, Constant):
-                        assert isinstance(arg.mu_type, mutype.MuPrimitive) or isinstance(arg.value, mutype._munullref)
-                        # arg.__init__(arg.value)     # re-initialise it to rehash it.
-                        # self.gblcnsts.add(arg)
                     if isinstance(arg, MuExternalFunc):
                         # Addresses of some C functions stored in global cells need to be processed.
                         self.externfncs.add(arg)
-                        # _recursive_addtype(self.gbltypes, arg._T)
-
                 if hasattr(_o.result, 'mu_name'):
                     _o.result.mu_name.scope = blk   # Correct the scope of result variables
 
@@ -145,13 +136,6 @@ class MuTyper:
         except NotImplementedError:
             log.warning("Ignoring '%s'." % op)
             self._alias[op.result] = op.args[0]
-
-        # # process the potential exception clause
-        # exc = getattr(op, 'mu_exc', None)
-        # if exc:
-        #     self.proc_arglist(exc.nor.args, blk)
-        #     self.proc_arglist(exc.exc.args, blk)
-        #     muops[-1].exc = exc
 
         return muops
 
@@ -172,7 +156,6 @@ class MuTyper:
             raise _NeedToLoadParentError(arg)
         if not hasattr(arg, 'mu_type'):     # has not been processed.
             arg.mu_type = ll2mu_ty(arg.concretetype)
-            # _recursive_addtype(self.gbltypes, arg.mu_type)
             if isinstance(arg, Constant):
                 if isinstance(arg.mu_type, mut.MuRef) and arg.value._obj is not None:
                     if arg not in self._cnst_gcell_dict:
@@ -189,16 +172,8 @@ class MuTyper:
                         if isinstance(arg.value, mutype._muprimitive) and arg.value._TYPE != arg.mu_type:
                             arg.value._TYPE = arg.mu_type
                         if not isinstance(arg.value, mutype._mufuncref):
-                            # arg.__init__(arg.value)     # re-initialise it to rehash it.
-                            # self.gblcnsts.add(arg)
                             arg.mu_name = MuName("%s_%s" % (str(arg.value), arg.mu_type.mu_name._name))
                     except (NotImplementedError, AssertionError, TypeError):
-                        # if isinstance(arg.value, llt.LowLevelType):
-                        #     arg.value = ll2mu_ty(arg.value)
-                        # elif isinstance(arg.value, llmemory.CompositeOffset):
-                        #     pass    # ignore AddressOffsets; they will be dealt with in ll2mu_op.
-                        # elif isinstance(arg.value, (str, dict)):
-                        #     pass
                         pass
 
             else:

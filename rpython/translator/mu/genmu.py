@@ -135,12 +135,20 @@ class MuTextIRGenerator:
                     __proc(arg)
                 for op in blk.operations:
                     map(__proc, op._args)
+                    if 'CALL' in op.opname:
+                        map(__proc, op.args)
                     if op.opname == 'BRANCH':
                         map(__proc, op.dest.args)
                     if op.opname == 'BRANCH2':
                         map(__proc, op.ifTrue.args)
                         map(__proc, op.ifFalse.args)
                         __proc(op.cond)
+                    if op.opname == 'SWITCH':
+                        __proc(op.opnd)
+                        map(__proc, op.default.args)
+                        for v, d in op.cases:
+                            __proc(v)
+                            map(__proc, d.args)
                     for attr in "exc nor".split(' '):
                         dst = getattr(op.exc, attr)
                         if dst:

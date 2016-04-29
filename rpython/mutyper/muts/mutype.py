@@ -132,11 +132,11 @@ class _muprimitive(_muobject):
 
     def __str__(self):
         if self._TYPE == float_t:
-            return "%sf" % self.val
+            return "%ff" % self.val
         elif self._TYPE == double_t:
-            return "%sd" % self.val
+            return "%fd" % self.val
         else:
-            return str(int(self.val))
+            return "%d" % int(self.val)
 
     def __repr__(self):
         return "%s" % self
