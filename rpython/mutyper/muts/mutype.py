@@ -108,7 +108,7 @@ float_t = MuPrimitive("float_t", "flt", "float", 0.0)
 double_t = MuPrimitive("double_t", "dbl", "double", 0.0)
 void_t = MuPrimitive("void_t", "void", "void", None)
 
-bool_t = int8_t
+bool_t = int1_t
 char_t = int8_t
 unichar_t = int16_t
 

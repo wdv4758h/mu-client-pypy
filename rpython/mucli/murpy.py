@@ -116,7 +116,7 @@ def load_extfncs(ctx, exfns):
                 hgcl = dd << ctx.handle_from_global(ctx.id_of(gcl_name))
                 ctx.store(hgcl, hadr)
             except AttributeError:
-                print("Failed to find function '{c_name}s' in libc." % locals())
+                print("Failed to find function '%(c_name)s' in libc." % locals())
 
 
 def launch(ir, hail, exfns, args):
@@ -144,7 +144,7 @@ def launch(ir, hail, exfns, args):
         hrtnval = ctx.load(irefrtnbox).cast(MuIntValue)
         rtnval = ctx.handle_to_sint(hrtnval)
 
-        print("Program exited with value {}".format(rtnval))
+        print("Program exited with value %(rtnval)d" % locals())
         return rtnval
 
 
