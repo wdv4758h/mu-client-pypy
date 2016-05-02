@@ -2,19 +2,21 @@
 Compile and run the targets as pytests
 """
 import subprocess as sp
-import os, sys
-from py._path.local import LocalPath
+import os
 
 
-pypy_dir = LocalPath(os.getenv("PYPY_MU"))
-targets_dir = pypy_dir / "rpython/translator/goal"
+targets_dir = os.path.dirname(__file__)
 
 
-def compile_target(tmpdir, target, args=[]):
+def _up(str_dir):
+    return os.path.abspath(os.path.join(str_dir, os.pardir))
+
+
+def compile_target(tmpdir, target, args=list()):
     if isinstance(args, list):
         args = ' '.join(args)
-    output_file = tmpdir / target.replace('.py', '.mu')
-    target_file = targets_dir / target
+    output_file = os.path.join(tmpdir.strpath, target.replace('.py', '.mu'))
+    target_file = os.path.join(targets_dir, target)
 
     cmd = "rpython -O0 -b mu --output %(output_file)s %(target_file)s %(args)s" % locals()
     print cmd
@@ -34,14 +36,14 @@ def compile_target(tmpdir, target, args=[]):
     return output_file
 
 
-def run_bundle(bundle, cmdargs=[], print_stderr_when_fail=True):
+def run_bundle(bundle, cmdargs=list(), print_stderr_when_fail=True):
     if isinstance(cmdargs, list):
         cmdargs = ' '.join(cmdargs)
 
     env = os.environ
     env['PATH'] = env['MU'] + "/cbinding:" + env['PATH']
-    _pypy_dir = pypy_dir
-    cmd = "python %(_pypy_dir)s/rpython/mucli/murpy.py %(bundle)s %(cmdargs)s" % locals()
+    murpy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'mucli', 'murpy.py'))
+    cmd = "python %(murpy_path)s %(bundle)s %(cmdargs)s" % locals()
     print cmd
     p = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, env=env)
     stdout_data, stderr_data = p.communicate()
