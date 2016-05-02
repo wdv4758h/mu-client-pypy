@@ -509,6 +509,7 @@ __primop_map = {
     'uint_lshift':      'SHL',
     'uint_rshift':      'LSHR',
     'float_add':        'FADD',
+    'float_sub':        'FSUB',
     'float_mul':        'FMUL',
     'float_truediv':    'FDIV',
     'int_eq':           'EQ',
@@ -655,6 +656,7 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
         ops.extend(_ops)
         ops.extend(__store(_rflenfld, n))
     except KeyError:  # doesn't have a length field
+        log.malloc_varsize("Ignored setting length field in type '%s'." % hyb)
         pass
     return ops
 
@@ -670,7 +672,6 @@ def __getfieldiref(var, fld):
             idx = mu_t._index_of(fld)
             iref_fld = ops.append(muops.GETFIELDIREF(iref, idx))
         except ValueError:
-            log.error("Field '%s' not found in type '%s'." % (fld, mu_t))
             raise KeyError
     return iref_fld, ops
 
@@ -680,6 +681,7 @@ def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
         ops.extend(__load(iref_fld, res))
     except KeyError:
+        log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
         raise NotImplementedError
     return ops
 
@@ -689,6 +691,7 @@ def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
         ops.extend(__store(iref_fld, val))
     except KeyError:
+        log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
         raise NotImplementedError
     return ops
 
@@ -793,6 +796,17 @@ def _llop2mu_ptr_iszero(ptr, res=None, llopname='ptr_zero'):
     cst.mu_type = ptr.mu_type
     cst.mu_name = MuName("NULL_%s" % ptr.mu_type.mu_name._name)
     return _llop2mu_ptr_eq(ptr, cst, res)
+
+
+def _llop2mu_direct_ptradd(ptr, n, res=None, llopname='direct_ptradd'):
+    _, ops = __getarrayitemiref(ptr, n)
+    if res:
+        ops[-1].result = res
+    return ops
+
+
+def _llop2mu_shrink_array(ptr, sz, res=None, llopname='shrink_array'):
+    return [], _newprimconst(mutype.bool_t, 0)  # always return False
 
 
 # ----------------

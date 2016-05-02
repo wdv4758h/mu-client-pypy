@@ -3,6 +3,7 @@ import sys
 
 import ctypes, ctypes.util
 from libmu import *
+import os
 
 import argparse
 import zipfile
@@ -89,34 +90,27 @@ def build_arglist(ctx, argv):
 
 def load_extfncs(ctx, exfns):
     libc = ctypes.CDLL(ctypes.util.find_library("c"))
+
+    dir_rpython = os.path.dirname(os.path.dirname(__file__))
+    path_librpyc = os.path.join(dir_rpython, 'translator', 'mu', 'rpyc', 'librpyc.so')
+    librpyc = ctypes.CDLL(path_librpyc)
+
     for c_name, fncptr_name, gcl_name, hdrs in exfns:
         with DelayedDisposer() as dd:
             try:
-                # if c_name == "write":
-                #     MY_WRITE_TYPE = ctypes.CFUNCTYPE(ctypes.c_ssize_t, ctypes.c_int,
-                #                                      ctypes.c_void_p, ctypes.c_size_t)
-                #
-                #     def fake_write(fd, buf, sz):
-                #         print(fd, hex(buf), sz)
-                #
-                #         ty = ctypes.c_char * sz
-                #         ary = ty.from_address(buf)
-                #
-                #         for i in range(sz):
-                #             print("ary[{}]={} {}".format(i, ary[i], ord(ary[i])))
-                #
-                #         return sz
-                #
-                #     fp = MY_WRITE_TYPE(fake_write)
-                #     adr = ctypes.cast(fp, ctypes.c_void_p).value
-                # else:
-                #     adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
                 adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
-                hadr = dd << ctx.handle_from_fp(ctx.id_of(fncptr_name), adr)
-                hgcl = dd << ctx.handle_from_global(ctx.id_of(gcl_name))
-                ctx.store(hgcl, hadr)
             except AttributeError:
                 print("Failed to find function '%(c_name)s' in libc." % locals())
+                try:
+                    adr = ctypes.cast(getattr(librpyc, c_name), ctypes.c_void_p).value
+                    print("Found function '%(c_name)s' in compiled RPython C backend functions." % locals())
+                except KeyError:
+                    print("Failed to find function '%(c_name)s in compiled RPython C backend functions." % locals())
+                    raise NotImplementedError()
+
+            hadr = dd << ctx.handle_from_fp(ctx.id_of(fncptr_name), adr)
+            hgcl = dd << ctx.handle_from_global(ctx.id_of(gcl_name))
+            ctx.store(hgcl, hadr)
 
 
 def launch(ir, hail, exfns, args):
