@@ -4,12 +4,12 @@ PyPy-Mu: A Mu Backend for PyPy
 
 Welcome to PyPy-Mu!
 
-PyPy-Mu is a fork of `PyPy <http://pypy.org>` that aims to
-add a `Mu Micro Virtual Machine <http://microvm.org>` backend for it.
+PyPy-Mu is a fork of `PyPy<http://pypy.org>` that aims to
+add a `Mu Micro Virtual Machine<http://microvm.org>` backend for it.
 
 This project is currently under active development,
 progressing towards a Mu backend that allows RPython to
-successfully compile `SOM interpreter <https://github.com/SOM-st/RPySOM>`.
+successfully compile `SOM interpreter<https://github.com/SOM-st/RPySOM>`.
 
 Building
 ========
@@ -17,7 +17,7 @@ Building
 Obtaining a Mu implementation
 -----------------------------
 
-The reference implementation for Mu can be found `here <https://github.com/microvm/microvm-refimpl2>`.
+The reference implementation for Mu can be found `here<https://github.com/microvm/microvm-refimpl2>`.
 Build the Mu implementation, make sure to build the C binding as well.
 
 
