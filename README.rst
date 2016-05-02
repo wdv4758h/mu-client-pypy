@@ -26,7 +26,7 @@ Compiling some RPython C backend support source code
 Currently the Mu backend still requires some support from the C backend function implementations.
 We thus build them into a shared library that's loaded by the Mu RPython client launcher.
 
-.. code-block:: console
+.. code-block:: bash
     $ cd rpython/translator/mu/rpyc
     $ make
 
@@ -40,12 +40,12 @@ Setting up environment variable
 
 - Set up an environment variable :bash:`$MU` to point to the cloned Mu MicroVM repository.
 
-.. code-block:: console
+.. code-block:: bash
     $ export MU=$REPOS/microvm-refimpl2
 
 - Make an alias for the client launcher, adding Python binding and C binding to environment varible:
 
-.. code-block:: console
+.. code-block:: bash
     $ alias murpy="PYTHONPATH=$MU/pythonbinding:$PYTHONPATH LD_LIBRARY_PATH=$MU/cbinding:$LD_LIBRARY_PATH python $PYPY_MU/rpython/mucli/murpy.py"
 
 
@@ -62,7 +62,7 @@ This is a zipped bundle of the IR, HAIL and external function list files.
 
 Use ``murpy`` to load and run the compiled bundle program:
 
-.. code-block:: console
+.. code-block:: bash
     $ murpy <target>-mu.mu
 
 Currently due to the limitation of the Mu implementation in Scala,
