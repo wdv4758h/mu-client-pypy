@@ -99,13 +99,14 @@ def load_extfncs(ctx, exfns):
         with DelayedDisposer() as dd:
             try:
                 adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
+                os.write(2, "Loaded function '$(c_name)s' in libc.\n" % locals())
             except AttributeError:
                 print("Failed to find function '%(c_name)s' in libc." % locals())
                 try:
                     adr = ctypes.cast(getattr(librpyc, c_name), ctypes.c_void_p).value
-                    print("Found function '%(c_name)s' in compiled RPython C backend functions." % locals())
+                    os.write(2, "Loaded function '%(c_name)s' in compiled RPython C backend functions.\n" % locals())
                 except KeyError:
-                    print("Failed to find function '%(c_name)s in compiled RPython C backend functions." % locals())
+                    os.write(2, "Failed to load function '%(c_name)s'.\n" % locals())
                     raise NotImplementedError()
 
             hadr = dd << ctx.handle_from_fp(ctx.id_of(fncptr_name), adr)
@@ -130,9 +131,7 @@ def launch(ir, hail, exfns, args):
         st = ctx.new_stack(bundle_entry)
         th = ctx.new_thread(st, PassValues(refstt_arglst, refrtnbox))
 
-        print("-------------------------------- program output --------------------------------")
         mu.execute()
-        print("--------------------------------------------------------------------------------")
 
         irefrtnbox = ctx.get_iref(refrtnbox)
         hrtnval = ctx.load(irefrtnbox).cast(MuIntValue)
