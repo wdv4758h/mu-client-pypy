@@ -17,8 +17,10 @@ from rpython.rlib.rarithmetic import r_uint, r_ulonglong
 from rpython.rlib.unroll import unrolling_iterable
 
 # We reuse helpers from rmd5 too
-from rpython.rlib.rmd5 import _rotateLeft
-
+# from rpython.rlib.rmd5 import _rotateLeft
+def _rotateLeft(x, n):
+    x &= 0xFFFFFFFF
+    return (x << n) | (x >> (32 - n))
 
 def _state2string(a, b, c, d, e):
     return ''.join([
