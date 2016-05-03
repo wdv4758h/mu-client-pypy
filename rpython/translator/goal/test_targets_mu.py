@@ -53,21 +53,13 @@ def run_bundle(bundle, cmdargs=list(), print_stderr_when_fail=True):
     # print "-------------------------------- stderr --------------------------------"
     # print stderr_data
 
-    if p.returncode == 0:
-        lines = stdout_data.split('\n')
-        idx_start = lines.index("-------------------------------- program output --------------------------------")
-        idx_end = lines.index("--------------------------------------------------------------------------------")
-        output = '\n'.join(lines[idx_start + 1:idx_end])
-        for idx in range(idx_start, idx_end + 1):
-            print lines[idx]
-    else:
-        output = stdout_data
+    if p.returncode != 0:
         if print_stderr_when_fail:
             print "-------------------------------- stderr --------------------------------"
             print stderr_data
             print "------------------------------------------------------------------------"
 
-    return p.returncode, output, stderr_data
+    return p.returncode, stdout_data, stderr_data
 
 
 def test_factorial_noprint(tmpdir):
@@ -81,27 +73,27 @@ def test_factorial_noprint(tmpdir):
 def test_print_helloworld(tmpdir):
     bundle_file = compile_target(tmpdir, "targetprint.py")
     r, out, err = run_bundle(bundle_file, [])
-    assert out == "hello world"
+    assert out == "hello world\n"
 
 
 def test_warningalone(tmpdir):
     bundle = compile_target(tmpdir, "targetwarningalone.py")
     r, out, err = run_bundle(bundle, ['0'])
-    assert out == '9'
+    assert out == '9\n'
     r, out, err = run_bundle(bundle, ['4'])
-    assert out == '1'
+    assert out == '1\n'
     r, out, err = run_bundle(bundle, ['2'])
-    assert out == '2'
+    assert out == '2\n'
     r, out, err = run_bundle(bundle, ['1'])
-    assert out == '0'
+    assert out == '0\n'
 
 
 def test_testlistvsdict(tmpdir):
     bundle = compile_target(tmpdir, "targettestlistvsdict.py")
     r, out, err = run_bundle(bundle, ['d', '1234'])
-    assert out == '1234'
+    assert out == '1234\n'
     r, out, err = run_bundle(bundle, ['l', '234'])
-    assert out == '1234'
+    assert out == '1234\n'
     r, out, err = run_bundle(bundle, ['d', '234'], print_stderr_when_fail=False)
     assert r == 1
 
@@ -109,19 +101,48 @@ def test_testlistvsdict(tmpdir):
 def test_targettestdicts(tmpdir):
     bundle = compile_target(tmpdir, "targettestdicts.py")
     r, out, err = run_bundle(bundle, ['d', '256'])
-    assert out == '0x100'
+    assert out == '0x100\n'
     r, out, err = run_bundle(bundle, ['d', '4095'])
-    assert out == '0xfff'
+    assert out == '0xfff\n'
     r, out, err = run_bundle(bundle, ['d', '4096'], print_stderr_when_fail=False)
     assert r == 1
     r, out, err = run_bundle(bundle, ['r', '0x100'])
-    assert out == '256'
+    assert out == '256\n'
     r, out, err = run_bundle(bundle, ['r', '0xfff'])
-    assert out == '4095'
+    assert out == '4095\n'
 
 
-def test_targetvarsized(tmpdir):
-    bundle = compile_target(tmpdir, "targetvarsized.py", ['1'])
-    r, out, err = run_bundle(bundle)
+# This test target takes quite a while to run...
+# def test_targetvarsized(tmpdir):
+#     bundle = compile_target(tmpdir, "targetvarsized.py", ['1'])
+#     r, out, err = run_bundle(bundle)
+#     print out
+#     assert r == 0
+
+# This test also takes a LONG time...
+# def test_targetsimplereadandwrite(tmpdir):
+#     bundle = compile_target(tmpdir, "targetsimplewrite.py")
+#     r, out, err = run_bundle(bundle, [])
+#     assert r == 0
+#
+#     bundle = compile_target(tmpdir, "targetsimpleread.py")
+#     r, out, err = run_bundle(bundle, [])
+#     assert r == 0
+
+
+def test_targetsha1sum(tmpdir):
+    bundle = compile_target(tmpdir, "targetsha1sum.py")
+    r, out, err = run_bundle(bundle, [__file__])
+    assert out.split(' ')[0] == '15633047fcbac25931ca197326ad4464319ef57e'
+
+
+def test_rpystonedalone(tmpdir):
+    bundle = compile_target(tmpdir, "targetrpystonedalone.py")
+    r, out, err = run_bundle(bundle, ["pystone", "1000"])
     print out
     assert r == 0
+
+    r, out, err = run_bundle(bundle, ["richards", "1"])
+    print out
+    assert r == 0
+

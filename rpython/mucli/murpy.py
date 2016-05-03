@@ -137,7 +137,7 @@ def launch(ir, hail, exfns, args):
         hrtnval = ctx.load(irefrtnbox).cast(MuIntValue)
         rtnval = ctx.handle_to_sint(hrtnval)
 
-        print("Program exited with value %(rtnval)d" % locals())
+        # print("Program exited with value %(rtnval)d" % locals())
         return rtnval
 
 

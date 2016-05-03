@@ -377,8 +377,7 @@ def _ll2mu_op(opname, args, result=None):
         return globals()['_llop2mu_' + opname](*args, res=result, llopname=opname)
     except KeyError:
         # try if it's an integer operation that can be redirected.
-        contains = lambda s, subs: reduce(lambda a, b: a or b, map(lambda e: e in s, subs), False)
-        if contains(opname, ('uint', 'char', 'long')):
+        if any(n in opname for n in ('uint', 'char', 'long')):
             opname = "int_" + opname[5:]
             try:
                 return globals()['_llop2mu_' + opname](*args, res=result, llopname=opname)
@@ -470,8 +469,8 @@ def _llop2mu_int_invert(x, res=None, llopname='int_invert'):
     # x' = (-x) - 1
     ops = _MuOpList()
     neg_x = ops.extend(_ll2mu_op('int_neg', [x]))
-    one = _newprimconst(x.mut, 1)
-    ops.extend(_ll2mu_op('_int_sub', (neg_x, one), res))
+    one = _newprimconst(x.mu_type, 1)
+    ops.extend(_ll2mu_op('int_sub', (neg_x, one), res))
     return ops
 
 
@@ -726,10 +725,10 @@ def __getinterioriref(var, offsets):
 
     # If the outer container is array, and the first index is an integer,
     # then get the variable part of the corresponding hybrid type first
-    if isinstance(var.concretetype.TO, lltype.Array):
-        assert isinstance(offsets[0].concretetype, lltype.Primitive)
-        assert isinstance(var.mu_type.TO, mutype.MuHybrid)
-        iref = ops.append(muops.GETVARPARTIREF(iref))
+    # if isinstance(var.concretetype.TO, lltype.Array):
+    #     assert isinstance(offsets[0].concretetype, lltype.Primitive)
+    #     assert isinstance(var.mu_type.TO, mutype.MuHybrid)
+    #     iref = ops.append(muops.GETVARPARTIREF(iref))
 
     for o in offsets:
         if o.concretetype == lltype.Void:
@@ -738,6 +737,12 @@ def __getinterioriref(var, offsets):
             ops.extend(subops)
         else:
             assert isinstance(o.concretetype, lltype.Primitive)
+            if len(ops) == 0 or ops[-1].opname != 'GETVARPARTIREF':
+                # This case happens when the outer container is array,
+                # and rtyper assumes it can respond to indexing.
+                # For translated hybrid type however, we need to get the variable part reference first.
+                assert isinstance(var.mu_type.TO, mutype.MuHybrid)
+                iref = ops.append(muops.GETVARPARTIREF(iref))
             iref = ops.append(muops.SHIFTIREF(iref, o))
 
     return iref, ops
