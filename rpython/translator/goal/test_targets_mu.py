@@ -132,8 +132,9 @@ def test_targettestdicts(tmpdir):
 
 def test_targetsha1sum(tmpdir):
     bundle = compile_target(tmpdir, "targetsha1sum.py")
-    r, out, err = run_bundle(bundle, [__file__])
-    assert out.split(' ')[0] == '15633047fcbac25931ca197326ad4464319ef57e'
+    file = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'requirements.txt'))
+    r, out, err = run_bundle(bundle, [file])
+    assert out.split(' ')[0] == '1a0f9d4af927a8d597dbc15f5bc09693da299cec'
 
 
 def test_rpystonedalone(tmpdir):

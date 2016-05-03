@@ -421,8 +421,9 @@ def _llop2mu_direct_call(cst_fnc, *args, **kwargs):
     if g is None:
         fr = cst_fnc.value
         fnc_sig = fr._TYPE.Sig
+        rtn_t = mutype.void_t if fnc_sig._voidrtn() else _ref2uptrvoid(fnc_sig.RTNS[0])
         extfnc = muni.MuExternalFunc(fr.fncname, tuple(map(_ref2uptrvoid, fnc_sig.ARGS)),
-                                  _ref2uptrvoid(fnc_sig.RTNS[0]), fr.compilation_info.includes)
+                                     rtn_t, fr.compilation_info.includes)
         ldfncptr = ops.append(muops.LOAD(extfnc))
         callee = ldfncptr
         call_op = muops.CCALL
@@ -904,6 +905,11 @@ def _llop2mu_gc_can_move(ptr, res=None, llopname='gc_can_move'):
 
 
 def _llop2mu_gc_pin(ptr, res=None, llopname='gc_can_move'):
+    return [], _newprimconst(mutype.bool_t, 1)
+
+
+def _llop2mu_gc_writebarrier_before_copy(src, dst, src_start, dst_start, length,
+                                         res=None, llopname='gc_writebarrier_before_copy'):
     return [], _newprimconst(mutype.bool_t, 1)
 
 # TODO: rest of the operations

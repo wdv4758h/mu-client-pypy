@@ -125,8 +125,13 @@ class MuTextIRGenerator:
                 _recursive_addtype(self.gbltypes, v.mu_type)
             if isinstance(v, Constant):
                 assert isinstance(v.value, mutype._muobject)
-                v.__init__(v.value)     # rehash
-                self.gblcnsts.add(v)
+                if isinstance(v.value, mutype._mufuncref):
+                    if not hasattr(v, 'mu_name'):
+                        assert getattr(v.value, 'graph', False)
+                        v.mu_name = v.value.graph.mu_name
+                else:
+                    v.__init__(v.value)     # rehash
+                    self.gblcnsts.add(v)
 
         for g in self.graphs:
             __proc(g)

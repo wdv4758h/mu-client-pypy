@@ -131,10 +131,19 @@ class _muprimitive(_muobject):
         return self._TYPE == other._TYPE and self.val == other.val
 
     def __str__(self):
+        def _scistr(f):
+            # fix case where the scientific notation doesn't contain a '.', like 1e-08
+            s = str(f)
+            if 'e' in s:
+                i = s.index('e')
+                if '.' not in s[:i]:
+                    s = '%s.0%s' % (s[:i], s[i:])
+            return s
+
         if self._TYPE == float_t:
-            return "%ff" % self.val
+            return "%sf" % _scistr(self.val)
         elif self._TYPE == double_t:
-            return "%fd" % self.val
+            return "%sd" % _scistr(self.val)
         else:
             return "%d" % int(self.val)
 
@@ -678,7 +687,10 @@ class MuFuncSig(MuType):
 
         MuType.__init__(self, name)
         self.ARGS = tuple(arg_ts)
-        self.RTNS = tuple(rtn_ts)
+        if len(rtn_ts) == 1 and rtn_ts[0] == void_t:
+            self.RTNS = tuple()
+        else:
+            self.RTNS = tuple(rtn_ts)
 
     @property
     def mu_constructor(self):
@@ -703,6 +715,9 @@ class MuFuncSig(MuType):
 
     def _trueargs(self):
         return [arg for arg in self.ARGS if arg is not void_t]
+
+    def _voidrtn(self):
+        return len(self.RTNS) == 0
 
 
 class MuFuncRef(MuRefType):

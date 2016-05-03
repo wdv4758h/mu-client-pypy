@@ -101,7 +101,6 @@ def load_extfncs(ctx, exfns):
                 adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
                 os.write(2, "Loaded function '$(c_name)s' in libc.\n" % locals())
             except AttributeError:
-                print("Failed to find function '%(c_name)s' in libc." % locals())
                 try:
                     adr = ctypes.cast(getattr(librpyc, c_name), ctypes.c_void_p).value
                     os.write(2, "Loaded function '%(c_name)s' in compiled RPython C backend functions.\n" % locals())
