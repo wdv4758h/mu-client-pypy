@@ -147,3 +147,39 @@ def test_rpystonedalone(tmpdir):
     print out
     assert r == 0
 
+
+def test_ackermann(tmpdir):
+    bundle = compile_target(tmpdir, "targetackermann.py")
+    r, out, err = run_bundle(bundle, ["3", "4"])
+    assert out == "125\n"
+
+
+def test_noop(tmpdir):
+    bundle = compile_target(tmpdir, "targetreallynopstandalone.py")
+    r, out, err = run_bundle(bundle, [])
+    assert r == 0
+
+
+def test_targetreadlines(tmpdir):
+    bundle = compile_target(tmpdir, "targetreadlines.py")
+    r, out, err = run_bundle(bundle, ['\'import os\''])
+    assert out == "import os\n\n"
+
+
+def test_targetpushpop(tmpdir):
+    bundle = compile_target(tmpdir, "targetpushpop.py")
+    r, out, err = run_bundle(bundle, [])
+    assert r == 11
+
+
+def test_targetosreadbench(tmpdir):
+    bundle = compile_target(tmpdir, "targetosreadbench.py")
+    r, out, err = run_bundle(bundle, [__file__])
+    assert r == 0
+
+
+def test_targetlbench(tmpdir):
+    bundle = compile_target(tmpdir, "targetlbench.py")
+    r, out, err = run_bundle(bundle, ['20'])
+    assert out == '0\n'
+    assert r == 0
