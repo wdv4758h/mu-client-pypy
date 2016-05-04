@@ -14,6 +14,7 @@ def entry_point(argv):
     fname = argv[1]
     l = []
     for i in xrange(100000):
+        # os.write(1, '\r' + str(i))
         f = os.open(fname, 0666, os.O_RDONLY)
         l.append(os.read(f, length))
         os.close(f)

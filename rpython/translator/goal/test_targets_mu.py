@@ -162,7 +162,7 @@ def test_noop(tmpdir):
 
 def test_targetreadlines(tmpdir):
     bundle = compile_target(tmpdir, "targetreadlines.py")
-    r, out, err = run_bundle(bundle, ['\'import os\''])
+    r, out, err = run_bundle(bundle, ['\'import os\'', __file__])
     assert out == "import os\n\n"
 
 

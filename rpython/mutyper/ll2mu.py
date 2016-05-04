@@ -109,6 +109,8 @@ def _lltype2mu_stt(llt):
             return __stt_cache[llt]
         except KeyError:
             pass
+        if len(llt._names) == 0:    # empty struct
+            return mutype.void_t
         stt = mutype.MuStruct(__newtypename(llt._name))
         __stt_cache[llt] = stt
         lst = []
@@ -313,6 +315,12 @@ def _llval2mu_ptr(llv):
     if isinstance(llv._TYPE.TO, lltype.FuncType):
         return _llval2mu_funcptr(llv)
     mut = ll2mu_ty(llv._TYPE)
+
+    if mut.TO is mutype.void_t:
+        muv = mutype._munullref(mut)
+        log.warning("Translating LL value '%(llv)r' to '%(muv)r'" % locals())
+        return muv
+
     return mutype._muref(mut, ll2mu_val(llv._obj))
 
 
