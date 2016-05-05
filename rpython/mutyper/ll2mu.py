@@ -109,8 +109,11 @@ def _lltype2mu_stt(llt):
             return __stt_cache[llt]
         except KeyError:
             pass
+
         if len(llt._names) == 0:    # empty struct
-            return mutype.void_t
+            # fill a dummy 64-bit integer field.
+            return mutype.MuStruct("empty", ('dummy', mutype.int64_t))
+
         stt = mutype.MuStruct(__newtypename(llt._name))
         __stt_cache[llt] = stt
         lst = []
@@ -272,8 +275,10 @@ def _llval2mu_stt(llv):
 
     mut = ll2mu_ty(llv._TYPE)
     stt = mutype._mustruct(mut)
-    for fld in mut._names:
-        setattr(stt, fld, ll2mu_val(getattr(llv, fld)))
+
+    if len(llv._TYPE._names) != 0:  # origional value struct is non-empty
+        for fld in mut._names:
+            setattr(stt, fld, ll2mu_val(getattr(llv, fld)))
 
     return stt
 
