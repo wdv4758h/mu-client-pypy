@@ -646,7 +646,12 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
     ops = _MuOpList()
     flavor = _hints.value['flavor']
     if flavor == 'gc':
-        hyb = ops.append(muops.NEWHYBRID(ll2mu_ty(T.value), n, result=res))
+        mut = ll2mu_ty(T.value)
+        if isinstance(mut, mutype.MuStruct):
+            # Empty array
+            obj = ops.append(muops.NEW(mut, result=res))
+        else:
+            obj = ops.append(muops.NEWHYBRID(ll2mu_ty(T.value), n, result=res))
     else:
         # Calculate the size of memory that needs to be allocated
         # see mumem.mu_hybsizeOf for reference.
@@ -661,15 +666,15 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
         # sz = f + v * n
         v = ops.extend(_ll2mu_op('int_mul', (_newprimconst(mutype.int64_t, _v), n)))
         sz = ops.extend(_ll2mu_op('int_add', (_newprimconst(mutype.int64_t, _f), v)))
-        hyb = ops.extend(_ll2mu_op('raw_malloc', (sz, ), res))
+        obj = ops.extend(_ll2mu_op('raw_malloc', (sz, ), res))
 
     # Set the length field
     try:
-        _rflenfld, _ops = __getfieldiref(hyb, 'length')
+        _rflenfld, _ops = __getfieldiref(obj, 'length')
         ops.extend(_ops)
         ops.extend(__store(_rflenfld, n))
     except KeyError:  # doesn't have a length field
-        log.malloc_varsize("Ignored setting length field in type '%s'." % hyb)
+        log.malloc_varsize("Ignored setting length field in type '%s'." % obj)
         pass
     return ops
 

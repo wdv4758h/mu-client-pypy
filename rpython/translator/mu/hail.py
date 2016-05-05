@@ -81,6 +81,18 @@ class HAILGenerator:
             return str(name)
         elif isinstance(obj, mutype._mufuncref):
             assert hasattr(obj, 'graph')
-            return str(obj.graph.mu_name)
+            try:
+                assert obj.graph.mu_name is not None
+                return str(obj.graph.mu_name)
+            except AssertionError:
+                # Assuming the function has never known to be indirectly called
+                # make the reference NULL for now.
+                # But the problem lies at the chopper stage
+                # where the function graph is chopped.
+                # Thus at the chopper stage it needs to consider function references
+                # in the reachable struct constants as well.
+                # TODO: fix the chopper.
+                return "NULL"
+
         else:
             raise TypeError("Unknown value '%s' of type '%s'." % (obj, mutype.mu_typeOf(obj)))
