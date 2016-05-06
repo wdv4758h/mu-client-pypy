@@ -605,34 +605,6 @@ _llop2mu_cast_primitive = _llop2mu_force_cast
 
 # ----------------
 # pointer operations
-def __store(irefloc, val):
-    ops = _MuOpList()
-    # make a special case for booleans
-    if irefloc.mu_type.TO is mutype.bool_t:
-        assert val.mu_type is mutype.bool_t
-        ext_val = ops.append(muops.ZEXT(val, mutype.int8_t))
-        ext_irefloc = copy(irefloc)
-        ext_irefloc.mu_type = mutype.MuIRef(mutype.int8_t)
-        ops.append(muops.STORE(ext_irefloc, ext_val))
-    else:
-        ops.append(muops.STORE(irefloc, val))
-    return ops
-
-
-def __load(irefloc, res=None):
-    ops = _MuOpList()
-    # make a special case for booleans
-    if irefloc.mu_type.TO is mutype.bool_t:
-        assert res.mu_type is mutype.bool_t
-        ext_irefloc = copy(irefloc)
-        ext_irefloc.mu_type = mutype.MuIRef(mutype.int8_t)
-        ldval = ops.append(muops.LOAD(ext_irefloc))
-        ops.append(muops.TRUNC(ldval, mutype.bool_t, result=res))
-    else:
-        ops.append(muops.LOAD(irefloc, result=res))
-    return ops
-
-
 def _llop2mu_malloc(T, _hints, res=None, llopname='malloc'):
     flavor = _hints.value['flavor']
     if flavor == 'gc':
@@ -672,7 +644,7 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
     try:
         _rflenfld, _ops = __getfieldiref(obj, 'length')
         ops.extend(_ops)
-        ops.extend(__store(_rflenfld, n))
+        ops.append(muops.STORE(_rflenfld, n))
     except KeyError:  # doesn't have a length field
         log.malloc_varsize("Ignored setting length field in type '%s'." % obj)
         pass
@@ -697,7 +669,7 @@ def __getfieldiref(var, fld):
 def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
     try:
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
-        ops.extend(__load(iref_fld, res))
+        ops.append(muops.LOAD(iref_fld, res))
     except KeyError:
         log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
         raise NotImplementedError
@@ -707,7 +679,7 @@ def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
 def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
     try:
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
-        ops.extend(__store(iref_fld, val))
+        ops.append(muops.STORE(iref_fld, val))
     except KeyError:
         log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
         raise NotImplementedError
@@ -722,19 +694,19 @@ def __getarrayitemiref(var, idx):
 
 def _llop2mu_getarrayitem(var, idx, res=None, llopname='getarrayitem'):
     iref_itm, ops = __getarrayitemiref(var, idx)
-    ops.extend(__load(iref_itm, res))
+    ops.append(muops.LOAD(iref_itm, res))
     return ops
 
 
 def _llop2mu_setarrayitem(var, idx, val, res=None, llopname='setarrayitem'):
     iref_itm, ops = __getarrayitemiref(var, idx)
-    ops.extend(__store(iref_itm, val))
+    ops.append(muops.STORE(iref_itm, val))
     return ops
 
 
 def _llop2mu_getarraysize(var, res=None, llopname='getarraysize'):
     iref_fld, ops = __getfieldiref(var, 'length')   # assuming that every Hybrid type has a length field
-    ops.extend(__load(iref_fld, res))
+    ops.append(muops.LOAD(iref_fld, res))
     return ops
 
 
@@ -770,14 +742,14 @@ def __getinterioriref(var, offsets):
 def _llop2mu_getinteriorfield(var, *offsets, **kwargs):
     iref, ops = __getinterioriref(var, offsets)
     res = kwargs['res'] if 'res' in kwargs else None
-    ops.extend(__load(iref, res))
+    ops.append(muops.LOAD(iref, res))
     return ops
 
 
 def _llop2mu_setinteriorfield(var, *offsets_val, **kwards):
     offsets, val = offsets_val[:-1], offsets_val[-1]
     iref, ops = __getinterioriref(var, offsets)
-    ops.extend(__store(iref, val))
+    ops.append(muops.STORE(iref, val))
     return ops
 
 
@@ -842,7 +814,7 @@ def _llop2mu_keepalive(ptr, res=None, llopname='keepalive'):
 def __raw2ccall(*args, **kwargs):
     ops = _MuOpList()
     externfnc = getattr(muni, kwargs['llopname'].replace('raw', 'c'))
-    fnp = ops.extend(__load(externfnc))
+    fnp = ops.append(muops.LOAD(externfnc))
     sig = externfnc._T.Sig
     args = list(args)
     for i, arg_t in enumerate(sig.ARGS):
@@ -874,7 +846,7 @@ def _llop2mu_raw_load(adr, ofs, res, llopname='raw_load'):
     ops = _MuOpList()
     loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
     loc_ptr = ops.append(muops.PTRCAST(loc_adr, mutype.MuUPtr(res.mu_type)))
-    ops.extend(__load(loc_ptr, res))
+    ops.append(muops.LOAD(loc_ptr, res))
     return ops
 
 
@@ -882,7 +854,7 @@ def _llop2mu_raw_store(adr, ofs, val, res=None, llopname='raw_store'):
     ops = _MuOpList()
     loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
     loc_ptr = ops.append(muops.PTRCAST(loc_adr, mutype.MuUPtr(val.mu_type)))
-    ops.extend(__store(loc_ptr, val))
+    ops.append(muops.STORE(loc_ptr, val))
     return ops
 
 for op in "add sub lt le eq ne gt ge".split(' '):

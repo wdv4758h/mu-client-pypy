@@ -9,7 +9,7 @@ from rpython.rtyper.lltypesystem import lltype as llt
 from .muts import mutype as mut
 from .muts import muops as muop
 from .ll2mu import *
-from .ll2mu import _MuOpList
+from .ll2mu import _MuOpList, _newprimconst
 import py
 from rpython.tool.ansi_print import AnsiLogger
 
@@ -62,7 +62,7 @@ class MuTyper:
         self.proc_gcells()
 
     def specialise_block(self, blk):
-        muops = []
+        muops = _MuOpList()
         self.proc_arglist(blk.inputargs, blk)
         if hasattr(blk, 'mu_excparam'):
             self.proc_arg(blk.mu_excparam, blk)
@@ -81,6 +81,8 @@ class MuTyper:
                 muops.append(muop.BRANCH(DEST.from_link(blk.exits[0])))
             elif len(blk.exits) == 2:
                 blk.exitswitch = self.proc_arg(blk.exitswitch, blk)
+                if blk.exitswitch.mu_type is mutype.bool_t:
+                    blk.exitswitch = muops.append(muop.EQ(blk.exitswitch, _newprimconst(mutype.bool_t, 1)))
                 muops.append(muop.BRANCH2(blk.exitswitch, DEST.from_link(blk.exits[1]), DEST.from_link(blk.exits[0])))
             else:   # more than 2 exits -> use SWITCH statement
                 blk.exitswitch = self.proc_arg(blk.exitswitch, blk)

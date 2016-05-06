@@ -172,10 +172,10 @@ def test_targetpushpop(tmpdir):
     assert r == 11
 
 
-def test_targetosreadbench(tmpdir):
-    bundle = compile_target(tmpdir, "targetosreadbench.py")
-    r, out, err = run_bundle(bundle, [__file__])
-    assert r == 0
+# def test_targetosreadbench(tmpdir):
+#     bundle = compile_target(tmpdir, "targetosreadbench.py")
+#     r, out, err = run_bundle(bundle, [__file__])
+#     assert r == 0
 
 
 def test_targetlbench(tmpdir):
