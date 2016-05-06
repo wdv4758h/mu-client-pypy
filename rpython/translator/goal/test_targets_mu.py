@@ -184,3 +184,24 @@ def test_targetlbench(tmpdir):
     r, out, err = run_bundle(bundle, ['20'])
     assert out == '0\n'
     assert r == 0
+
+
+def test_targetjitstandalone(tmpdir):
+    bundle = compile_target(tmpdir, "targetjitstandalone.py")
+    r, out, err = run_bundle(bundle, ['100', '100'])
+    print out
+    assert r == 0
+
+
+def test_targetgcbench(tmpdir):
+    bundle = compile_target(tmpdir, "targetgcbench.py")
+    r, out, err = run_bundle(bundle, [])
+    print out
+    assert r == 0
+
+
+def test_targetbigintbenchmark(tmpdir):
+    bundle = compile_target(tmpdir, "targetbigintbenchmark.py")
+    r, out, err = run_bundle(bundle, [])
+    print out
+    assert r == 0

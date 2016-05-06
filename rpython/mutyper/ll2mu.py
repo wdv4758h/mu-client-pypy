@@ -765,7 +765,15 @@ def _llop2mu_getinteriorarraysize(var, *offsets, **kwargs):
 
 
 def _llop2mu_cast_pointer(cst_TYPE, var_ptr, res=None, llopname='cast_pointer'):
-    return [muops.REFCAST(var_ptr, res.mu_type if res else ll2mu_ty(cst_TYPE.value), result=res)]
+    if isinstance(var_ptr.mu_type, (mutype.MuUPtr, mutype.MuUFuncPtr)):
+        if res:
+            assert isinstance(res.mu_type, (mutype.MuUPtr, mutype.MuUFuncPtr))
+        _op = muops.PTRCAST
+    else:
+        if res:
+            assert not isinstance(res.mu_type, (mutype.MuUPtr, mutype.MuUFuncPtr))
+        _op = muops.REFCAST
+    return [_op(var_ptr, res.mu_type if res else ll2mu_ty(cst_TYPE.value), result=res)]
 
 
 def _llop2mu_cast_opaque_ptr(var_ptr, res, llopname='cast_opaque_ptr'):
