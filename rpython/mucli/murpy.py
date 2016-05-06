@@ -115,7 +115,8 @@ def load_extfncs(ctx, exfns):
 
 def launch(ir, hail, exfns, args):
     dll = MuRefImpl2StartDLL("libmurefimpl2start.so")
-    mu = dll.mu_refimpl2_new()
+    oneGB = 2 ** 30
+    mu = dll.mu_refimpl2_new_ex(heap_size=512 * 2 ** 20, stack_size=63 * 1024, global_size=4 * 2 ** 20)
 
     with mu.new_context() as ctx:
         ctx.load_bundle(ir)

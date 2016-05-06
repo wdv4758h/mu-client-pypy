@@ -246,9 +246,7 @@ class MuExceptionTransformer:
                 # set the catch block exits
                 catblk.exits = (exclnk, )
             else:   # exception information is not used. -> ignore the raised exception
-                excobjptr = Variable("excobjptr")
-                excobjptr.concretetype = lltype.Ptr(lltype.OpaqueType('_Void'))
-                excblk.exits[1].target.mu_excparam = excobjptr
+                pass
 
     def _get_pack_ops(self, var_type, var_value):
         """
