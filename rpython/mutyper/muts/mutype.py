@@ -219,6 +219,9 @@ class MuStruct(MuContainerType):
                 raise TypeError("%s: cannot inline MuHybrid type %s" %
                                 (self._name, typ))
 
+        names.insert(0, '__gc_idhash')
+        flds['__gc_idhash'] = int64_t
+
         self._flds = frozendict(flds)
         self._names = tuple(names)
 
@@ -374,6 +377,9 @@ class MuHybrid(MuContainerType):
             if isinstance(typ, MuHybrid):
                 raise TypeError("%s: cannot inline MuHybrid type %s" %
                                 (self._name, typ))
+
+        names.insert(0, '__gc_idhash')
+        flds['__gc_idhash'] = int64_t
 
         self._flds = frozendict(flds)
         self._names = tuple(names)
