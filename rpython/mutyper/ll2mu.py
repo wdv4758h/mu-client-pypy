@@ -668,7 +668,9 @@ def __getfieldiref(var, fld):
 
 def _llop2mu_getsubstruct(var, cnst_fldname, res=None, llopname='getsubstruct'):
     try:
-        _, ops = __getfieldiref(var, cnst_fldname.value)
+        _res, ops = __getfieldiref(var, cnst_fldname.value)
+        if isinstance(_res.mu_type.TO, mutype.MuRef):
+            ops.append(muops.LOAD(_res))
         if res:
             ops[-1].result = res
     except KeyError:
