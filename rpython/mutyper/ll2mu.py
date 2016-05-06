@@ -666,6 +666,17 @@ def __getfieldiref(var, fld):
     return iref_fld, ops
 
 
+def _llop2mu_getsubstruct(var, cnst_fldname, res=None, llopname='getsubstruct'):
+    try:
+        _, ops = __getfieldiref(var, cnst_fldname.value)
+        if res:
+            ops[-1].result = res
+    except KeyError:
+        log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
+        raise NotImplementedError
+    return ops
+
+
 def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
     try:
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
