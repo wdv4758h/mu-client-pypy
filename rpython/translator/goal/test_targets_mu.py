@@ -162,8 +162,9 @@ def test_noop(tmpdir):
 
 def test_targetreadlines(tmpdir):
     bundle = compile_target(tmpdir, "targetreadlines.py")
-    r, out, err = run_bundle(bundle, ['\'import os\'', __file__])
-    assert out == "import os\n\n"
+    file = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'requirements.txt'))
+    r, out, err = run_bundle(bundle, ['\'enum34>=1.1.2\'', file])
+    assert out == "enum34>=1.1.2\n\n"
 
 
 def test_targetpushpop(tmpdir):

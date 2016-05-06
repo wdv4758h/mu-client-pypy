@@ -669,7 +669,7 @@ def __getfieldiref(var, fld):
 def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
     try:
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
-        ops.append(muops.LOAD(iref_fld, res))
+        ops.append(muops.LOAD(iref_fld, result=res))
     except KeyError:
         log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
         raise NotImplementedError
@@ -694,7 +694,7 @@ def __getarrayitemiref(var, idx):
 
 def _llop2mu_getarrayitem(var, idx, res=None, llopname='getarrayitem'):
     iref_itm, ops = __getarrayitemiref(var, idx)
-    ops.append(muops.LOAD(iref_itm, res))
+    ops.append(muops.LOAD(iref_itm, result=res))
     return ops
 
 
@@ -706,7 +706,7 @@ def _llop2mu_setarrayitem(var, idx, val, res=None, llopname='setarrayitem'):
 
 def _llop2mu_getarraysize(var, res=None, llopname='getarraysize'):
     iref_fld, ops = __getfieldiref(var, 'length')   # assuming that every Hybrid type has a length field
-    ops.append(muops.LOAD(iref_fld, res))
+    ops.append(muops.LOAD(iref_fld, result=res))
     return ops
 
 
@@ -742,7 +742,7 @@ def __getinterioriref(var, offsets):
 def _llop2mu_getinteriorfield(var, *offsets, **kwargs):
     iref, ops = __getinterioriref(var, offsets)
     res = kwargs['res'] if 'res' in kwargs else None
-    ops.append(muops.LOAD(iref, res))
+    ops.append(muops.LOAD(iref, result=res))
     return ops
 
 
@@ -846,7 +846,7 @@ def _llop2mu_raw_load(adr, ofs, res, llopname='raw_load'):
     ops = _MuOpList()
     loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
     loc_ptr = ops.append(muops.PTRCAST(loc_adr, mutype.MuUPtr(res.mu_type)))
-    ops.append(muops.LOAD(loc_ptr, res))
+    ops.append(muops.LOAD(loc_ptr, result=res))
     return ops
 
 
