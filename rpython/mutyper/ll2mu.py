@@ -956,4 +956,9 @@ def _llop2mu_gc_identityhash(obj, res=None, llopname='gc_identityhash'):
     fnr = mutype._mufuncref(fnr_t, _llhelper=_ll_identityhash)
     return [muops.CALL(fnr, [obj], result=res)]
 
+
+def _llop2mu_gc__collect(res=None, llopname='gc__collect'):
+    return [], _newprimconst(mutype.bool_t, 1)
+
+
 # TODO: rest of the operations
