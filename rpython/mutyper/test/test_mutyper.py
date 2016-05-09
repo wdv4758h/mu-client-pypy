@@ -173,5 +173,3 @@ def test_llhelperfunc():
 
     mutyper = MuTyper(t)
     muops = mutyper.specialise_op(op, blk)
-    assert len(mutyper.helper_graphs) == 1
-    assert mutyper.helper_graphs[0] == muops[0].callee

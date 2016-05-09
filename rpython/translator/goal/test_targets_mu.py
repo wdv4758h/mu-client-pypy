@@ -41,7 +41,7 @@ def run_bundle(bundle, cmdargs=list(), print_stderr_when_fail=True):
         cmdargs = ' '.join(cmdargs)
 
     env = os.environ
-    env['PATH'] = env['MU'] + "/cbinding:" + env['PATH']
+    env['LD_LIBRARY_PATH'] = env['MU'] + "/cbinding:" + env['LD_LIBRARY_PATH']
     murpy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'mucli', 'murpy.py'))
     cmd = "python %(murpy_path)s %(bundle)s %(cmdargs)s" % locals()
     print cmd

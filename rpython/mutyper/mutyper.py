@@ -57,11 +57,6 @@ class MuTyper:
             print_graph(g)
             self.specialise(g)
 
-        backend_optimizations(self.tlr, self.helper_graphs)
-        for g in self.helper_graphs:
-            print_graph(g)
-            self.specialise(g)
-
     def specialise(self, g):
         g.mu_name = MuName(g.name)
         get_arg_types = lambda lst: map(ll2mu_ty, map(lambda arg: arg.concretetype, lst))
@@ -158,8 +153,8 @@ class MuTyper:
                                                    l2a(_o.result.concretetype))
                         if not hasattr(fnr, 'graph'):
                             fnr.graph = graph
-                        if graph not in self.helper_graphs:
-                            self.helper_graphs.append(graph)
+                        # self.mlha.finish()
+                        backend_optimizations(self.tlr, [graph])
                         _o.callee = graph
                 if hasattr(_o.result, 'mu_name'):
                     _o.result.mu_name.scope = blk   # Correct the scope of result variables

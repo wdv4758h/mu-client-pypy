@@ -211,9 +211,10 @@ def ll_math_ldexp(x, exp):
         errno = 0
     else:
         r = math_ldexp(x, exp)
-        errno = rposix.get_saved_errno()
-        if isinf(r):
-            errno = ERANGE
+        # errno = rposix.get_saved_errno()
+        # if isinf(r):
+        #     errno = ERANGE
+        errno = 0
     if errno:
         _likely_raise(errno, r)
     return r
@@ -242,14 +243,14 @@ def ll_math_fmod(x, y):
         return x
 
     r = math_fmod(x, y)
-    errno = rposix.get_saved_errno()
-    if isnan(r):
-        if isnan(x) or isnan(y):
-            errno = 0
-        else:
-            errno = EDOM
-    if errno:
-        _likely_raise(errno, r)
+    # errno = rposix.get_saved_errno()
+    # if isnan(r):
+    #     if isnan(x) or isnan(y):
+    #         errno = 0
+    #     else:
+    #         errno = EDOM
+    # if errno:
+    #     _likely_raise(errno, r)
     return r
 
 
@@ -261,20 +262,20 @@ def ll_math_hypot(x, y):
         return math_fabs(y)
 
     r = math_hypot(x, y)
-    errno = rposix.get_saved_errno()
-    if not isfinite(r):
-        if isnan(r):
-            if isnan(x) or isnan(y):
-                errno = 0
-            else:
-                errno = EDOM
-        else:  # isinf(r)
-            if isfinite(x) and isfinite(y):
-                errno = ERANGE
-            else:
-                errno = 0
-    if errno:
-        _likely_raise(errno, r)
+    # errno = rposix.get_saved_errno()
+    # if not isfinite(r):
+    #     if isnan(r):
+    #         if isnan(x) or isnan(y):
+    #             errno = 0
+    #         else:
+    #             errno = EDOM
+    #     else:  # isinf(r)
+    #         if isfinite(x) and isfinite(y):
+    #             errno = ERANGE
+    #         else:
+    #             errno = 0
+    # if errno:
+    #     _likely_raise(errno, r)
     return r
 
 
@@ -318,21 +319,21 @@ def ll_math_pow(x, y):
             return 0.0
 
     r = math_pow(x, y)
-    errno = rposix.get_saved_errno()
-    if not isfinite(r):
-        if isnan(r):
-            # a NaN result should arise only from (-ve)**(finite non-integer)
-            errno = EDOM
-        else:   # isinf(r)
-            # an infinite result here arises either from:
-            # (A) (+/-0.)**negative (-> divide-by-zero)
-            # (B) overflow of x**y with x and y finite
-            if x == 0.0:
-                errno = EDOM
-            else:
-                errno = ERANGE
-    if errno:
-        _likely_raise(errno, r)
+    # errno = rposix.get_saved_errno()
+    # if not isfinite(r):
+    #     if isnan(r):
+    #         # a NaN result should arise only from (-ve)**(finite non-integer)
+    #         errno = EDOM
+    #     else:   # isinf(r)
+    #         # an infinite result here arises either from:
+    #         # (A) (+/-0.)**negative (-> divide-by-zero)
+    #         # (B) overflow of x**y with x and y finite
+    #         if x == 0.0:
+    #             errno = EDOM
+    #         else:
+    #             errno = ERANGE
+    # if errno:
+    #     _likely_raise(errno, r)
     return r
 
 def ll_math_sqrt(x):
@@ -388,22 +389,22 @@ def new_unary_math_function(name, can_overflow, c99):
     def ll_math(x):
         r = c_func(x)
         # Error checking fun.  Copied from CPython 2.6
-        errno = rposix.get_saved_errno()
-        if not isfinite(r):
-            if isnan(r):
-                if isnan(x):
-                    errno = 0
-                else:
-                    errno = EDOM
-            else:  # isinf(r)
-                if not isfinite(x):
-                    errno = 0
-                elif can_overflow:
-                    errno = ERANGE
-                else:
-                    errno = EDOM
-        if errno:
-            _likely_raise(errno, r)
+        # errno = rposix.get_saved_errno()
+        # if not isfinite(r):
+        #     if isnan(r):
+        #         if isnan(x):
+        #             errno = 0
+        #         else:
+        #             errno = EDOM
+        #     else:  # isinf(r)
+        #         if not isfinite(x):
+        #             errno = 0
+        #         elif can_overflow:
+        #             errno = ERANGE
+        #         else:
+        #             errno = EDOM
+        # if errno:
+        #     _likely_raise(errno, r)
         return r
 
     return func_with_new_name(ll_math, 'll_math_' + name)

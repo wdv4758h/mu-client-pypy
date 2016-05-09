@@ -73,11 +73,11 @@ def build_arglist(ctx, argv):
             ir = dd << ctx.get_iref(hstr)
 
             # hash
-            hir_hash = dd << ctx.get_field_iref(ir, 0)
+            hir_hash = dd << ctx.get_field_iref(ir, 1)
             ctx.store(hir_hash, dd << ctx.handle_from_int(hash(s), 64))
 
             # length
-            hir_length = dd << ctx.get_field_iref(ir, 1)
+            hir_length = dd << ctx.get_field_iref(ir, 2)
             ctx.store(hir_length, hlength)
 
             # chars
@@ -96,18 +96,18 @@ def build_arglist(ctx, argv):
         irefstt = dd << ctx.get_iref(refstt)
 
         # Set the length of the list
-        ireffld_len = dd << ctx.get_field_iref(irefstt, 0)
+        ireffld_len = dd << ctx.get_field_iref(irefstt, 1)
         hlen = dd << ctx.handle_from_int(len(argv), 64)
         ctx.store(ireffld_len, hlen)
 
         # Create the hybrid items
-        ireffld_items = dd << ctx.get_field_iref(irefstt, 1)
+        ireffld_items = dd << ctx.get_field_iref(irefstt, 2)
         refhyb_items = dd << ctx.new_hybrid(_id("@hybrpy_stringPtr_0"), hlen)
         ctx.store(ireffld_items, refhyb_items)
 
         # Set the length field of the hybrid type.
         irefhyb = dd << ctx.get_iref(refhyb_items)
-        irefhyblen = dd << ctx.get_field_iref(irefhyb, 0)
+        irefhyblen = dd << ctx.get_field_iref(irefhyb, 1)
         ctx.store(irefhyblen, hlen)
 
         # Store the strings
