@@ -14,11 +14,44 @@ def slurp(filename):
     with open(filename) as t:
         return t.read()
 
+SIZES = {
+        "k": 1024**1,
+        "m": 1024**2,
+        "g": 1024**3,
+        "t": 1024**4,
+        }
+
+def parse_size(sz_str):
+    sz_str = sz_str.lower()
+
+    for k,v in SIZES.items():
+        if sz_str.endswith(k):
+            num = int(sz_str[:-1]) * v
+            break
+    else:
+        num = int(sz_str)
+
+    return num
+
+def get_vm_opts(ns):
+    rv = {}
+    for k in ["sosSize", "losSize", "globalSize", "stackSize", "vmLog", "gcLog"]:
+        if hasattr(ns, k):
+            v = getattr(ns, k)
+            if v is not None:
+                rv[k] = v
+    return rv
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('bundle', help="Generated RPython Mu bundle.")
-    parser.add_argument('prog_args', nargs='*', help="Program arguments.")
+    parser.add_argument('--sosSize', type=parse_size, help="small object space size (bytes). May have k, m, g or t as suffix. 1KiB=1024B")
+    parser.add_argument('--losSize', type=parse_size, help="large object space size (bytes)")
+    parser.add_argument('--globalSize', type=parse_size, help="global memory space size (bytes)")
+    parser.add_argument('--stackSize', type=parse_size, help="stack size (bytes). Size of each stack. Must be at least 8192 bytes.")
+    parser.add_argument('--vmLog', help="micro VM logging level. Can be ALL, TRACE, DEBUG, INFO, WARN, ERROR, OFF")
+    parser.add_argument('--gcLog', help="GC logging level (see vmLog)")
+    parser.add_argument('bundle', help="generated RPython Mu bundle")
+    parser.add_argument('prog_args', nargs='*', help="program arguments")
     return parser.parse_args()
 
 
@@ -99,7 +132,7 @@ def load_extfncs(ctx, exfns):
         with DelayedDisposer() as dd:
             try:
                 adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
-                os.write(2, "Loaded function '$(c_name)s' in libc.\n" % locals())
+                os.write(2, "Loaded function '%(c_name)s' in libc.\n" % locals())
             except AttributeError:
                 try:
                     adr = ctypes.cast(getattr(librpyc, c_name), ctypes.c_void_p).value
@@ -113,10 +146,9 @@ def load_extfncs(ctx, exfns):
             ctx.store(hgcl, hadr)
 
 
-def launch(ir, hail, exfns, args):
+def launch(vmopts, ir, hail, exfns, args):
     dll = MuRefImpl2StartDLL("libmurefimpl2start.so")
-    oneGB = 2 ** 30
-    mu = dll.mu_refimpl2_new_ex(heap_size=512 * 2 ** 20, stack_size=63 * 1024, global_size=4 * 2 ** 20)
+    mu = dll.mu_refimpl2_new_ex(**vmopts)
 
     with mu.new_context() as ctx:
         ctx.load_bundle(ir)
@@ -143,7 +175,8 @@ def launch(ir, hail, exfns, args):
 
 def main():
     args = parse_args()
-    rtnval = launch(*extract_bundle(args.bundle), args=[args.bundle] + args.prog_args)
+    vmopts = get_vm_opts(args)
+    rtnval = launch(vmopts, *extract_bundle(args.bundle), args=[args.bundle] + args.prog_args)
     return rtnval
 
 
