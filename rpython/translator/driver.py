@@ -553,11 +553,8 @@ class TranslationDriver(SimpleTaskEngine):
         self.entry_graph = bk.getdesc(self.entry_point).getuniquegraph()
         self.translator.graphs = prepare(self.translator.graphs, self.entry_graph)
 
-        from rpython.mutyper.tools.textgraph import print_graph
-        self.mutyper = MuTyper()
-        for g in self.translator.graphs:
-            print_graph(g)
-            self.mutyper.specialise(g)
+        self.mutyper = MuTyper(self.translator)
+        self.mutyper.specialise_all()
 
     @taskdef(["mutype_mu"], "MuIR Code Generation")
     def task_compile_mu(self):

@@ -122,7 +122,7 @@ def test_ll2muop_1():
             return 1
         return n * fac(n - 1)
 
-    _, _, g = gengraph(fac, [int])
+    t, _, g = gengraph(fac, [int])
     # == == == == == == == == == == == == == == == == == == == == == == == ==
     # (rpython.mutyper.test.test_mutyper:30)fac
     # ------------------------
@@ -151,7 +151,7 @@ def test_ll2muop_1():
     # == == == == == == == == == == == == == == == == == == == == == == == ==
     op = g.startblock.operations[2]
     assert op.opname == 'int_or'
-    typer = MuTyper()
+    typer = MuTyper(t)
     op.result = typer.proc_arg(op.result, g.startblock)
     typer.proc_arglist(op.args, g.startblock)
 
@@ -194,12 +194,12 @@ def test_ll2muop_2():
             return d[s]
         return 0
 
-    _, _, g = gengraph(f, [str])
+    t, _, g = gengraph(f, [str])
     opgen = _search_op(g, 'getinteriorfield')
     op = opgen.next()
     # v79 = getinteriorfield(s_0, ('chars'), (0))
 
-    typer = MuTyper()
+    typer = MuTyper(t)
     op.result = typer.proc_arg(op.result, g.startblock)
     typer.proc_arglist(op.args, g.startblock)
 
@@ -229,7 +229,7 @@ def test_rtti():
     v = cst.value._obj.rtti
     print v, v._TYPE
     muv = ll2mu_val(v)
-    assert muv._obj0 == mu.char_t(0)
+    assert muv._obj0._TYPE == mu.char_t
 
 
 def test_address():
@@ -311,11 +311,13 @@ def test_adrofs():
 
     op = blk.operations[14]  # v108 = int_mul((<ItemOffset <Char> 1>), length_10)
     ofs = op.args[0].value
+    print ofs
     assert ll2mu_val(ofs) == mu.int64_t(1)
 
     op = blk.operations[11]
     ofs = op.args[1].value
-    assert ll2mu_val(ofs) == mu.int64_t(16)
+    print ofs
+    assert ll2mu_val(ofs) == mu.int64_t(24)     # including the __gc_idhash field
 
 
 def test_ll2mu_bool():

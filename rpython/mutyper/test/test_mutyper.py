@@ -14,9 +14,9 @@ def test_ldgcell():
     def f(s):
         return s + "hello"
 
-    _, _, g = gengraph(f, [str])
+    t, _, g = gengraph(f, [str])
     print_graph(g)
-    typer = MuTyper()
+    typer = MuTyper(t)
     typer.specialise(g)
     op = g.startblock.operations[0]
     assert op.opname == 'LOAD'
@@ -35,7 +35,7 @@ def test_gcellnodup():
     graph = g.startblock.operations[-2].args[0].value._obj.graph
     print_graph(graph)
 
-    mutyper = MuTyper()
+    mutyper = MuTyper(t)
     for _g in t.graphs:
         mutyper.specialise(_g)
 
@@ -49,10 +49,10 @@ def test_argtransform():
             return 1
         return n * fac(n - 1)
 
-    _, _, g = gengraph(fac, [int])
+    t, _, g = gengraph(fac, [int])
     print_graph(g)
 
-    typer = MuTyper()
+    typer = MuTyper(t)
     typer.specialise(g)
 
     assert g.mu_name == MuName("fac")
@@ -71,10 +71,10 @@ def test_typesandconsts():
             return 1
         return n * fac(n - 1)
 
-    _, _, g = gengraph(fac, [int])
+    t, _, g = gengraph(fac, [int])
     print_graph(g)
 
-    typer = MuTyper()
+    typer = MuTyper(t)
     typer.specialise(g)
 
     # assert len(typer.gblcnsts) == 2
@@ -100,10 +100,10 @@ def test_pick_out_gen_const():
     def f(x):
         return - x
 
-    _, _, g = gengraph(f, [int])
+    t, _, g = gengraph(f, [int])
     print_graph(g)
 
-    mutyper = MuTyper()
+    mutyper = MuTyper(t)
     mutyper.specialise(g)
     # assert len(mutyper.gblcnsts) == 1   # 0
 
@@ -145,9 +145,33 @@ def test_externfnc():
     # exits: [('blk_3', [(<* struct object_vtabl...=... }>), (<* struct object { typ...=... }>)]),
     #           ('blk_5', [dst_0, length_10, s2_3, len2_0])]
     # ------------------------------------------------------
-    mutyper = MuTyper()
+    mutyper = MuTyper(t)
     blk.mu_name = MuName("blk_4", g)
     mutyper.specialise(g)
 
     for op in blk.operations:
         print op
+
+
+def test_llhelperfunc():
+    class Cls:
+        pass
+    a = Cls()
+    b = Cls()
+    dic = {a: 1, b: 2}
+    def lookup(obj):
+        return dic[obj]
+
+    t, _, g_lu = gengraph(lookup, [Cls])
+    t.graphs = prepare(t.graphs, g_lu)
+    print_graph(g_lu)
+    g = g_lu.startblock.operations[1].args[0].value._obj0.graph.startblock.operations[1].args[
+        0].value._obj0.graph
+    print_graph(g)
+    blk = g.startblock.exits[1].target
+    op = blk.operations[0]      # gc_identityhash(inst)
+
+    mutyper = MuTyper(t)
+    muops = mutyper.specialise_op(op, blk)
+    assert len(mutyper.helper_graphs) == 1
+    assert mutyper.helper_graphs[0] == muops[0].callee

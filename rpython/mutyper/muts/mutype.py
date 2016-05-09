@@ -206,9 +206,9 @@ class MuStruct(MuContainerType):
         flds = {}
         names = []
         for name, typ in fields:
-            if name.startswith('_'):
-                raise NameError("%s: field name %r should not start with "
-                                "an underscore" % (self._name, name,))
+            # if name.startswith('_'):
+            #     raise NameError("%s: field name %r should not start with "
+            #                     "an underscore" % (self._name, name,))
             if name in flds:
                 raise TypeError("%s: repeated field name" % self._name)
 
@@ -218,9 +218,6 @@ class MuStruct(MuContainerType):
             if isinstance(typ, MuHybrid):
                 raise TypeError("%s: cannot inline MuHybrid type %s" %
                                 (self._name, typ))
-
-        names.insert(0, '__gc_idhash')
-        flds['__gc_idhash'] = int64_t
 
         self._flds = frozendict(flds)
         self._names = tuple(names)
@@ -365,9 +362,9 @@ class MuHybrid(MuContainerType):
         flds = {}
         names = []
         for name, typ in fields:
-            if name.startswith('_'):
-                raise NameError("%s: field name %r should not start with "
-                                "an underscore" % (self._name, name,))
+            # if name.startswith('_'):
+            #     raise NameError("%s: field name %r should not start with "
+            #                     "an underscore" % (self._name, name,))
             if name in flds:
                 raise TypeError("%s: repeated field name" % self._name)
 
@@ -377,9 +374,6 @@ class MuHybrid(MuContainerType):
             if isinstance(typ, MuHybrid):
                 raise TypeError("%s: cannot inline MuHybrid type %s" %
                                 (self._name, typ))
-
-        names.insert(0, '__gc_idhash')
-        flds['__gc_idhash'] = int64_t
 
         self._flds = frozendict(flds)
         self._names = tuple(names)

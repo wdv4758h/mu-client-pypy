@@ -6,10 +6,15 @@ from rpython.mutyper.muts.muni import MuExternalFunc
 from rpython.mutyper.muts.muops import DEST
 from .muts.muentity import *
 from rpython.rtyper.lltypesystem import lltype as llt
+from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
+from rpython.rtyper.llannotation import lltype_to_annotation as l2a
+from rpython.translator.backendopt.all import backend_optimizations
 from .muts import mutype as mut
 from .muts import muops as muop
 from .ll2mu import *
 from .ll2mu import _MuOpList, _newprimconst
+from .tools.textgraph import print_graph
+
 import py
 from rpython.tool.ansi_print import AnsiLogger
 
@@ -36,13 +41,26 @@ class _NeedToLoadParentError(Exception):
 
 
 class MuTyper:
-    def __init__(self):
+    def __init__(self, translator):
         self.ldgcells = {}      # MuGlobalCells that need to be LOADed.
         self._cnst_gcell_dict = {}  # mapping Constant to MuGlobalCell
         self._seen = set()
         self.externfncs = set()
         self._alias = {}
-        pass
+        self.tlr = translator
+        self.mlha = MixLevelHelperAnnotator(self.tlr.rtyper)
+        self.graphs = translator.graphs
+        self.helper_graphs = []
+
+    def specialise_all(self):
+        for g in self.graphs:
+            print_graph(g)
+            self.specialise(g)
+
+        backend_optimizations(self.tlr, self.helper_graphs)
+        for g in self.helper_graphs:
+            print_graph(g)
+            self.specialise(g)
 
     def specialise(self, g):
         g.mu_name = MuName(g.name)
@@ -132,6 +150,17 @@ class MuTyper:
                     if isinstance(arg, MuExternalFunc):
                         # Addresses of some C functions stored in global cells need to be processed.
                         self.externfncs.add(arg)
+                    if isinstance(arg, mutype._mufuncref) and hasattr(arg, '_llhelper'):
+                        # Some added LL helper functions need to be annotated and rtyped.
+                        fnr = arg
+                        llfnc = fnr._llhelper
+                        graph = self.mlha.getgraph(llfnc, map(l2a, [a.concretetype for a in _o.args]),
+                                                   l2a(_o.result.concretetype))
+                        if not hasattr(fnr, 'graph'):
+                            fnr.graph = graph
+                        if graph not in self.helper_graphs:
+                            self.helper_graphs.append(graph)
+                        _o.callee = graph
                 if hasattr(_o.result, 'mu_name'):
                     _o.result.mu_name.scope = blk   # Correct the scope of result variables
 
