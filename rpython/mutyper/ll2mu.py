@@ -957,10 +957,10 @@ def _llop2mu_gc_identityhash(obj, res=None, llopname='gc_identityhash'):
         return h
 
     def _ll_getgcidhash(obj):
-        return len(str(obj))
+        return 1 if obj else 0
 
     def _ll_setgcidhash(obj, idhash):
-        print obj, idhash
+        return idhash * 2
 
     def _postproc(graph):
         fld = Constant(GC_IDHASH_FLD, lltype.Void)

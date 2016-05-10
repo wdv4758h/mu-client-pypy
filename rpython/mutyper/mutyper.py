@@ -4,6 +4,7 @@ Converts the LLTS types and operations to MuTS.
 from rpython.flowspace.model import FunctionGraph, Block, Link, Variable, Constant, c_last_exception, SpaceOperation
 from rpython.mutyper.muts.muni import MuExternalFunc
 from rpython.mutyper.muts.muops import DEST
+from rpython.translator.mu.preps import prepare
 from .muts.muentity import *
 from rpython.rtyper.lltypesystem import lltype as llt
 from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
@@ -158,6 +159,7 @@ class MuTyper:
                             fnc = arg._postproc_fnc
                             fnc(graph)
                         backend_optimizations(self.tlr, [graph])
+                        prepare([graph], graph)
                         _o.callee = graph
                 if hasattr(_o.result, 'mu_name'):
                     _o.result.mu_name.scope = blk   # Correct the scope of result variables
