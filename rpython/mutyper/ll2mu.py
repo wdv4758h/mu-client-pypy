@@ -514,13 +514,16 @@ def _llop2mu_int_force_ge_zero(x, res=None, llopname='int_force_ge_zero'):
     return _llop2mu_int_abs(x, res)
 
 
+def _llop2mu_float_neg(x, res=None, llopname='float_neg'):
+    return [muops.SUB(_newprimconst(x.mu_type, 0.0), x, result=res)]
+
+
 def _llop2mu_float_abs(x, res=None, llopname='float_abs'):
     ops = _MuOpList()
     # -x = 0 - x
     neg_x = ops.extend(_ll2mu_op('float_neg', [x]))
-    f_0 = ops[-1].args[0]
     # x > 0 ?
-    cmp_res = ops.extend(_ll2mu_op('float_gt', (x, f_0)))
+    cmp_res = ops.extend(_ll2mu_op('float_gt', [x, _newprimconst(x.mu_type, 0.0)]))
     # True -> x, False -> (-x)
     ops.append(muops.SELECT(cmp_res, x, neg_x, result=res))
     return ops
@@ -873,10 +876,10 @@ def _llop2mu_free(obj, res=None, llopname='free'):
     return _ll2mu_op('raw_free', (obj, ), res)
 
 
-# def _llop2mu_raw_memclear():
-#     pass
-#
-#
+def _llop2mu_raw_memclear(adr, sz, res=None, llopname='raw_memclear'):
+    return _ll2mu_op('raw_memset', [adr, _newprimconst(mutype.int8_t, 0), sz], result=res)
+
+
 def _llop2mu_raw_load(adr, ofs, res, llopname='raw_load'):
     ops = _MuOpList()
     loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
@@ -988,6 +991,20 @@ def _llop2mu_gc_identityhash(obj, res=None, llopname='gc_identityhash'):
 
 def _llop2mu_gc__collect(res=None, llopname='gc__collect'):
     return [], _newprimconst(mutype.bool_t, 1)
+
+
+def _llop2mu_gc_id(obj, res=None, llopname='gc_id'):
+    ops = _MuOpList()
+    ops.extend(_ll2mu_op('cast_ptr_to_adr', [obj], result=res))
+    ops.extend(_ll2mu_op('keepalive', [obj]))
+    return ops
+
+
+def _llop2mu_length_of_simple_gcarray_from_opaque(opq, res=None, llopname='length_of_simple_gcarray_from_opaque'):
+    ops = _MuOpList()
+    ref = ops.extend(_ll2mu_op('cast_pointer', [Constant(lltype.Ptr(lltype.GcArray(lltype.Signed)), lltype.Void), opq]))
+    ops.extend(_ll2mu_op('getarraysize', [ref], result=res))
+    return ops
 
 
 # TODO: rest of the operations
