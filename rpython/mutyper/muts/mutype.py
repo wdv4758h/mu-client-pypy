@@ -130,7 +130,7 @@ class _muprimitive(_muobject):
     def __eq__(self, other):
         return self._TYPE == other._TYPE and self.val == other.val
 
-    def __str__(self):
+    def __repr__(self):
         def _scistr(f):
             # fix case where the scientific notation doesn't contain a '.', like 1e-08
             s = str(f)
@@ -138,6 +138,9 @@ class _muprimitive(_muobject):
                 i = s.index('e')
                 if '.' not in s[:i]:
                     s = '%s.0%s' % (s[:i], s[i:])
+            # fix infinity case
+            if 'inf' in s and self.val > 0:
+                s = '+' + s     # prepend a '+' for +inf value whose '+' sign is omitted.
             return s
 
         if self._TYPE == float_t:
@@ -147,8 +150,10 @@ class _muprimitive(_muobject):
         else:
             return "%d" % int(self.val)
 
-    def __repr__(self):
-        return "%s" % self
+    def __str__(self):
+        repr_str = repr(self)
+        repr_str = repr_str.replace('+', 'p')
+        return repr_str
 
     def __hash__(self):
         return hash(self.val)
@@ -656,6 +661,9 @@ class _munullref(_mugenref):
             return '0'
         else:
             return 'NULL'
+
+    def __repr__(self):
+        return str(self)
 
     def __eq__(self, other):
         return isinstance(other, _munullref)

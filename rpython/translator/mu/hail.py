@@ -65,7 +65,7 @@ class HAILGenerator:
 
     def _getinitstr(self, obj):
         if isinstance(obj, (mutype._muprimitive, mutype._munullref)):
-            return str(obj)
+            return repr(obj)
 
         elif isinstance(obj, (mutype._mustruct, mutype._muhybrid)):
             return "{%s}" % ' '.join([self._getinitstr(obj._getattr(fld)) for fld in mutype.mu_typeOf(obj)._names])
