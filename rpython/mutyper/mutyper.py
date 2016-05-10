@@ -153,7 +153,10 @@ class MuTyper:
                                                    l2a(_o.result.concretetype))
                         if not hasattr(fnr, 'graph'):
                             fnr.graph = graph
-                        # self.mlha.finish()
+                        self.mlha.finish()
+                        if hasattr(arg, '_postproc_fnc'):   # post-RTyper process (hack) the graph.
+                            fnc = arg._postproc_fnc
+                            fnc(graph)
                         backend_optimizations(self.tlr, [graph])
                         _o.callee = graph
                 if hasattr(_o.result, 'mu_name'):
