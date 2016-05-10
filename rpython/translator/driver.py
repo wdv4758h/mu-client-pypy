@@ -549,11 +549,8 @@ class TranslationDriver(SimpleTaskEngine):
         exctran = MuExceptionTransformer(self.translator)
         exctran.transform_all()
 
-        bk = self.translator.annotator.bookkeeper
-        self.entry_graph = bk.getdesc(self.entry_point).getuniquegraph()
-        self.translator.graphs = prepare(self.translator.graphs, self.entry_graph)
-
         self.mutyper = MuTyper(self.translator)
+        self.mutyper.prepare_all()
         self.mutyper.specialise_all()
 
     @taskdef(["mutype_mu"], "MuIR Code Generation")
@@ -564,7 +561,7 @@ class TranslationDriver(SimpleTaskEngine):
             bundle_name = target_name + MuTextIRGenerator.bundle_suffix
         else:
             bundle_name = target_name
-        irgen = MuTextIRGenerator(self.translator.graphs, self.mutyper, self.entry_graph)
+        irgen = MuTextIRGenerator(self.translator.graphs, self.mutyper, self.translator.entry_point_graph)
         irgen.bundlegen(bundle_name)
 
     def proceed(self, goals):

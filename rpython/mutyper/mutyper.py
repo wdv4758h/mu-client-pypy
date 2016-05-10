@@ -50,13 +50,27 @@ class MuTyper:
         self._alias = {}
         self.tlr = translator
         self.mlha = MixLevelHelperAnnotator(self.tlr.rtyper)
-        self.graphs = translator.graphs
-        self.helper_graphs = []
+        self.graphs = list(translator.graphs)
+        self.helper_graphs = {}
+        self._fncname_cntr_dic = {}
+
+    def prepare_all(self):
+        # wrapper outside of preps.prepare to provide for the name_dict
+        self.graphs = self._prepare(self.graphs, self.tlr.entry_point_graph)
+
+    def _prepare(self, graphs, entry_point):
+        return prepare(graphs, entry_point, self._fncname_cntr_dic)
 
     def specialise_all(self):
         for g in self.graphs:
             print_graph(g)
             self.specialise(g)
+
+        for g in self.helper_graphs.values():
+            print_graph(g)
+            self.specialise(g)
+
+        self.tlr.graphs = self.graphs = self.graphs + self.helper_graphs.values()
 
     def specialise(self, g):
         g.mu_name = MuName(g.name)
@@ -159,7 +173,12 @@ class MuTyper:
                             fnc = arg._postproc_fnc
                             fnc(graph)
                         backend_optimizations(self.tlr, [graph])
-                        prepare([graph], graph)
+                        key = (graph.name, ) + tuple(a.concretetype for a in graph.startblock.inputargs)
+                        if key not in self.helper_graphs:
+                            graph = prepare([graph], graph)[0]
+                            self.helper_graphs[key] = graph
+                        else:
+                            graph = self.helper_graphs[key]
                         _o.callee = graph
                 if hasattr(_o.result, 'mu_name'):
                     _o.result.mu_name.scope = blk   # Correct the scope of result variables

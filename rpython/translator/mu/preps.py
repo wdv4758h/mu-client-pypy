@@ -64,13 +64,11 @@ _OPS_ALLOW_LLTYPE_ARGS += [op for op in LL_OPERATIONS if op.startswith("int_")]
 _OPS_ALLOW_LLTYPE_ARGS += [op for op in LL_OPERATIONS if op.startswith("adr_")]
 
 
-def prepare(graphs, entry_graph):
+def prepare(graphs, entry_graph, name_dic={}):
     # Chop graph
     n0 = len(graphs)
     graphs = chop(graphs, entry_graph)
     log.graphchop("%d -> %d graphs" % (n0, len(graphs)))
-
-    name_dic = {}   # {str: ([FunctionGraph], int)}
 
     for g in graphs:
         # Assign names
