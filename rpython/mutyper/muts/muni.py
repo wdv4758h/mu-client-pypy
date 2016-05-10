@@ -22,6 +22,9 @@ class MuExternalFunc(MuGlobalCell):
     def __str__(self):
         return "muexternfnc %s <%s> @ %s" % (self.c_name, self.mu_type.Sig, self.mu_name)
 
+    def __hash__(self):
+        return hash(self.c_name)
+
 
 c_malloc = MuExternalFunc('malloc', (int64_t, ), __voidptr_t, ('stdlib.h',))
 c_free = MuExternalFunc('free', (__voidptr_t, ), void_t, ('stdlib.h',))

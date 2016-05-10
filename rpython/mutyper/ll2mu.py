@@ -416,7 +416,7 @@ def _ll2mu_op(opname, args, result=None):
 def _newprimconst(mut, primval):
     c = Constant(mut(primval))
     c.mu_type = mut
-    c.mu_name = MuName("%s_%s" % (str(primval), c.mu_type.mu_name._name))
+    c.mu_name = MuName("%s_%s" % (str(c.value), c.mu_type.mu_name._name))
     return c
 
 
