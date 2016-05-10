@@ -365,9 +365,11 @@ def _llval2mu_adrofs(llv):
                 return mumem.mu_offsetOf(mut, mut._names[-2])
             return mumem.mu_offsetOf(ll2mu_ty(llv.TYPE), llv.fldname)
         elif isinstance(llv, llmemory.ArrayItemsOffset):
+            mut = ll2mu_ty(llv.TYPE)
+            _ofs = 8 if GC_IDHASH_FLD in mut._names else 0  # __gc_idhash field
             if llv.TYPE._hints.get("nolength", False):
-                return 0
-            return 8    # sizeof(i64)
+                return _ofs
+            return _ofs + 8    # sizeof(i64)
         else:
             raise AssertionError("Value {:r} of type {:r} shouldn't appear.".format(llv, type(llv)))
 
