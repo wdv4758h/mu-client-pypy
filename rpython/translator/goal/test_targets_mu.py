@@ -43,7 +43,8 @@ def run_bundle(bundle, cmdargs=list(), print_stderr_when_fail=True):
     env = os.environ
     env['LD_LIBRARY_PATH'] = env['MU'] + "/cbinding:" + env['LD_LIBRARY_PATH']
     murpy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'mucli', 'murpy.py'))
-    cmd = "python %(murpy_path)s %(bundle)s %(cmdargs)s" % locals()
+    murpy_args = "--vmLog ERROR"
+    cmd = "python %(murpy_path)s %(murpy_args)s %(bundle)s %(cmdargs)s" % locals()
     print cmd
     p = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, env=env)
     stdout_data, stderr_data = p.communicate()

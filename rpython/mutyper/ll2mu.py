@@ -62,11 +62,11 @@ def _ll2mu_ty(llt):
 
 def _lltype2mu_prim(llt):
     type_map = {
-        lltype.Signed:           mutype.int32_t,
-        lltype.Unsigned:         mutype.int32_t,
-        lltype.SignedLongLong:   mutype.int64_t,
-        lltype.UnsignedLongLong: mutype.int64_t,
-        # ll.SignedLongLongLong: MuInt(128),
+        lltype.Signed:              mutype.int32_t,
+        lltype.Unsigned:            mutype.int32_t,
+        lltype.SignedLongLong:      mutype.int64_t,
+        lltype.UnsignedLongLong:    mutype.int64_t,
+        lltype.SignedLongLongLong:  mutype.int128_t,
 
         lltype.Float:            mutype.double_t,
         lltype.SingleFloat:      mutype.float_t,
@@ -404,8 +404,10 @@ def _ll2mu_op(opname, args, result=None):
         return globals()['_llop2mu_' + opname](*args, res=result, llopname=opname)
     except KeyError:
         # try if it's an integer operation that can be redirected.
-        if any(n in opname for n in ('uint', 'char', 'long')):
-            opname = "int_" + opname[5:]
+        prefixes = ('uint', 'char', 'lllong', 'long')
+        if any(n in opname for n in prefixes):
+            for pfx in prefixes:
+                opname = opname.replace(pfx, 'int')
             try:
                 return globals()['_llop2mu_' + opname](*args, res=result, llopname=opname)
             except KeyError:
