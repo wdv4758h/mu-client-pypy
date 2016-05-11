@@ -531,6 +531,9 @@ def _llop2mu_float_abs(x, res=None, llopname='float_abs'):
     return ops
 
 
+def _llop2mu_float_is_true(x, res=None, llopname='float_is_true'):
+    return [muops.NE(x, _newprimconst(x.mu_type, 0.0), result=res)]
+
 __primop_map = {
     'int_floordiv':     'SDIV',
     'int_mod':          'SREM',
