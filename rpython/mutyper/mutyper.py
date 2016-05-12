@@ -186,7 +186,12 @@ class MuTyper:
             if isinstance(arg, Constant):
                 if isinstance(arg.mu_type, mut.MuRef) and arg.value._obj is not None:
                     if arg not in self._cnst_gcell_dict:
-                        gcell = MuGlobalCell(arg.mu_type, ll2mu_val(arg.value))
+                        muv = ll2mu_val(arg.value)
+                        # fix the type mismatch, all heap constants must be refs
+                        if isinstance(muv._TYPE, mutype.MuUPtr):
+                            muv._TYPE = mutype.MuRef(muv._TYPE.TO)
+                            arg.mu_type = muv._TYPE
+                        gcell = MuGlobalCell(arg.mu_type, muv)
                         self._cnst_gcell_dict[arg] = gcell
                     else:
                         gcell = self._cnst_gcell_dict[arg]
