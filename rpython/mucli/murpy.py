@@ -40,6 +40,9 @@ def get_vm_opts(ns):
             v = getattr(ns, k)
             if v is not None:
                 rv[k] = v
+
+    rv['staticCheck'] = not ns.noCheck
+
     return rv
 
 def parse_args():
@@ -56,6 +59,10 @@ def parse_args():
                         help="micro VM logging level.")
     parser.add_argument('--gcLog', choices="ALL, TRACE, DEBUG, INFO, WARN, ERROR, OFF".split(', '),
                         help="GC logging level (see vmLog).")
+    parser.add_argument('--noCheck', action='store_true',
+                        help="Skip static checking before VM execution.")
+    parser.add_argument('--checkOnly', action='store_true',
+                        help="Only run the static checker on the bundle without executing it.")
     parser.add_argument('bundle', help="generated RPython Mu bundle")
     parser.add_argument('prog_args', nargs='*', help="program arguments")
     return parser.parse_args()
@@ -129,41 +136,46 @@ def build_arglist(ctx, argv):
 
 def load_extfncs(ctx, exfns):
     libc = ctypes.CDLL(ctypes.util.find_library("c"))
+    libm = ctypes.CDLL(ctypes.util.find_library("m"))
 
     dir_rpython = os.path.dirname(os.path.dirname(__file__))
     path_librpyc = os.path.join(dir_rpython, 'translator', 'mu', 'rpyc', 'librpyc.so')
     librpyc = ctypes.CDLL(path_librpyc)
 
+    libs = [libc, libm, librpyc]
     for c_name, fncptr_name, gcl_name, hdrs in exfns:
         with DelayedDisposer() as dd:
-            try:
-                adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
-                # os.write(2, "Loaded function '%(c_name)s' in libc.\n" % locals())
-            except AttributeError:
+            adr = None
+            for lib in libs:
                 try:
-                    adr = ctypes.cast(getattr(librpyc, c_name), ctypes.c_void_p).value
-                    # os.write(2, "Loaded function '%(c_name)s' in compiled RPython C backend functions.\n" % locals())
-                except KeyError:
-                    os.write(2, "Failed to load function '%(c_name)s'.\n" % locals())
-                    raise NotImplementedError()
+                    adr = ctypes.cast(getattr(lib, c_name), ctypes.c_void_p).value
+                    break
+                except AttributeError:
+                    adr = None
+                    pass
+            if adr is None:
+                os.write(2, "Failed to load function '%(c_name)s'.\n" % locals())
+                raise NotImplementedError
 
             hadr = dd << ctx.handle_from_fp(ctx.id_of(fncptr_name), adr)
             hgcl = dd << ctx.handle_from_global(ctx.id_of(gcl_name))
             ctx.store(hgcl, hadr)
 
 
-def launch(vmopts, ir, hail, exfns, args):
+def launch(cmdargs, ir, hail, exfns, args):
     dll = MuRefImpl2StartDLL("libmurefimpl2start.so")
+    vmopts = get_vm_opts(cmdargs)
     mu = dll.mu_refimpl2_new_ex(**vmopts)
 
     with mu.new_context() as ctx:
         ctx.load_bundle(ir)
         ctx.load_hail(hail)
+        load_extfncs(ctx, exfns)
 
-        # TODO: prepare extern functions.
+        if cmdargs.checkOnly:
+            return 0
 
         refstt_arglst = build_arglist(ctx, args)
-        load_extfncs(ctx, exfns)
         refrtnbox = ctx.new_fixed(ctx.id_of("@i64"))
         bundle_entry = ctx.handle_from_func(ctx.id_of("@_mu_bundle_entry"))
         st = ctx.new_stack(bundle_entry)
@@ -180,9 +192,8 @@ def launch(vmopts, ir, hail, exfns, args):
 
 
 def main():
-    args = parse_args()
-    vmopts = get_vm_opts(args)
-    rtnval = launch(vmopts, *extract_bundle(args.bundle), args=[args.bundle] + args.prog_args)
+    cmdargs = parse_args()
+    rtnval = launch(cmdargs, *extract_bundle(cmdargs.bundle), args=[cmdargs.bundle] + cmdargs.prog_args)
     return rtnval
 
 
