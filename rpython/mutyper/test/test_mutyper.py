@@ -173,3 +173,5 @@ def test_llhelperfunc():
 
     mutyper = MuTyper(t)
     muops = mutyper.specialise_op(op, blk)
+    op_call = muops[0]
+    print_graph(op_call.callee)

@@ -88,7 +88,7 @@ class MuTextIRGenerator:
                                           t.mu_name, t.mu_constructor))
 
         for cst in self.gblcnsts:
-            fp_ir.write(".const %s <%s> = %s\n" % (cst.mu_name, cst.mu_type.mu_name, cst.value))
+            fp_ir.write(".const %s <%s> = %r\n" % (cst.mu_name, cst.mu_type.mu_name, cst.value))
 
         hailgen = HAILGenerator()
         for gcell in self.mutyper.ldgcells:

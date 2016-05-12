@@ -44,12 +44,18 @@ def get_vm_opts(ns):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--sosSize', type=parse_size, help="small object space size (bytes). May have k, m, g or t as suffix. 1KiB=1024B")
-    parser.add_argument('--losSize', type=parse_size, help="large object space size (bytes)")
-    parser.add_argument('--globalSize', type=parse_size, help="global memory space size (bytes)")
-    parser.add_argument('--stackSize', type=parse_size, help="stack size (bytes). Size of each stack. Must be at least 8192 bytes.")
-    parser.add_argument('--vmLog', help="micro VM logging level. Can be ALL, TRACE, DEBUG, INFO, WARN, ERROR, OFF")
-    parser.add_argument('--gcLog', help="GC logging level (see vmLog)")
+    parser.add_argument('--sosSize', type=parse_size,
+                        help="small object space size (bytes). May have k, m, g or t as suffix. 1KiB=1024B")
+    parser.add_argument('--losSize', type=parse_size,
+                        help="large object space size (bytes)")
+    parser.add_argument('--globalSize', type=parse_size,
+                        help="global memory space size (bytes)")
+    parser.add_argument('--stackSize', type=parse_size,
+                        help="stack size (bytes). Size of each stack. Must be at least 8192 bytes.")
+    parser.add_argument('--vmLog', choices="ALL, TRACE, DEBUG, INFO, WARN, ERROR, OFF".split(', '),
+                        help="micro VM logging level.")
+    parser.add_argument('--gcLog', choices="ALL, TRACE, DEBUG, INFO, WARN, ERROR, OFF".split(', '),
+                        help="GC logging level (see vmLog).")
     parser.add_argument('bundle', help="generated RPython Mu bundle")
     parser.add_argument('prog_args', nargs='*', help="program arguments")
     return parser.parse_args()
@@ -132,11 +138,11 @@ def load_extfncs(ctx, exfns):
         with DelayedDisposer() as dd:
             try:
                 adr = ctypes.cast(getattr(libc, c_name), ctypes.c_void_p).value
-                os.write(2, "Loaded function '%(c_name)s' in libc.\n" % locals())
+                # os.write(2, "Loaded function '%(c_name)s' in libc.\n" % locals())
             except AttributeError:
                 try:
                     adr = ctypes.cast(getattr(librpyc, c_name), ctypes.c_void_p).value
-                    os.write(2, "Loaded function '%(c_name)s' in compiled RPython C backend functions.\n" % locals())
+                    # os.write(2, "Loaded function '%(c_name)s' in compiled RPython C backend functions.\n" % locals())
                 except KeyError:
                     os.write(2, "Failed to load function '%(c_name)s'.\n" % locals())
                     raise NotImplementedError()

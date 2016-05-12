@@ -83,6 +83,11 @@ class MuOperation(object):
         assert len(args) == len(names)
         for i in range(len(names)):
             setattr(self, names[i], args[i])
+        try:
+            if cls.__dict__['_fnc_rtntype'](args) == int1_t:
+                self.result.mu_type = int1_t
+        except Exception:
+            pass
         
     def __str__(self):
         cls = self.__class__
