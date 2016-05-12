@@ -42,6 +42,7 @@ def get_vm_opts(ns):
                 rv[k] = v
 
     rv['staticCheck'] = not ns.noCheck
+    rv['sourceInfo'] = not ns.noSourceInfo
 
     return rv
 
@@ -61,6 +62,12 @@ def parse_args():
                         help="GC logging level (see vmLog).")
     parser.add_argument('--noCheck', action='store_true',
                         help="Skip static checking before VM execution.")
+    parser.add_argument('--noSourceInfo', action='store_true',
+                        help="""Do not generate source information when parsing.
+                        Source information records and shows the line and column
+                        of each identified entity. It is helpful when debugging,
+                        but is very time-consumimg to generate. Disable it when
+                        the bundle is big.""")
     parser.add_argument('--checkOnly', action='store_true',
                         help="Only run the static checker on the bundle without executing it.")
     parser.add_argument('bundle', help="generated RPython Mu bundle")
