@@ -610,6 +610,11 @@ for triplet in __spec_cast_map:
 def _llop2mu_force_cast(x, res, llopname='force_cast'):
     SRC_LLTYPE = x.concretetype
     RES_LLTYPE = res.concretetype
+    SRC_MUTYPE = ll2mu_ty(SRC_LLTYPE)
+    RES_MUTYPE = ll2mu_ty(RES_LLTYPE)
+
+    def is_unsigned(LLT):
+        return LLT in (lltype.Unsigned, lltype.UnsignedLongLong) or (hasattr(LLT, '_type') and not LLT._type.SIGNED)
 
     if isinstance(SRC_LLTYPE, lltype.Ptr) and \
             (RES_LLTYPE == llmemory.Address or isinstance(RES_LLTYPE, lltype.Primitive)):
@@ -619,6 +624,16 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
             isinstance(RES_LLTYPE, lltype.Ptr):
         assert RES_LLTYPE.TO._gckind == 'raw'
         return _llop2mu_cast_adr_to_ptr(x, res)
+    elif isinstance(SRC_MUTYPE, mutype.MuInt) and isinstance(RES_MUTYPE, mutype.MuInt):
+        log.force_cast("%s -> %s (%s -> %s)" % (SRC_LLTYPE, RES_LLTYPE, SRC_MUTYPE, RES_MUTYPE))
+        if SRC_MUTYPE.bits < RES_MUTYPE.bits:
+            op = muops.ZEXT if is_unsigned(SRC_LLTYPE) else muops.SEXT
+        elif SRC_MUTYPE.bits > RES_MUTYPE.bits:
+            op = muops.TRUNC
+        else:
+            return [], x
+        return [op(x, RES_MUTYPE, result=res)]
+
     elif ll2mu_ty(SRC_LLTYPE).__class__ == ll2mu_ty(RES_LLTYPE).__class__:
         return [], x
 
@@ -998,11 +1013,13 @@ def _llop2mu_gc__collect(res=None, llopname='gc__collect'):
     return [], _newprimconst(mutype.bool_t, 1)
 
 
-def _llop2mu_gc_id(obj, res=None, llopname='gc_id'):
-    ops = _MuOpList()
-    ops.extend(_ll2mu_op('cast_ptr_to_adr', [obj], result=res))
-    ops.extend(_ll2mu_op('keepalive', [obj]))
-    return ops
+# def _llop2mu_gc_id(obj, res=None, llopname='gc_id'):
+#     ops = _MuOpList()
+#     ops.extend(_ll2mu_op('cast_ptr_to_adr', [obj], result=res))
+#     ops.extend(_ll2mu_op('keepalive', [obj]))
+#     return ops
+
+_llop2mu_gc_id = _llop2mu_gc_identityhash
 
 
 def _llop2mu_length_of_simple_gcarray_from_opaque(opq, res=None, llopname='length_of_simple_gcarray_from_opaque'):
