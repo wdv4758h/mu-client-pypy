@@ -626,7 +626,6 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
         assert RES_LLTYPE.TO._gckind == 'raw'
         return _llop2mu_cast_adr_to_ptr(x, res)
     elif isinstance(SRC_MUTYPE, mutype.MuInt) and isinstance(RES_MUTYPE, mutype.MuInt):
-        log.force_cast("%s -> %s (%s -> %s)" % (SRC_LLTYPE, RES_LLTYPE, SRC_MUTYPE, RES_MUTYPE))
         if SRC_MUTYPE.bits < RES_MUTYPE.bits:
             op = muops.ZEXT if is_unsigned(SRC_LLTYPE) else muops.SEXT
         elif SRC_MUTYPE.bits > RES_MUTYPE.bits:

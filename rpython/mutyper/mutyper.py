@@ -118,7 +118,7 @@ class MuTyper:
                 exitcases = [Constant(e.llexitcase, lltype.typeOf(e.llexitcase)) for e in solid_exits]
                 self.proc_arglist(exitcases, blk)
                 cases = zip(exitcases, map(DEST.from_link, solid_exits))
-                defl_exit = next((DEST.from_link(e) for e in blk.exits if e.exitcase == 'default'), cases[-1])
+                defl_exit = next((DEST.from_link(e) for e in blk.exits if e.exitcase == 'default'), cases[-1][1])
                 muops.append(muop.SWITCH(blk.exitswitch, defl_exit, cases))
 
         else:
