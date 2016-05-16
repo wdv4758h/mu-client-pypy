@@ -14,11 +14,11 @@ def main(argv):
 
     d["foo"] = "FOO"
     d["bar"] = "BAR"
-    # d["cowsay"] = "COWSAY"
+    d["cowsay"] = "COWSAY"
 
     print d.get("foo", None)
-    # print d.get("bar", None)
-    # print d.get("cowsay", None)
+    print d.get("bar", None)
+    print d.get("cowsay", None)
 
     return 0
 

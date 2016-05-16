@@ -614,7 +614,8 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
     RES_MUTYPE = ll2mu_ty(RES_LLTYPE)
 
     def is_unsigned(LLT):
-        return LLT in (lltype.Unsigned, lltype.UnsignedLongLong) or (hasattr(LLT, '_type') and not LLT._type.SIGNED)
+        return LLT in (lltype.Unsigned, lltype.UnsignedLongLong) or \
+               (LLT._type in _inttypes.values() and not LLT._type.SIGNED)
 
     if isinstance(SRC_LLTYPE, lltype.Ptr) and \
             (RES_LLTYPE == llmemory.Address or isinstance(RES_LLTYPE, lltype.Primitive)):
