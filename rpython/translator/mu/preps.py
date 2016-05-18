@@ -3,7 +3,7 @@ Preparations before the MuTyper process
 """
 import py
 from rpython.mutyper.muts.muentity import MuName
-from rpython.rtyper.lltypesystem.lltype import Void, LowLevelType
+from rpython.rtyper.lltypesystem import lltype
 from rpython.flowspace.model import Constant
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.rtyper.lltypesystem.lloperation import LL_OPERATIONS
@@ -90,12 +90,12 @@ def prepare(graphs, entry_graph, name_dic={}):
                 return True
             if 'setfield' in opname:
                 return True
-            if arg.concretetype != Void:
+            if arg.concretetype != lltype.Void:
                 return True
             if isinstance(arg, Constant):
                 if isinstance(arg.value, (str, list)):
                     return True
-                elif isinstance(arg.value, LowLevelType):
+                elif isinstance(arg.value, lltype.LowLevelType):
                     return opname in _OPS_ALLOW_LLTYPE_ARGS
             log.keep_arg("Throwing argument %(arg)r from operation %(opname)s" % locals())
             return False
@@ -104,12 +104,12 @@ def prepare(graphs, entry_graph, name_dic={}):
             op.args = [arg for arg in op.args if _keep_arg(arg, op.opname)]
             if op.opname == 'cast_pointer':     # fix problem with some cast_pointer ops that don't have CAST_TYPE
                 try:
-                    assert isinstance(op.args[0], Constant) and isinstance(op.args[0].value, LowLevelType)
+                    assert isinstance(op.args[0], Constant) and isinstance(op.args[0].value, lltype.LowLevelType)
                 except AssertionError:
-                    op.args.insert(0, Constant(op.result.concretetype, Void))
+                    op.args.insert(0, Constant(op.result.concretetype, lltype.Void))
 
         # Remove the Void inputarg in return block and (None) constants in links.
-        if g.returnblock.inputargs[0].concretetype == Void:
+        if g.returnblock.inputargs[0].concretetype == lltype.Void:
             g.returnblock.inputargs = []
             for blk in g.iterblocks():
                 for lnk in blk.exits:
@@ -118,5 +118,31 @@ def prepare(graphs, entry_graph, name_dic={}):
 
         for blk in g.iterblocks():
             # remove the input args that are Void as well.
-            blk.inputargs = [arg for arg in blk.inputargs if arg.concretetype != Void]
+            blk.inputargs = [arg for arg in blk.inputargs if arg.concretetype != lltype.Void]
     return graphs
+
+
+def normalise_constant(cnst):
+    llv = cnst.value
+    llv_norm = _normalise_value(llv)
+    if llv_norm is llv:
+        return cnst
+    Constant.__init__(cnst, llv_norm, lltype.typeOf(llv_norm))
+
+
+def _normalise_value(llv):
+    if not (isinstance(llv, lltype._ptr) and isinstance(llv._obj, lltype._parentable)):
+        return llv
+
+    llv = llv._obj._normalizedcontainer()._as_ptr()
+    obj = llv._obj
+    if isinstance(obj, (lltype._fixedsizearray, lltype._array)):
+        n = obj.getlength()
+        for i in range(n):
+            itm = obj.getitem(i)
+            itm_norm = _normalise_value(itm)
+            if not (itm_norm is itm):
+                obj._TYPE.OF = lltype.typeOf(itm_norm)
+                obj.setitem(i, _normalise_value(itm))
+
+    return llv

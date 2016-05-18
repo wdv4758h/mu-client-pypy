@@ -1,4 +1,4 @@
-from ..preps import prepare
+from ..preps import prepare, normalise_constant
 from rpython.rlib.objectmodel import specialize
 from rpython.rtyper.test.test_llinterp import gengraph
 from rpython.mutyper.tools.textgraph import print_graph
@@ -43,3 +43,14 @@ def test_remove_None_return():
     print_graph(g_ll_str)
     assert len(op.args) == 2
     assert len(g_ll_str.startblock.inputargs) == 1
+
+
+def test_normalise_constant():
+    from pyhaskell.interpreter.jscparser import parse_js
+    t, _, graph = gengraph(parse_js, [str])
+
+    print_graph(graph)
+    cnst = graph.startblock.operations[0].args[0].value._obj.graph.startblock.operations[0].args[0]
+    cnst_norm = normalise_constant(cnst)
+    assert cnst_norm.concretetype.TO.OF.TO._name != 'object'
+    print cnst_norm.value
