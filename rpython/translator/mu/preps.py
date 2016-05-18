@@ -7,6 +7,7 @@ from rpython.rtyper.lltypesystem import lltype
 from rpython.flowspace.model import Constant
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.rtyper.lltypesystem.lloperation import LL_OPERATIONS
+from copy import copy
 
 log = AnsiLogger("preps")
 
@@ -100,6 +101,7 @@ def prepare(graphs, entry_graph, name_dic={}):
             log.keep_arg("Throwing argument %(arg)r from operation %(opname)s" % locals())
             return False
 
+        # ---------
         for _, op in g.iterblockops():
             op.args = [arg for arg in op.args if _keep_arg(arg, op.opname)]
             if op.opname == 'cast_pointer':     # fix problem with some cast_pointer ops that don't have CAST_TYPE
@@ -119,30 +121,78 @@ def prepare(graphs, entry_graph, name_dic={}):
         for blk in g.iterblocks():
             # remove the input args that are Void as well.
             blk.inputargs = [arg for arg in blk.inputargs if arg.concretetype != lltype.Void]
+
+        # Make all constants that have the same hash the same object
+        for blk in g.iterblocks():
+            _cnsts = {}
+            for op in blk.operations:
+                for op in blk.operations:
+                    for i in filter(lambda idx: isinstance(op.args[idx], Constant), range(len(op.args))):
+                        c = op.args[i]
+                        if c not in _cnsts:
+                            _cnsts[c] = c
+                        else:
+                            op.args[i] = _cnsts[c]
+
+        for blk in g.iterblocks():
+            # normalise all the constants
+            for op in blk.operations:
+                for c in filter(lambda arg: isinstance(arg, Constant), op.args):
+                    normalise_constant(c)
+            for lnk in blk.exits:
+                for c in filter(lambda arg: isinstance(arg, Constant), lnk.args):
+                    normalise_constant(c)
     return graphs
 
 
 def normalise_constant(cnst):
     llv = cnst.value
     llv_norm = _normalise_value(llv)
-    if llv_norm is llv:
-        return cnst
-    Constant.__init__(cnst, llv_norm, lltype.typeOf(llv_norm))
+    if not (llv_norm is llv):
+        Constant.__init__(cnst, llv_norm, lltype.typeOf(llv_norm))
+
+    return cnst
 
 
 def _normalise_value(llv):
-    if not (isinstance(llv, lltype._ptr) and isinstance(llv._obj, lltype._parentable)):
+    def _is_normalized(obj):
+        return obj._normalizedcontainer() is obj
+
+    if isinstance(llv, lltype._ptr):
+        norm_obj = _normalise_value(llv._obj)
+        return llv if norm_obj is llv._obj else norm_obj._as_ptr()
+
+    if not isinstance(llv, lltype._parentable):
         return llv
 
-    llv = llv._obj._normalizedcontainer()._as_ptr()
-    obj = llv._obj
-    if isinstance(obj, (lltype._fixedsizearray, lltype._array)):
-        n = obj.getlength()
-        for i in range(n):
-            itm = obj.getitem(i)
-            itm_norm = _normalise_value(itm)
-            if not (itm_norm is itm):
-                obj._TYPE.OF = lltype.typeOf(itm_norm)
-                obj.setitem(i, _normalise_value(itm))
+    obj = llv
 
-    return llv
+    if isinstance(obj, (lltype._fixedsizearray, lltype._array)):
+        if obj.getlength() > 0:
+            n = obj.getlength()
+            itm = obj.getitem(0)
+            itm_norm = _normalise_value(itm)
+            if itm_norm is not itm:
+                _type_args = (itm_norm._TYPE, n) if isinstance(obj, lltype._fixedsizearray) else (itm_norm._TYPE, )
+                new_arr = obj.__class__(obj._TYPE.__class__(*_type_args), n,
+                                        parent=obj._parentstructure(),
+                                        parentindex=getattr(obj, '_parent_index', None))
+                for idx in range(n):
+                    itm = obj.getitem(idx)
+                    itm_norm = _normalise_value(itm)
+                    new_arr.setitem(idx, _normalise_value(itm_norm))
+
+                obj = new_arr
+
+    elif isinstance(obj, lltype._struct):
+        if not _is_normalized(obj):
+            obj = obj._normalizedcontainer()
+            if obj._TYPE._is_varsize():
+                arrfld = obj._TYPE._arrayfld
+                arr = getattr(obj, arrfld)
+                arr_norm = _normalise_value(arr)
+                if arr_norm is not arr:
+                    new_obj = copy(obj)
+                    setattr(new_obj, arrfld, arr_norm)
+                    obj = new_obj
+    return obj
