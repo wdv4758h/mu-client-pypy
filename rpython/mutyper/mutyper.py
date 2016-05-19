@@ -129,22 +129,7 @@ class MuTyper:
         muops = []
 
         # set up -- process the result and the arguments
-        try:
-            self.proc_arglist(op.args, blk)
-        except _NeedToLoadParentError as e:
-            # effectively insert a 'getfield' operation to get the field from parent structure.
-            prnt = e.cnst.value._obj._wrparent()
-            idx = e.cnst.value._obj._parent_index
-            ty = e.cnst.value._obj._parent_type
-            cnst_prnt = Constant(prnt, ty)
-            _op = SpaceOperation('getfield', [cnst_prnt, Constant(idx, lltype.Void)], Variable())
-            # replace the constant with the result of getfield
-            op.args[op.args.index(e.cnst)] = _op.result
-            # specialise the getfield operation
-            muops += self.specialise_op(_op, blk)
-            # try process the arguments again.
-            self.proc_arglist(op.args, blk)
-
+        self.proc_arglist(op.args, blk)
         op.result = self.proc_arg(op.result, blk)
 
         # translate operation
@@ -198,42 +183,47 @@ class MuTyper:
         if arg in self._alias:
             return self._alias[arg]
 
-        # replace the constant with the normalised container
-        if isinstance(arg, Constant) and isinstance(arg.value, lltype._ptr) and isinstance(arg.value._obj, lltype._parentable):
-            new_ptr = arg.value._obj._normalizedcontainer()._as_ptr()
-            arg = Constant(new_ptr, new_ptr._TYPE)
-
-        if _NeedToLoadParentError.need(arg):
-            raise _NeedToLoadParentError(arg)
-        if not hasattr(arg, 'mu_type'):     # has not been processed.
-            arg.mu_type = ll2mu_ty(arg.concretetype)
-            if isinstance(arg, Constant):
-                if isinstance(arg.mu_type, mut.MuRef) and arg.value._obj is not None:
-                    if arg not in self._cnst_gcell_dict:
-                        muv = ll2mu_val(arg.value)
-                        # fix the type mismatch, all heap constants must be refs
-                        if isinstance(muv._TYPE, mutype.MuUPtr):
-                            muv._TYPE = mutype.MuRef(muv._TYPE.TO)
-                            arg.mu_type = muv._TYPE
-                        gcell = MuGlobalCell(arg.mu_type, muv)
-                        self._cnst_gcell_dict[arg] = gcell
-                    else:
-                        gcell = self._cnst_gcell_dict[arg]
-
-                    return self._get_ldgcell_var(gcell, blk)
-                else:
-                    try:
-                        arg.value = ll2mu_val(arg.value)
-                        # Correcting type mismatch caused by incomplete type information when calling ll2mu_val.
-                        if isinstance(arg.value, mutype._muprimitive) and arg.value._TYPE != arg.mu_type:
-                            arg.value._TYPE = arg.mu_type
-                        if not isinstance(arg.value, mutype._mufuncref):
-                            arg.mu_name = MuName("%s_%s" % (str(arg.value), arg.mu_type.mu_name._name))
-                    except (NotImplementedError, AssertionError, TypeError):
-                        pass
-
-            else:
+        if isinstance(arg, Variable):
+            if not (hasattr(arg, 'mu_type') and hasattr(arg, 'mu_name')):
+                arg.mu_type = ll2mu_ty(arg.concretetype)
                 arg.mu_name = MuName(arg.name, blk)
+
+        elif isinstance(arg, Constant):
+            llv = arg.value
+            if arg.concretetype is lltype.Void:
+                if isinstance(llv, mutype.MuType):
+                    return arg
+                elif isinstance(llv, lltype.LowLevelType):
+                    Constant.__init__(arg, ll2mu_ty(llv), lltype.Void)
+            else:
+                try:
+                    if not hasattr(arg, 'mu_type'):     # has not been processed.
+                        muv = ll2mu_val(llv)
+                        mut = ll2mu_ty(arg.concretetype)
+                        if isinstance(muv, mutype._muprimitive) and muv._TYPE != mut:
+                            log.warning("correcting the type of '%(muv)s' from '%(type1)s' to '%(type2)s'." %
+                                        {'muv': muv, 'type1': muv._TYPE, 'type2': mut})
+                            muv._TYPE = mut
+                        # fix the type mismatch, all heap constants must be refs
+                        if not isinstance(muv, mutype._munullref) and isinstance(muv._TYPE, mutype.MuUPtr):
+                            muv._TYPE = mutype.MuRef(muv._TYPE.TO)
+                            mut = muv._TYPE
+                        Constant.__init__(arg, muv, arg.concretetype)
+                        arg.mu_type = mut
+                        if isinstance(muv, (mutype._muprimitive, mutype._munullref)):
+                            arg.mu_name = MuName("%s_%s" % (str(arg.value), arg.mu_type.mu_name._name))
+
+                    if isinstance(arg.value, mutype._muref):
+                        if arg not in self._cnst_gcell_dict:
+                            gcl = MuGlobalCell(arg.mu_type, arg.value)
+                            self._cnst_gcell_dict[arg] = gcl
+                        else:
+                            gcl = self._cnst_gcell_dict[arg]
+                        return self._get_ldgcell_var(gcl, blk)
+                except (NotImplementedError, AssertionError, TypeError):
+                    log.info("can not process '%(arg)s' in mutyper, ignored." % locals())
+                    pass
+
         return arg
 
     def _get_ldgcell_var(self, gcell, blk):

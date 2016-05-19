@@ -94,7 +94,7 @@ def test_excobj():
 
     t.graphs = prepare(t.graphs, g)
 
-    mutyper = MuTyper()
+    mutyper = MuTyper(t)
     for _g in t.graphs:
         mutyper.specialise(_g)
 

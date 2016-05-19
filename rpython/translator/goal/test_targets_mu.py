@@ -18,7 +18,7 @@ def compile_target(tmpdir, target, args=list()):
     output_file = os.path.join(tmpdir.strpath, target.replace('.py', '.mu'))
     target_file = os.path.join(targets_dir, target)
 
-    cmd = "rpython -O0 -b mu --output %(output_file)s %(target_file)s %(args)s" % locals()
+    cmd = "rpython -b mu --output %(output_file)s %(target_file)s %(args)s" % locals()
     print cmd
     p = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
     stdout_data, stderr_data = p.communicate()
@@ -43,7 +43,7 @@ def run_bundle(bundle, cmdargs=list(), print_stderr_when_fail=True):
     env = os.environ
     env['LD_LIBRARY_PATH'] = env['MU'] + "/cbinding:" + env['LD_LIBRARY_PATH']
     murpy_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'mucli', 'murpy.py'))
-    murpy_args = "--vmLog ERROR"
+    murpy_args = "--noSourceInfo --vmLog ERROR"
     cmd = "python %(murpy_path)s %(murpy_args)s %(bundle)s %(cmdargs)s" % locals()
     print cmd
     p = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE, shell=True, env=env)
@@ -174,6 +174,7 @@ def test_targetpushpop(tmpdir):
     assert r == 11
 
 
+# There are some memory size constraints.
 # def test_targetosreadbench(tmpdir):
 #     bundle = compile_target(tmpdir, "targetosreadbench.py")
 #     r, out, err = run_bundle(bundle, [__file__])
@@ -201,9 +202,9 @@ def test_targetjitstandalone(tmpdir):
 #     assert r == 0
 
 
-# Currently there is trouble supporting the 128-bit integers.
-def test_targetbigintbenchmark(tmpdir):
-    bundle = compile_target(tmpdir, "targetbigintbenchmark.py")
-    r, out, err = run_bundle(bundle, [])
-    print out
-    assert r == 0
+# It takes too long to run this one.
+# def test_targetbigintbenchmark(tmpdir):
+#     bundle = compile_target(tmpdir, "targetbigintbenchmark.py")
+#     r, out, err = run_bundle(bundle, [])
+#     print out
+#     assert r == 0

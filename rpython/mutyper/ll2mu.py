@@ -645,9 +645,9 @@ _llop2mu_cast_primitive = _llop2mu_force_cast
 def _llop2mu_malloc(T, _hints, res=None, llopname='malloc'):
     flavor = _hints.value['flavor']
     if flavor == 'gc':
-        return [muops.NEW(ll2mu_ty(T.value), result=res)]
+        return [muops.NEW(T.value, result=res)]
     else:
-        cst_sz = _newprimconst(mutype.int64_t, mumem.mu_sizeOf(ll2mu_ty(T.value)))
+        cst_sz = _newprimconst(mutype.int64_t, mumem.mu_sizeOf(T.value))
         return _ll2mu_op('raw_malloc', (cst_sz,), res)
 
 
@@ -655,17 +655,17 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
     ops = _MuOpList()
     flavor = _hints.value['flavor']
     if flavor == 'gc':
-        mut = ll2mu_ty(T.value)
+        mut = T.value
         if isinstance(mut, mutype.MuStruct):
             # Empty array
             obj = ops.append(muops.NEW(mut, result=res))
         else:
-            obj = ops.append(muops.NEWHYBRID(ll2mu_ty(T.value), n, result=res))
+            obj = ops.append(muops.NEWHYBRID(mut, n, result=res))
     else:
         # Calculate the size of memory that needs to be allocated
         # see mumem.mu_hybsizeOf for reference.
 
-        hyb_t = ll2mu_ty(T.value)
+        hyb_t = T.value
         fixstt = mutype.MuStruct('fix', *[(f, getattr(hyb_t, f)) for f in hyb_t._names[:-1]])
         fix_sz = mumem.mu_sizeOf(fixstt)
         var_t = getattr(hyb_t, hyb_t._varfld)
@@ -823,7 +823,7 @@ def _llop2mu_cast_pointer(cst_TYPE, var_ptr, res=None, llopname='cast_pointer'):
         if res:
             assert not isinstance(res.mu_type, (mutype.MuUPtr, mutype.MuUFuncPtr))
         _op = muops.REFCAST
-    return [_op(var_ptr, res.mu_type if res else ll2mu_ty(cst_TYPE.value), result=res)]
+    return [_op(var_ptr, res.mu_type if res else cst_TYPE.value, result=res)]
 
 
 def _llop2mu_cast_opaque_ptr(var_ptr, res, llopname='cast_opaque_ptr'):
@@ -1024,7 +1024,8 @@ _llop2mu_gc_id = _llop2mu_gc_identityhash
 
 def _llop2mu_length_of_simple_gcarray_from_opaque(opq, res=None, llopname='length_of_simple_gcarray_from_opaque'):
     ops = _MuOpList()
-    ref = ops.extend(_ll2mu_op('cast_pointer', [Constant(lltype.Ptr(lltype.GcArray(lltype.Signed)), lltype.Void), opq]))
+    mut = ll2mu_ty(lltype.Ptr(lltype.GcArray(lltype.Signed)))
+    ref = ops.extend(_ll2mu_op('cast_pointer', [Constant(mut, lltype.Void), opq]))
     ops.extend(_ll2mu_op('getarraysize', [ref], result=res))
     return ops
 

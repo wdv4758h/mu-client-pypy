@@ -17,7 +17,7 @@ def test_genmu():
 
     t.graphs = prepare(t.graphs, g)
 
-    mutyper = MuTyper()
+    mutyper = MuTyper(t)
     for _g in t.graphs:
         print_graph(_g)
         mutyper.specialise(_g)
