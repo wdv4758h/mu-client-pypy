@@ -28,11 +28,17 @@ class HAILGenerator:
 
     def add_gcell(self, gcell):
         self._find_refs(gcell._obj)
-        self.gcells[gcell] = self._refs[gcell._obj._obj0]     # Get the HAILName that was assigned to the content of gcell.
+        obj = gcell._obj._obj0
+        if isinstance(obj, mutype._mustruct):
+            obj = obj._top_container()
+        self.gcells[gcell] = self._refs[obj]     # Get the HAILName that was assigned to the content of gcell.
 
     def _find_refs(self, obj):
         if isinstance(obj, (mutype._muref, mutype._muiref)):
             refnt = obj._obj0
+            if isinstance(refnt, mutype._mustruct):
+                refnt = refnt._top_container()
+
             if refnt not in self._refs:
                 self._refs[refnt] = _HAILName(mutype.mu_typeOf(obj).mu_name._name)
             else:
@@ -45,7 +51,8 @@ class HAILGenerator:
 
         elif isinstance(obj, (mutype._mumemarray)):
             if isinstance(obj._OF, (mutype.MuContainerType, mutype.MuRef, mutype.MuIRef)):
-                for itm in obj:
+                for i in range(len(obj.items)):
+                    itm = obj[i]
                     self._find_refs(itm)
 
     def codegen(self, fp):
@@ -74,8 +81,11 @@ class HAILGenerator:
             return "{%s}" % ' '.join([self._getinitstr(itm) for itm in obj])
 
         elif isinstance(obj, (mutype._muref, mutype._muiref)):
-            assert obj._obj0 in self._refs
-            name = self._refs[obj._obj0]
+            refrnt = obj._obj0
+            if isinstance(refrnt, mutype._mustruct):
+                refrnt = refrnt._top_container()
+            assert refrnt in self._refs
+            name = self._refs[refrnt]
             if isinstance(name, MuName) and 'gcl' in str(name):
                 return "*%s" % name
             return str(name)

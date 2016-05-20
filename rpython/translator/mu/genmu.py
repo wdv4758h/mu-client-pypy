@@ -159,6 +159,23 @@ class MuTextIRGenerator:
                         if dst:
                             __proc(dst.args)
 
+        def _add_parent_types(stt):
+            while stt._parent:
+                prnt = stt._parent
+                _recursive_addtype(self.gbltypes, prnt._TYPE)
+                stt = prnt
+
+        for gcl in self.mutyper.ldgcells:
+            obj = gcl.value._obj0
+            if isinstance(obj, mutype._mustruct):
+                _add_parent_types(obj)
+            elif isinstance(obj, mutype._muhybrid):
+                arr = getattr(obj, obj._TYPE._varfld)
+                if isinstance(arr._OF, mutype.MuRef):
+                    for itm in arr:
+                        if isinstance(itm._obj0, mutype._mustruct):
+                            _add_parent_types(itm._obj0)
+
 
 def _recursive_addtype(s_types, mut):
     if mut not in s_types:

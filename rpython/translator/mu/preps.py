@@ -132,16 +132,9 @@ def prepare(graphs, entry_graph, name_dic={}):
                         if c not in _cnsts:
                             _cnsts[c] = c
                         else:
+                            assert c == _cnsts[c]
                             op.args[i] = _cnsts[c]
 
-        for blk in g.iterblocks():
-            # normalise all the constants
-            for op in blk.operations:
-                for c in filter(lambda arg: isinstance(arg, Constant), op.args):
-                    normalise_constant(c)
-            for lnk in blk.exits:
-                for c in filter(lambda arg: isinstance(arg, Constant), lnk.args):
-                    normalise_constant(c)
     return graphs
 
 
@@ -180,7 +173,7 @@ def _normalise_value(llv):
                 for idx in range(n):
                     itm = obj.getitem(idx)
                     itm_norm = _normalise_value(itm)
-                    new_arr.setitem(idx, _normalise_value(itm_norm))
+                    new_arr.setitem(idx, itm_norm)
 
                 obj = new_arr
 

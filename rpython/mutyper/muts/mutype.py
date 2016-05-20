@@ -188,6 +188,12 @@ class _muparentable(object):        # parentable may not be _mucontainers (eg. l
         self._parent = parent
         self._parentindex = parentindex
 
+    def _top_container(self):
+        obj = self
+        while obj._parent:
+            obj = obj._parent
+        return obj
+
 
 # ----------------------------------------------------------
 class MuStruct(MuContainerType):
@@ -478,7 +484,7 @@ class _muhybrid(_muparentable, _mucontainer):
 
     def _str_item(self, item):
         if isinstance(mu_typeOf(item), MuStruct):
-            of = self._TYPE.OF
+            of = getattr(self._TYPE, self._TYPE._varfld)
             return "%s {%s}" % (of._name, item._str_fields())
         else:
             return repr(item)

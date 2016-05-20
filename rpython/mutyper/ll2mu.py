@@ -292,6 +292,22 @@ def _llval2mu_stt(llv):
         for fld in filter(lambda n: n != GC_IDHASH_FLD, mut._names):
             setattr(stt, fld, ll2mu_val(getattr(llv, fld)))
 
+    # deal with the parent structs
+    llstt = llv
+    mustt = stt
+    while not (llstt._normalizedcontainer() is llstt):
+        llprnt = llstt._parentstructure()
+        prnt_idx = llstt._parent_index
+        prnt_llt = llprnt._TYPE
+        prnt_mut = ll2mu_ty(prnt_llt)
+        muprnt = mutype._mustruct(prnt_mut)
+        for fld in tuple(n for n in prnt_mut._names if n != prnt_idx and n != GC_IDHASH_FLD):
+            setattr(muprnt, fld, ll2mu_val(getattr(llprnt, fld)))
+        setattr(muprnt, prnt_idx, mustt)
+        mustt._setparent(muprnt, prnt_idx)
+
+        llstt = llprnt
+        mustt = muprnt
     return stt
 
 
