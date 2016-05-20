@@ -1,7 +1,6 @@
-from rpython.mutyper.muts.muentity import MuName, MuGlobalCell
+from rpython.mutyper.muts.muentity import MuName
 from rpython.rtyper.lltypesystem import lltype
 from rpython.rtyper.lltypesystem import llmemory
-from rpython.rtyper.lltypesystem.llmemory import ItemOffset
 from .muts import mutype
 from .muts import muops
 from .muts import muni
@@ -10,10 +9,9 @@ from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
 from rpython.rlib.rarithmetic import _inttypes
 from rpython.flowspace.model import Constant, SpaceOperation
+from rpython.translator.c.node import needs_gcheader
 from random import randint
-from copy import copy
 
-import py
 from rpython.tool.ansi_print import AnsiLogger
 
 
@@ -118,7 +116,7 @@ def _lltype2mu_stt(llt):
         __stt_cache[llt] = stt
         lst = []
 
-        if isinstance(llt, lltype.GcStruct):
+        if needs_gcheader(llt):
             lst.append((GC_IDHASH_FLD, mutype.int64_t))
 
         for n in llt._names:
@@ -143,7 +141,7 @@ def _lltype2mu_varstt(llt):
         flds = llt._flds
 
     _flds = [(n, ll2mu_ty(flds[n])) for n in names[:-1]] + [(llt._arrayfld, var_t)]
-    if isinstance(llt, lltype.GcStruct):
+    if needs_gcheader(llt):
         _flds.insert(0, (GC_IDHASH_FLD, mutype.int64_t))
 
     return mutype.MuHybrid(__newtypename(llt._name), *_flds)
@@ -157,7 +155,7 @@ def _lltype2mu_arr(llt):
     else:
         flds = ('length', mutype.int64_t), ('items', ll2mu_ty(llt.OF))
 
-    if isinstance(llt, lltype.GcArray):
+    if needs_gcheader(llt):
         flds = ((GC_IDHASH_FLD, mutype.int64_t), ) + flds
 
     return mutype.MuHybrid(__newtypename("%s" % llt.OF.__name__), *flds)
@@ -978,6 +976,7 @@ def _llop2mu_gc_writebarrier_before_copy(src, dst, src_start, dst_start, length,
 
 
 def _llop2mu_gc_identityhash(obj, res=None, llopname='gc_identityhash'):
+    assert obj.mu_type._names[0] == GC_IDHASH_FLD
     # Create a function reference that has the field '_llhelper'.
     # The operation is translated into a CALL.
     # The LL helper function is caught by the mutyper for post processing,
