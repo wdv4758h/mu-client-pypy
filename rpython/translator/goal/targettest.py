@@ -26,7 +26,10 @@ def main(argv):
     print obj.x
     if isinstance(obj, B):
         print obj.y
-    # print dic[obj]
+    try:
+        print dic[obj]
+    except KeyError:
+        print "Object key not found."
     return 0
 
 
