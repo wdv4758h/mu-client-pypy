@@ -146,8 +146,16 @@ def load_extfncs(ctx, exfns):
     libm = ctypes.CDLL(ctypes.util.find_library("m"))
 
     dir_rpython = os.path.dirname(os.path.dirname(__file__))
-    path_librpyc = os.path.join(dir_rpython, 'translator', 'mu', 'rpyc', 'librpyc.so')
-    librpyc = ctypes.CDLL(path_librpyc)
+    dir_librpyc = os.path.join(dir_rpython, 'translator', 'mu', 'rpyc')
+    path_librpyc = os.path.join(dir_librpyc, 'librpyc.so')
+
+    try:
+        librpyc = ctypes.CDLL(path_librpyc)
+    except OSError as e:
+        print("ERROR: library {} not found. "
+                "Please execute 'make' in the directory {}".format(
+                    path_librpyc, dir_librpyc), file=sys.stderr)
+        raise e
 
     libs = [libc, libm, librpyc]
     for c_name, fncptr_name, gcl_name, hdrs in exfns:
