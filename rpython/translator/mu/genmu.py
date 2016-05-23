@@ -176,9 +176,16 @@ class MuTextIRGenerator:
                     _trav_sttval(obj._top_container())
                 elif isinstance(obj, mutype._muhybrid):
                     arr = getattr(obj, obj._TYPE._varfld)
+
                     if isinstance(arr._OF, mutype.MuRef):
+                        fn = _trav_refval
+                    elif isinstance(arr._OF, mutype.MuStruct):
+                        fn = _trav_sttval
+                    else:
+                        fn = None
+                    if fn:
                         for itm in arr:
-                            _trav_refval(itm)
+                            fn(itm)
 
         for gcl in self.mutyper.ldgcells:
             _trav_refval(gcl.value)
