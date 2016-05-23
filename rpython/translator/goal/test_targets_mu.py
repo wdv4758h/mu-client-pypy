@@ -208,3 +208,14 @@ def test_targetjitstandalone(tmpdir):
 #     r, out, err = run_bundle(bundle, [])
 #     print out
 #     assert r == 0
+
+
+def test_targetprebuiltdictlookup(tmpdir):
+    bundle = compile_target(tmpdir, "targetprebuiltdictlookup.py")
+    r, out, err = run_bundle(bundle, ['1'])
+    print out
+    assert r == 0
+    lines = out.split('\n')
+    assert lines[0] == 'B type 0'
+    assert lines[1] == 'dummy'
+    assert lines[2] != 'Object key not found.'

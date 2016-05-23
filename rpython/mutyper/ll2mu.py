@@ -293,6 +293,8 @@ def _llval2mu_stt(llv):
     # deal with the parent structs
     llstt = llv
     mustt = stt
+    mustt_idhash = mustt if hasattr(mustt, GC_IDHASH_FLD) else None
+    _idhash = 0
     while not (llstt._normalizedcontainer() is llstt):
         llprnt = llstt._parentstructure()
         prnt_idx = llstt._parent_index
@@ -304,8 +306,14 @@ def _llval2mu_stt(llv):
         setattr(muprnt, prnt_idx, mustt)
         mustt._setparent(muprnt, prnt_idx)
 
+        if hasattr(llprnt, '_hash_cache_'):
+            _idhash = llprnt._hash_cache_
+
         llstt = llprnt
         mustt = muprnt
+
+    if mustt_idhash and _idhash != 0:
+        setattr(mustt_idhash, GC_IDHASH_FLD, mutype.int64_t(_idhash))
     return stt
 
 
