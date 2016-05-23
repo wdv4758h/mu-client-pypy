@@ -984,7 +984,7 @@ def _llop2mu_gc_writebarrier_before_copy(src, dst, src_start, dst_start, length,
 
 
 def _llop2mu_gc_identityhash(obj, res=None, llopname='gc_identityhash'):
-    assert obj.mu_type.TO._names[0] == GC_IDHASH_FLD
+    # assert obj.mu_type.TO._names[0] == GC_IDHASH_FLD
     # Create a function reference that has the field '_llhelper'.
     # The operation is translated into a CALL.
     # The LL helper function is caught by the mutyper for post processing,
