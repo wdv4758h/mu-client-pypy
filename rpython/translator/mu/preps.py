@@ -4,7 +4,7 @@ Preparations before the MuTyper process
 import py
 from rpython.mutyper.muts.muentity import MuName
 from rpython.rtyper.lltypesystem import lltype
-from rpython.flowspace.model import Constant
+from rpython.flowspace.model import Constant, Variable
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.rtyper.lltypesystem.lloperation import LL_OPERATIONS
 from copy import copy
@@ -121,6 +121,14 @@ def prepare(graphs, entry_graph, name_dic={}):
         for blk in g.iterblocks():
             # remove the input args that are Void as well.
             blk.inputargs = [arg for arg in blk.inputargs if arg.concretetype != lltype.Void]
+            # replace constants with dummy variables --> they shouldn't appear there
+            idx_cnsts = filter(lambda i: isinstance(blk.inputargs[i], Constant), range(len(blk.inputargs)))
+            if len(idx_cnsts) > 0:
+                for i in idx_cnsts:
+                    _v = Variable('dummy')
+                    _v.concretetype = blk.inputargs[i].concretetype
+                    blk.inputargs[i] = _v
+
 
         # Make all constants that have the same hash the same object
         for blk in g.iterblocks():
