@@ -159,14 +159,6 @@ class MuTextIRGenerator:
                         if dst:
                             _trav_symbol(dst.args)
 
-        def _add_parent_types(stt):
-            stt_norm = stt._top_container()
-            _recursive_addtype(self.gbltypes, stt_norm._TYPE)
-            # while stt._parent:
-            #     prnt = stt._parent
-            #     _recursive_addtype(self.gbltypes, prnt._TYPE)
-            #     stt = prnt
-
         def _trav_refval(ref):
             def _trav_sttval(obj):
                 _recursive_addtype(self.gbltypes, obj._TYPE)
