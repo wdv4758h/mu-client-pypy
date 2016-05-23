@@ -120,7 +120,7 @@ class MuTextIRGenerator:
                 fp.write("%s%s\n" % (' ' * idt * 2, op))
 
     def _collect_gbldefs(self):
-        def __proc(v):
+        def _trav_symbol(v):
             if hasattr(v, 'mu_type'):
                 _recursive_addtype(self.gbltypes, v.mu_type)
             if isinstance(v, Constant):
@@ -134,47 +134,62 @@ class MuTextIRGenerator:
                     self.gblcnsts.add(v)
 
         for g in self.graphs:
-            __proc(g)
+            _trav_symbol(g)
             for blk in g.iterblocks():
                 for arg in blk.inputargs:
-                    __proc(arg)
+                    _trav_symbol(arg)
                 for op in blk.operations:
-                    map(__proc, op._args)
+                    map(_trav_symbol, op._args)
                     if 'CALL' in op.opname:
-                        map(__proc, op.args)
+                        map(_trav_symbol, op.args)
                     if op.opname == 'BRANCH':
-                        map(__proc, op.dest.args)
+                        map(_trav_symbol, op.dest.args)
                     if op.opname == 'BRANCH2':
-                        map(__proc, op.ifTrue.args)
-                        map(__proc, op.ifFalse.args)
-                        __proc(op.cond)
+                        map(_trav_symbol, op.ifTrue.args)
+                        map(_trav_symbol, op.ifFalse.args)
+                        _trav_symbol(op.cond)
                     if op.opname == 'SWITCH':
-                        __proc(op.opnd)
-                        map(__proc, op.default.args)
+                        _trav_symbol(op.opnd)
+                        map(_trav_symbol, op.default.args)
                         for v, d in op.cases:
-                            __proc(v)
-                            map(__proc, d.args)
+                            _trav_symbol(v)
+                            map(_trav_symbol, d.args)
                     for attr in "exc nor".split(' '):
                         dst = getattr(op.exc, attr)
                         if dst:
-                            __proc(dst.args)
+                            _trav_symbol(dst.args)
 
         def _add_parent_types(stt):
-            while stt._parent:
-                prnt = stt._parent
-                _recursive_addtype(self.gbltypes, prnt._TYPE)
-                stt = prnt
+            stt_norm = stt._top_container()
+            _recursive_addtype(self.gbltypes, stt_norm._TYPE)
+            # while stt._parent:
+            #     prnt = stt._parent
+            #     _recursive_addtype(self.gbltypes, prnt._TYPE)
+            #     stt = prnt
+
+        def _trav_refval(ref):
+            def _trav_sttval(obj):
+                _recursive_addtype(self.gbltypes, obj._TYPE)
+                for fld in obj._TYPE._names:
+                    fldval = getattr(obj, fld)
+                    if isinstance(fldval, mutype._muref):
+                        _trav_refval(fldval)
+                    elif isinstance(fldval, mutype._mustruct):
+                        _trav_sttval(fldval)
+
+            if not isinstance(ref, mutype._munullref):
+                _recursive_addtype(self.gbltypes, ref._TYPE)
+                obj = ref._obj0
+                if isinstance(obj, mutype._mustruct):
+                    _trav_sttval(obj._top_container())
+                elif isinstance(obj, mutype._muhybrid):
+                    arr = getattr(obj, obj._TYPE._varfld)
+                    if isinstance(arr._OF, mutype.MuRef):
+                        for itm in arr:
+                            _trav_refval(itm)
 
         for gcl in self.mutyper.ldgcells:
-            obj = gcl.value._obj0
-            if isinstance(obj, mutype._mustruct):
-                _add_parent_types(obj)
-            elif isinstance(obj, mutype._muhybrid):
-                arr = getattr(obj, obj._TYPE._varfld)
-                if isinstance(arr._OF, mutype.MuRef):
-                    for itm in arr:
-                        if isinstance(itm._obj0, mutype._mustruct):
-                            _add_parent_types(itm._obj0)
+            _trav_refval(gcl.value)
 
 
 def _recursive_addtype(s_types, mut):
