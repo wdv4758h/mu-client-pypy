@@ -72,7 +72,6 @@ class MuTextIRGenerator:
         def _writefrom(entry_name, strio):
             s = strio.getvalue()
             strio.close()
-            print s
             zf.writestr(entry_name, s)
 
         _writefrom(bdlpath.basename.replace('.mu', '.uir'), strio_ir)
