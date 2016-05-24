@@ -63,20 +63,19 @@ class MuTyper:
 
     def specialise_all(self):
         for g in self.graphs:
-            print_graph(g)
             self.specialise(g)
 
         for g in self.helper_graphs.values():
-            print_graph(g)
             self.specialise(g)
 
         self.tlr.graphs = self.graphs = self.graphs + self.helper_graphs.values()
 
     def specialise(self, g):
+        log.info("specialising graph '%s'" % g.name)
         g.mu_name = MuName(g.name)
         get_arg_types = lambda lst: map(ll2mu_ty, map(lambda arg: arg.concretetype, lst))
-        g.mu_type = mut.MuFuncRef(mut.MuFuncSig(get_arg_types(g.startblock.inputargs),
-                                                get_arg_types(g.returnblock.inputargs)))
+        g.mu_type = mut.MuFuncRef(mut.MuFuncSig(get_arg_types(g.startblock.mu_inputargs),
+                                                get_arg_types(g.returnblock.mu_inputargs)))
         ver = Variable('_ver')
         ver.mu_name = MuName(ver.name, g)
         g.mu_version = ver
@@ -91,7 +90,7 @@ class MuTyper:
 
     def specialise_block(self, blk):
         muops = _MuOpList()
-        self.proc_arglist(blk.inputargs, blk)
+        self.proc_arglist(blk.mu_inputargs, blk)
         if hasattr(blk, 'mu_excparam'):
             self.proc_arg(blk.mu_excparam, blk)
 
@@ -100,11 +99,11 @@ class MuTyper:
 
         # Exits
         for e in blk.exits:
-            self.proc_arglist(e.args, blk)
+            self.proc_arglist(e.mu_args, blk)
         if blk.exitswitch is not c_last_exception:
             if len(blk.exits) == 0:
                 if not (len(muops) > 0 and muops[-1].opname == 'THROW'):
-                    muops.append(muop.RET(blk.inputargs[0] if len(blk.inputargs) == 1 else None))
+                    muops.append(muop.RET(blk.mu_inputargs[0] if len(blk.mu_inputargs) == 1 else None))
             elif len(blk.exits) == 1:
                 muops.append(muop.BRANCH(DEST.from_link(blk.exits[0])))
             elif len(blk.exits) == 2:
@@ -123,7 +122,7 @@ class MuTyper:
 
         else:
             muops[-1].exc = muop.EXCEPT(DEST.from_link(blk.exits[0]), DEST.from_link(blk.exits[1]))
-        blk.operations = tuple(muops)
+        blk.mu_operations = tuple(muops)
 
     def specialise_op(self, op, blk):
         muops = []
@@ -242,7 +241,7 @@ class MuTyper:
     def proc_gcells(self):
         for gcell, dic in self.ldgcells.items():
             for blk, ldgcell in dic.items():
-                blk.operations = (muop.LOAD(gcell, result=ldgcell), ) + blk.operations
+                blk.mu_operations = (muop.LOAD(gcell, result=ldgcell), ) + blk.mu_operations
                 del dic[blk]
 
 

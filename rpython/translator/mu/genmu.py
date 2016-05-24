@@ -6,6 +6,7 @@ from rpython.mutyper.ll2mu import ll2mu_ty, _MuOpList
 from rpython.mutyper.muts.muentity import MuName
 from rpython.mutyper.muts.muops import CALL, THREAD_EXIT, STORE, GETIREF
 from rpython.mutyper.muts import mutype
+from rpython.mutyper.tools.textgraph import print_graph
 from .hail import HAILGenerator
 from StringIO import StringIO
 import zipfile
@@ -34,6 +35,7 @@ class MuTextIRGenerator:
 
     def _create_bundle_entry(self, pe):
         blk = Block([])
+        blk.mu_inputargs = []
 
         be = FunctionGraph(MuTextIRGenerator.BUNDLE_ENTRY_NAME, blk)
         be.mu_name = MuName(be.name)
@@ -45,24 +47,25 @@ class MuTextIRGenerator:
         rtnbox = Variable('rtnbox')
         rtnbox.mu_name = MuName(rtnbox.name, be.startblock)
         rtnbox.mu_type = mutype.MuRef(pe.mu_type.Sig.RTNS[0])
-        blk.inputargs = pe.startblock.inputargs + [rtnbox]
+        blk.mu_inputargs = pe.startblock.mu_inputargs + [rtnbox]
 
-        be.mu_type = mutype.MuFuncRef(mutype.MuFuncSig(map(lambda arg: arg.mu_type, blk.inputargs), ()))
+        be.mu_type = mutype.MuFuncRef(mutype.MuFuncSig(map(lambda arg: arg.mu_type, blk.mu_inputargs), ()))
         _recursive_addtype(self.gbltypes, be.mu_type)
         ops = _MuOpList()
-        rtn = ops.append(CALL(pe, tuple(pe.startblock.inputargs)))
+        rtn = ops.append(CALL(pe, tuple(pe.startblock.mu_inputargs)))
         rtn.mu_name.scope = blk
         irfrtnbox = ops.append(GETIREF(rtnbox))
         ops.append(STORE(irfrtnbox, rtn))
         ops.append(THREAD_EXIT())
-        blk.operations = tuple(ops)
+        blk.mu_operations = tuple(ops)
         return be
 
     def bundlegen(self, bdlpath):
         strio_ir = StringIO()
         strio_hail = StringIO()
         strio_exfn = StringIO()
-        self.codegen(strio_ir, strio_hail, strio_exfn)
+        strio_graphs = StringIO()
+        self.codegen(strio_ir, strio_hail, strio_exfn, strio_graphs)
 
         zf = zipfile.ZipFile(bdlpath.strpath, mode="w", compression=zip_compression)
 
@@ -75,10 +78,10 @@ class MuTextIRGenerator:
         _writefrom(bdlpath.basename.replace('.mu', '.uir'), strio_ir)
         _writefrom(bdlpath.basename.replace('.mu', '.hail'), strio_hail)
         _writefrom(bdlpath.basename.replace('.mu', '.exfn'), strio_exfn)
-
+        _writefrom(bdlpath.basename.replace('.mu', '.txt'), strio_graphs)
         zf.close()
 
-    def codegen(self, fp_ir, fp_hail, fp_exfn):
+    def codegen(self, fp_ir, fp_hail, fp_exfn, fp_rpy_graphs=None):
         """
         Generate bundle code to a writable file fp.
         """
@@ -108,15 +111,19 @@ class MuTextIRGenerator:
             self._genblocks(g, fp_ir)
             fp_ir.write("}\n")
 
+        if fp_rpy_graphs:
+            for g in self.graphs:
+                print_graph(g, fp_rpy_graphs)
+
     def _genblocks(self, g, fp):
         idt = 4     # indentation
         for blk in g.iterblocks():
             fp.write('%s%s(%s)%s:\n' % (
                 ' ' * idt, blk.mu_name,
-                ' '.join(["<%s> %s" % (arg.mu_type.mu_name, arg.mu_name) for arg in blk.inputargs]),
+                ' '.join(["<%s> %s" % (arg.mu_type.mu_name, arg.mu_name) for arg in blk.mu_inputargs]),
                 '[%s]' % blk.mu_excparam.mu_name if hasattr(blk, 'mu_excparam') else ''
             ))
-            for op in blk.operations:
+            for op in blk.mu_operations:
                 fp.write("%s%s\n" % (' ' * idt * 2, op))
 
     def _collect_gbldefs(self):
@@ -136,9 +143,9 @@ class MuTextIRGenerator:
         for g in self.graphs:
             _trav_symbol(g)
             for blk in g.iterblocks():
-                for arg in blk.inputargs:
+                for arg in blk.mu_inputargs:
                     _trav_symbol(arg)
-                for op in blk.operations:
+                for op in blk.mu_operations:
                     map(_trav_symbol, op._args)
                     if 'CALL' in op.opname:
                         map(_trav_symbol, op.args)

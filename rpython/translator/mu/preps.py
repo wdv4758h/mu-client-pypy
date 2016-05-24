@@ -61,11 +61,39 @@ def chop(graphs, g_entry):
 
 
 _OPS_ALLOW_LLTYPE_ARGS = []
-_OPS_ALLOW_LLTYPE_ARGS += [op for op in LL_OPERATIONS if op.startswith("int_")]
-_OPS_ALLOW_LLTYPE_ARGS += [op for op in LL_OPERATIONS if op.startswith("adr_")]
+_OPS_ALLOW_LLTYPE_ARGS += [_op for _op in LL_OPERATIONS if _op.startswith("int_")]
+_OPS_ALLOW_LLTYPE_ARGS += [_op for _op in LL_OPERATIONS if _op.startswith("adr_")]
+
+
+def _keep_arg(arg, opname=''):
+    # Returns True if the argument/parameter is to be kept
+    if 'malloc' in opname:
+        return True
+    if 'setfield' in opname:
+        return True
+    if arg.concretetype != lltype.Void:
+        return True
+    if isinstance(arg, Constant):
+        if isinstance(arg.value, (str, list)):
+            return True
+        elif isinstance(arg.value, lltype.LowLevelType):
+            return opname in _OPS_ALLOW_LLTYPE_ARGS
+    log.keep_arg("Throwing argument %(arg)r from operation %(opname)s" % locals())
+    return False
 
 
 def prepare(graphs, entry_graph, name_dic={}):
+    _cnsts = {}
+    def _replace_consts_in_list(lst):
+        # Make all constants that have the same hash the same object
+        for _i in filter(lambda idx: isinstance(lst[idx], Constant), range(len(lst))):
+            c = lst[_i]
+            if c not in _cnsts:
+                _cnsts[c] = c
+            else:
+                assert c == _cnsts[c]
+                lst[_i] = _cnsts[c]
+
     # Chop graph
     n0 = len(graphs)
     graphs = chop(graphs, entry_graph)
@@ -85,115 +113,33 @@ def prepare(graphs, entry_graph, name_dic={}):
                 name_dic[name] = (gs, ctr)
         g.name = "%s_%d" % (name, ctr)
 
-        def _keep_arg(arg, opname=''):
-            # Returns True if the argument/parameter is to be kept
-            if 'malloc' in opname:
-                return True
-            if 'setfield' in opname:
-                return True
-            if arg.concretetype != lltype.Void:
-                return True
-            if isinstance(arg, Constant):
-                if isinstance(arg.value, (str, list)):
-                    return True
-                elif isinstance(arg.value, lltype.LowLevelType):
-                    return opname in _OPS_ALLOW_LLTYPE_ARGS
-            log.keep_arg("Throwing argument %(arg)r from operation %(opname)s" % locals())
-            return False
-
-        # ---------
-        for _, op in g.iterblockops():
-            op.args = [arg for arg in op.args if _keep_arg(arg, op.opname)]
-            if op.opname == 'cast_pointer':     # fix problem with some cast_pointer ops that don't have CAST_TYPE
-                try:
-                    assert isinstance(op.args[0], Constant) and isinstance(op.args[0].value, lltype.LowLevelType)
-                except AssertionError:
-                    op.args.insert(0, Constant(op.result.concretetype, lltype.Void))
-
-        # Remove the Void inputarg in return block and (None) constants in links.
-        if g.returnblock.inputargs[0].concretetype == lltype.Void:
-            g.returnblock.inputargs = []
-            for blk in g.iterblocks():
-                for lnk in blk.exits:
-                    if lnk.target is g.returnblock:
-                        lnk.args = []
-
         for blk in g.iterblocks():
             # remove the input args that are Void as well.
-            blk.inputargs = [arg for arg in blk.inputargs if arg.concretetype != lltype.Void]
+            blk.mu_inputargs = [arg for arg in blk.inputargs if arg.concretetype != lltype.Void]
             # replace constants with dummy variables --> they shouldn't appear there
-            idx_cnsts = filter(lambda i: isinstance(blk.inputargs[i], Constant), range(len(blk.inputargs)))
+            idx_cnsts = filter(lambda _i: isinstance(blk.mu_inputargs[_i], Constant), range(len(blk.mu_inputargs)))
             if len(idx_cnsts) > 0:
                 for i in idx_cnsts:
                     _v = Variable('dummy')
-                    _v.concretetype = blk.inputargs[i].concretetype
-                    blk.inputargs[i] = _v
+                    _v.concretetype = blk.mu_inputargs[i].concretetype
+                    blk.mu_inputargs[i] = _v
 
-
-        # Make all constants that have the same hash the same object
-        for blk in g.iterblocks():
-            _cnsts = {}
             for op in blk.operations:
-                for op in blk.operations:
-                    for i in filter(lambda idx: isinstance(op.args[idx], Constant), range(len(op.args))):
-                        c = op.args[i]
-                        if c not in _cnsts:
-                            _cnsts[c] = c
-                        else:
-                            assert c == _cnsts[c]
-                            op.args[i] = _cnsts[c]
+                op.args = [arg for arg in op.args if _keep_arg(arg, op.opname)]
+                if op.opname == 'cast_pointer':  # fix problem with some cast_pointer ops that don't have CAST_TYPE
+                    try:
+                        assert isinstance(op.args[0], Constant) and isinstance(op.args[0].value,
+                                                                               lltype.LowLevelType)
+                    except AssertionError:
+                        op.args.insert(0, Constant(op.result.concretetype, lltype.Void))
 
+                _replace_consts_in_list(op.args)
+
+            # set the mu_arg attribute for every links
+            for lnk in blk.exits:
+                lnk.mu_args = [arg for arg in lnk.args if arg.concretetype != lltype.Void]
+                _replace_consts_in_list(lnk.mu_args)
+
+        if not hasattr(g.returnblock, 'mu_inputargs'):
+            g.returnblock.mu_inputargs = [arg for arg in g.returnblock.inputargs if arg.concretetype != lltype.Void]
     return graphs
-
-
-def normalise_constant(cnst):
-    llv = cnst.value
-    llv_norm = _normalise_value(llv)
-    if not (llv_norm is llv):
-        Constant.__init__(cnst, llv_norm, lltype.typeOf(llv_norm))
-
-    return cnst
-
-
-def _normalise_value(llv):
-    def _is_normalized(obj):
-        return obj._normalizedcontainer() is obj
-
-    if isinstance(llv, lltype._ptr):
-        norm_obj = _normalise_value(llv._obj)
-        return llv if norm_obj is llv._obj else norm_obj._as_ptr()
-
-    if not isinstance(llv, lltype._parentable):
-        return llv
-
-    obj = llv
-
-    if isinstance(obj, (lltype._fixedsizearray, lltype._array)):
-        if obj.getlength() > 0:
-            n = obj.getlength()
-            itm = obj.getitem(0)
-            itm_norm = _normalise_value(itm)
-            if itm_norm is not itm:
-                _type_args = (itm_norm._TYPE, n) if isinstance(obj, lltype._fixedsizearray) else (itm_norm._TYPE, )
-                new_arr = obj.__class__(obj._TYPE.__class__(*_type_args), n,
-                                        parent=obj._parentstructure(),
-                                        parentindex=getattr(obj, '_parent_index', None))
-                for idx in range(n):
-                    itm = obj.getitem(idx)
-                    itm_norm = _normalise_value(itm)
-                    new_arr.setitem(idx, itm_norm)
-
-                obj = new_arr
-
-    elif isinstance(obj, lltype._struct):
-        if not _is_normalized(obj):
-            obj = obj._normalizedcontainer()
-            if obj._TYPE._is_varsize():
-                arrfld = obj._TYPE._arrayfld
-                arr = getattr(obj, arrfld)
-                arr_norm = _normalise_value(arr)
-                if arr_norm is not arr:
-                    new_obj = copy(obj)
-                    setattr(new_obj, arrfld, arr_norm)
-                    obj = new_obj
-    return obj

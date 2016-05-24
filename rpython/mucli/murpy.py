@@ -77,7 +77,7 @@ def parse_args():
 
 def extract_bundle(bdl):
     zf = zipfile.ZipFile(bdl, 'r')
-    ir, hail, exfn = map(zf.read, zf.namelist())
+    ir, hail, exfn = map(zf.read, zf.namelist()[:3])    # disregard the 4-th text graph file.
     zf.close()
     return ir, hail, json.loads(exfn)
 

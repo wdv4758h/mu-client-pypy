@@ -1,6 +1,8 @@
 """ Text Form Display
 
 """
+import sys
+
 
 class GraphLister(object):
     def __init__(self, iterable):
@@ -43,19 +45,19 @@ def list_entries(lst):
         i += 1
 
 
-def print_block(b, map_bi):
-    print "blk_%d" % map_bi[b]
-    print "input: [%s]" % (", ".join([str(arg) for arg in b.inputargs]))
+def print_block(b, map_bi, w_obj=sys.stdout):
+    w_obj.write("blk_%d\n" % map_bi[b])
+    w_obj.write("input: [%s]\n" % (", ".join([str(arg) for arg in b.inputargs])))
 
-    print "operations:"
+    w_obj.write("operations:\n")
     for op in b.operations:
-        print "    %s" % op
+        w_obj.write("    %s\n" % op)
 
     if b.exitswitch:
-        print "switch: %s" % b.exitswitch
+        w_obj.write("switch: %s\n" % b.exitswitch)
 
-    print "exits: [%s]" % (", ".join(
-        [str(("blk_%d" % map_bi[lnk.target], lnk.args)) for lnk in b.exits]))
+    w_obj.write("exits: [%s]\n" % (", ".join(
+        [str(("blk_%d" % map_bi[lnk.target], lnk.args)) for lnk in b.exits])))
 
 
 def print_graph_with_name(graphs, name):
@@ -74,14 +76,14 @@ def build_block_index_map(g):
     return map_blk_idx
 
 
-def print_graph(g):
-    print '================================================'
-    print str(g)
+def print_graph(g, w_obj=sys.stdout):
+    w_obj.write('================================================\n')
+    w_obj.write(str(g)+'\n')
 
     map_bi = build_block_index_map(g)
 
     for b in g.iterblocks():
-        print '------------------------'
-        print_block(b, map_bi)
-    print '================================================'
-    print
+        w_obj.write('------------------------\n')
+        print_block(b, map_bi, w_obj)
+    w_obj.write('================================================\n')
+    w_obj.write('\n')
