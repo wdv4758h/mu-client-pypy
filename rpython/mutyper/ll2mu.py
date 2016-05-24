@@ -581,6 +581,7 @@ for cmp in 'lt le gt ge'.split(' '):
     __primop_map['int_' + cmp] = 'S' + cmp.upper()
     __primop_map['uint_' + cmp] = 'U' + cmp.upper()
     __primop_map['float_' + cmp] = 'FO' + cmp.upper()
+    __primop_map['char_' + cmp] = 'U' + cmp.upper()
 
 for key in __primop_map:
     globals()['_llop2mu_' + key] = \
