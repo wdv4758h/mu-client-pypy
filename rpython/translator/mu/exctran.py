@@ -197,7 +197,7 @@ class MuExceptionTransformer:
             if len(lnks) == 2:
                 lnks[0].prevblock = cmpblk
                 lnks[1].prevblock = cmpblk
-                cmpblk.exits = tuple(lnks)
+                cmpblk.exits = (lnks[1], lnks[0])
             else:
                 _args = [vexc_t, vexc_v] + list(set(inargs[2:]) & set(_collect_args(lnks[1:])))
                 chain = _create_compare_blocks(lnks[1:], cases[1:], _args)
