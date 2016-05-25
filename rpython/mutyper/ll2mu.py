@@ -539,7 +539,7 @@ def _llop2mu_int_force_ge_zero(x, res=None, llopname='int_force_ge_zero'):
 
 
 def _llop2mu_float_neg(x, res=None, llopname='float_neg'):
-    return [muops.SUB(_newprimconst(x.mu_type, 0.0), x, result=res)]
+    return [muops.FSUB(_newprimconst(x.mu_type, 0.0), x, result=res)]
 
 
 def _llop2mu_float_abs(x, res=None, llopname='float_abs'):
@@ -554,7 +554,7 @@ def _llop2mu_float_abs(x, res=None, llopname='float_abs'):
 
 
 def _llop2mu_float_is_true(x, res=None, llopname='float_is_true'):
-    return [muops.NE(x, _newprimconst(x.mu_type, 0.0), result=res)]
+    return [muops.FUNE(x, _newprimconst(x.mu_type, 0.0), result=res)]
 
 __primop_map = {
     'int_floordiv':     'SDIV',
@@ -572,7 +572,7 @@ __primop_map = {
     'int_eq':           'EQ',
     'int_ne':           'NE',
     'float_eq':         'FOEQ',
-    'float_ne':         'FONE'
+    'float_ne':         'FUNE'
 }
 
 for op in "add sub mul and or xor".split(' '):
