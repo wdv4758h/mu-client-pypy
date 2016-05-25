@@ -153,7 +153,7 @@ class MuExceptionTransformer:
             return lnk
 
         def _has_excinfo_var(exclnk):
-            return isinstance(exclnk.last_exception, Variable) and \
+            return isinstance(exclnk.last_exception, Constant) and \
                     (exclnk.last_exception in exclnk.args or exclnk.last_exc_value in exclnk.args)
 
         def _create_compare_blocks(lnks, cases, inargs):
