@@ -61,10 +61,10 @@ def mu_alignOf(mutype):
     if isinstance(mutype, MuStruct):
         if len(mutype._names) == 0:
             return 1
-        elif len(mutype._names) == 1:
-            return mu_alignOf(getattr(mutype, mutype._names[0]))
+        # elif len(mutype._names) == 1:
+        #     return mu_alignOf(getattr(mutype, mutype._names[0]))
         else:
-            return max(*[mu_alignOf(getattr(mutype, fld)) for fld in mutype._names])
+            return max(mu_alignOf(getattr(mutype, fld)) for fld in mutype._names)
 
     if isinstance(mutype, MuArray):
         return mu_alignOf(mutype.OF)
