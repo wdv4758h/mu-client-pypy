@@ -2,7 +2,7 @@ from rpython.flowspace.model import Variable, Constant
 from rpython.rtyper.test.test_llinterp import gengraph
 from rpython.translator.mu.preps import prepare
 from ..exctran import MuExceptionTransformer
-from rpython.mutyper.tools.textgraph import print_graph
+from rpython.mutyper.tools.textgraph import print_graph, print_block
 from copy import copy
 
 
@@ -39,6 +39,7 @@ def test_exctran():
 
     assert blk.exits[1].args == []  # no extra args need to be carried.
     catblk = blk.exits[1].target
+    print_block(catblk)
     assert hasattr(catblk, 'mu_excparam')
     assert catblk.operations[0].opname == 'cast_pointer'
     exc_t = catblk.operations[1].result
@@ -46,16 +47,18 @@ def test_exctran():
     assert catblk.exits[0].args == [exc_t, exc_v]
 
     cmpblk_1 = catblk.exits[0].target
+    print_block(cmpblk_1)
     assert cmpblk_1.inputargs == [exc_t, exc_v]
     assert cmpblk_1.operations[0].args[2].value == org_lnks[1].llexitcase
     assert cmpblk_1.exits[0].args == [exc_t, exc_v]
     assert cmpblk_1.exits[1].args == [exc_v]
 
     cmpblk_2 = cmpblk_1.exits[0].target
+    print_block(cmpblk_2)
     assert cmpblk_2.inputargs == [exc_t, exc_v]
     assert cmpblk_2.operations[0].args[2].value == org_lnks[2].llexitcase
-    assert cmpblk_2.exits[0].args == org_lnks[2].args  # []
-    assert cmpblk_2.exits[1].args == [exc_t, exc_v]
+    assert cmpblk_2.exits[1].args == org_lnks[2].args  # []
+    assert cmpblk_2.exits[0].args == [exc_t, exc_v]
 
 
 def test_exctran_gcbench():
@@ -71,7 +74,7 @@ def test_exctran_gcbench():
     exctran.exctran_block(blk)
 
     assert blk.exits == org_lnks
-    assert hasattr(blk.exits[1].target, 'mu_excparam')
+    assert not hasattr(blk.exits[1].target, 'mu_excparam')
 
 
 def test_exctran_write():
@@ -94,14 +97,41 @@ def test_exctran_write():
     print_graph(g_write_1)
 
     exctran = MuExceptionTransformer(t)
-    blk = g_write_1.startblock
+    blk = g_write_1.startblock.exits[0].target
     exctran.exctran_block(blk)
 
     print_graph(g_write_1)
+
+    print_block(blk)
 
     assert len(blk.exits[1].args) == 1
     catblk = blk.exits[1].target
     assert len(catblk.inputargs) == 1
     assert len(catblk.exits) == 1
     assert len(catblk.exits[0].args) == 3
-    assert catblk.exits[0].args[1] == catblk.operations[1].result   # exception type
+    assert catblk.operations[1].result in catblk.exits[0].args   # exception type
+    assert catblk.operations[2].result in catblk.exits[0].args   # exception value
+
+
+def test_last_exc_value():
+    def shft(x, n):
+        try:
+            return x << n
+        except Exception, e:
+            print str(e)
+            return 42
+
+    def main(argv):
+        try:
+            print shft(int(argv[1]), int(argv[2]))
+            return 0
+        except Exception, e:
+            print str(e)
+            return 1
+
+    t, _, g = gengraph(main, [str])
+    graphs = prepare(t.graphs, g)
+    print_graph(g)
+
+    exctran = MuExceptionTransformer(t)
+    exctran.exctran_block(g.startblock)

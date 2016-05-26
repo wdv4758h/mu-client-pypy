@@ -153,8 +153,8 @@ class MuExceptionTransformer:
             return lnk
 
         def _has_excinfo_var(exclnk):
-            return isinstance(exclnk.last_exception, Constant) and \
-                    (exclnk.last_exception in exclnk.args or exclnk.last_exc_value in exclnk.args)
+            return (isinstance(exclnk.last_exception, Variable) and exclnk.last_exception in exclnk.args) or \
+                   (isinstance(exclnk.last_exc_value, Variable) and exclnk.last_exc_value in exclnk.args)
 
         def _create_compare_blocks(lnks, cases, inargs):
             """
@@ -244,6 +244,7 @@ class MuExceptionTransformer:
                     exclnk.args[exclnk.args.index(exclnk.last_exc_value)] = var_exc_v
 
                 # set the catch block exits
+                exclnk.prevblock = catblk
                 catblk.exits = (exclnk, )
             else:   # exception information is not used. -> ignore the raised exception
                 pass

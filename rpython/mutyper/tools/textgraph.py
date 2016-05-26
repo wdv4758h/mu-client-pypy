@@ -45,8 +45,8 @@ def list_entries(lst):
         i += 1
 
 
-def print_block(b, map_bi, w_obj=sys.stdout):
-    w_obj.write("blk_%d\n" % map_bi[b])
+def print_block(b, map_bi=None, w_obj=sys.stdout):
+    w_obj.write("blk_%d\n" % (map_bi[b] if map_bi else -1))
     w_obj.write("input: [%s]\n" % (", ".join([str(arg) for arg in b.inputargs])))
 
     w_obj.write("operations:\n")
@@ -57,7 +57,7 @@ def print_block(b, map_bi, w_obj=sys.stdout):
         w_obj.write("switch: %s\n" % b.exitswitch)
 
     w_obj.write("exits: [%s]\n" % (", ".join(
-        [str(("blk_%d" % map_bi[lnk.target], lnk.args)) for lnk in b.exits])))
+        [str(("blk_%d" % (map_bi[lnk.target] if map_bi else -1), lnk.args)) for lnk in b.exits])))
 
 
 def print_graph_with_name(graphs, name):
