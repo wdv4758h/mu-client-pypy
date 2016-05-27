@@ -194,7 +194,8 @@ def launch(cmdargs, ir, hail, exfns, args):
         refrtnbox = ctx.new_fixed(ctx.id_of("@i64"))
         bundle_entry = ctx.handle_from_func(ctx.id_of("@_mu_bundle_entry"))
         st = ctx.new_stack(bundle_entry)
-        th = ctx.new_thread(st, None, PassValues(refstt_arglst, refrtnbox))
+        reftl = ctx.new_fixed(ctx.id_of("@sttmu_threadlocal"))
+        th = ctx.new_thread(st, reftl, PassValues(refstt_arglst, refrtnbox))
 
         mu.execute()
 

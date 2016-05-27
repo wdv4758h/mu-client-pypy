@@ -1,44 +1,23 @@
 """
 Converts the LLTS types and operations to MuTS.
 """
-from rpython.flowspace.model import FunctionGraph, Block, Link, Variable, Constant, c_last_exception, SpaceOperation
+from rpython.flowspace.model import Variable, Constant, c_last_exception
 from rpython.mutyper.muts.muni import MuExternalFunc
 from rpython.mutyper.muts.muops import DEST
 from rpython.translator.mu.preps import prepare
 from .muts.muentity import *
-from rpython.rtyper.lltypesystem import lltype as llt
+from rpython.rtyper.lltypesystem import lltype
 from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
 from rpython.rtyper.llannotation import lltype_to_annotation as l2a
 from rpython.translator.backendopt.all import backend_optimizations
-from .muts import mutype as mut
+from .muts import mutype
 from .muts import muops as muop
-from .ll2mu import *
-from .ll2mu import _MuOpList, _newprimconst
-from .tools.textgraph import print_graph
+from . import ll2mu
 
-import py
 from rpython.tool.ansi_print import AnsiLogger
 
 
 log = AnsiLogger("MuTyper")
-
-
-class _NeedToLoadParentError(Exception):
-    def __init__(self, cnst):
-        self.cnst = cnst
-
-    @staticmethod
-    def need(cnst):
-        if isinstance(cnst, Constant) and isinstance(cnst.value, lltype._ptr):
-            ptr = cnst.value
-            obj = ptr._obj
-            wrprnt = getattr(obj, '_wrparent', None)
-            if wrprnt:
-                assert isinstance(obj, lltype._struct)
-                prnt = wrprnt()
-                ty = prnt._TYPE
-                return len(ty._names) > 1
-        return False
 
 
 class MuTyper:
@@ -53,6 +32,16 @@ class MuTyper:
         self.graphs = list(translator.graphs)
         self.helper_graphs = {}
         self._fncname_cntr_dic = {}
+
+        # initialise thread local struct type
+        if len(translator.annotator.bookkeeper.thread_local_fields) == 0:
+            self.tlstt_t = None
+        else:
+            _tlflds = []
+            for tlf in translator.annotator.bookkeeper.thread_local_fields:
+                _tlflds.append((tlf.fieldname, ll2mu.ll2mu_ty(tlf.FIELDTYPE)))
+            self.tlstt_t = mutype.MuStruct('mu_threadlocal', *_tlflds)
+        setattr(ll2mu, '__mu_threadlocalstt_t', self.tlstt_t)
 
     def prepare_all(self):
         # wrapper outside of preps.prepare to provide for the name_dict
@@ -73,8 +62,8 @@ class MuTyper:
     def specialise(self, g):
         log.info("specialising graph '%s'" % g.name)
         g.mu_name = MuName(g.name)
-        get_arg_types = lambda lst: map(ll2mu_ty, map(lambda arg: arg.concretetype, lst))
-        g.mu_type = mut.MuFuncRef(mut.MuFuncSig(get_arg_types(g.startblock.mu_inputargs),
+        get_arg_types = lambda lst: map(ll2mu.ll2mu_ty, map(lambda arg: arg.concretetype, lst))
+        g.mu_type = mutype.MuFuncRef(mutype.MuFuncSig(get_arg_types(g.startblock.mu_inputargs),
                                                 get_arg_types(g.returnblock.mu_inputargs)))
         ver = Variable('_ver')
         ver.mu_name = MuName(ver.name, g)
@@ -89,7 +78,7 @@ class MuTyper:
         self.proc_gcells()
 
     def specialise_block(self, blk):
-        muops = _MuOpList()
+        muops = ll2mu._MuOpList()
         self.proc_arglist(blk.mu_inputargs, blk)
         if hasattr(blk, 'mu_excparam'):
             self.proc_arg(blk.mu_excparam, blk)
@@ -109,7 +98,7 @@ class MuTyper:
             elif len(blk.exits) == 2:
                 blk.exitswitch = self.proc_arg(blk.exitswitch, blk)
                 if blk.exitswitch.mu_type is mutype.bool_t:
-                    blk.exitswitch = muops.append(muop.EQ(blk.exitswitch, _newprimconst(mutype.bool_t, 1)))
+                    blk.exitswitch = muops.append(muop.EQ(blk.exitswitch, ll2mu._newprimconst(mutype.bool_t, 1)))
                 muops.append(muop.BRANCH2(blk.exitswitch, DEST.from_link(blk.exits[1]), DEST.from_link(blk.exits[0])))
             else:   # more than 2 exits -> use SWITCH statement
                 blk.exitswitch = self.proc_arg(blk.exitswitch, blk)
@@ -133,7 +122,7 @@ class MuTyper:
 
         # translate operation
         try:
-            _muops, res = ll2mu_op(op)
+            _muops, res = ll2mu.ll2mu_op(op)
             if len(_muops) == 0:
                 self._alias[op.result] = res     # no op -> result = args[0]
 
@@ -164,7 +153,7 @@ class MuTyper:
                         else:
                             graph = self.helper_graphs[key]
                         _o.callee = graph
-                if hasattr(_o.result, 'mu_name'):
+                if hasattr(_o, 'result') and hasattr(_o.result, 'mu_name'):
                     _o.result.mu_name.scope = blk   # Correct the scope of result variables
 
             muops += _muops
@@ -184,7 +173,7 @@ class MuTyper:
 
         if isinstance(arg, Variable):
             if not (hasattr(arg, 'mu_type') and hasattr(arg, 'mu_name')):
-                arg.mu_type = ll2mu_ty(arg.concretetype)
+                arg.mu_type = ll2mu.ll2mu_ty(arg.concretetype)
                 arg.mu_name = MuName(arg.name, blk)
 
         elif isinstance(arg, Constant):
@@ -193,12 +182,12 @@ class MuTyper:
                 if isinstance(llv, mutype.MuType):
                     return arg
                 elif isinstance(llv, lltype.LowLevelType):
-                    Constant.__init__(arg, ll2mu_ty(llv), lltype.Void)
+                    Constant.__init__(arg, ll2mu.ll2mu_ty(llv), lltype.Void)
             else:
                 try:
                     if not hasattr(arg, 'mu_type'):     # has not been processed.
-                        muv = ll2mu_val(llv)
-                        mut = ll2mu_ty(arg.concretetype)
+                        muv = ll2mu.ll2mu_val(llv)
+                        mut = ll2mu.ll2mu_ty(arg.concretetype)
                         if isinstance(muv, mutype._muprimitive) and muv._TYPE != mut:
                             log.warning("correcting the type of '%(muv)s' from '%(type1)s' to '%(type2)s'." %
                                         {'muv': muv, 'type1': muv._TYPE, 'type2': mut})

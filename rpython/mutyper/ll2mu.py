@@ -263,6 +263,8 @@ def _llval2mu_prim(llv):
     if isinstance(llv, TotalOrderSymbolic):
         llv = llv.compute_fn()
     elif isinstance(llv, CDefinedIntSymbolic):
+        if llv.default == '?':
+            raise NotImplementedError("Unknown default value for CDefinedIntSymbolic '%s'." % llv.expr)
         llv = llv.default
     elif isinstance(llv, str):  # char
         llv = ord(llv)
@@ -413,11 +415,12 @@ def _llval2mu_opq(llv):
     log.ll2mu_val("WARNING: specialising '%r' to '%r' of type '%s'." % (llv, muv, muv._TYPE))
     return muv
 
+
 # ----------------------------------------------------------
 def ll2mu_op(llop):
     tmp = _ll2mu_op(llop.opname, llop.args, llop.result)
     if isinstance(tmp, list):
-        return tmp, tmp[-1].result
+        return tmp, getattr(tmp[-1], 'result', None)
     return tmp
 
 
@@ -447,12 +450,12 @@ def _newprimconst(mut, primval):
 class _MuOpList(list):
     def append(self, op):
         list.append(self, op)
-        return op.result
+        return getattr(op, 'result', None)
 
     def extend(self, oplist):
         if len(oplist) > 0:
             list.extend(self, oplist)
-            return self[-1].result
+            return getattr(self[-1], 'result', None)
         return None
 
 
@@ -1060,5 +1063,34 @@ def _llop2mu_length_of_simple_gcarray_from_opaque(opq, res=None, llopname='lengt
     ops.extend(_ll2mu_op('getarraysize', [ref], result=res))
     return ops
 
+
+# ----------------
+# threadlocal stuff
+def _llop2mu_threadlocalref_get(ofs, res=None, llopname='threadlocalref_get'):
+    ops = _MuOpList()
+
+    # HACK!
+    tlstt_t = globals().get('__mu_threadlocalstt_t', None)
+    assert tlstt_t
+
+    tlref_void = ops.append(muops.GET_THREADLOCAL())
+    tlref_stt = ops.extend(_ll2mu_op('cast_pointer', [Constant(mutype.MuRef(tlstt_t), mutype.void_t), tlref_void]))
+    fld = ofs.value.expr[10:]
+    ops.extend(_ll2mu_op('getfield', [tlref_stt, Constant(fld, lltype.Void)], result=res))
+    return ops
+
+
+def _llop2mu_threadlocalref_set(ofs, val, res=None, llopname='threadlocalref_set'):
+    ops = _MuOpList()
+
+    # HACK!
+    tlstt_t = globals().get('__mu_threadlocalstt_t', None)
+    assert tlstt_t
+
+    tlref_void = ops.append(muops.GET_THREADLOCAL())
+    tlref_stt = ops.extend(_ll2mu_op('cast_pointer', [Constant(mutype.MuRef(tlstt_t), mutype.void_t), tlref_void]))
+    fld = ofs.value.expr[10:]
+    ops.extend(_ll2mu_op('setfield', [tlref_stt, Constant(fld, lltype.Void), val]))
+    return ops
 
 # TODO: rest of the operations

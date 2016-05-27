@@ -64,7 +64,7 @@ class MuOperation(object):
             res = Variable('rtn')
             res.mu_type = cls.__dict__['_fnc_rtntype'](args)
             if res.mu_type is not void_t:
-                res.mu_name = MuName(res.name, args[0].mu_name.scope)
+                res.mu_name = MuName(res.name, args[0].mu_name.scope if len(args) > 0 else None)
             kwargs['result'] = res
 
         if 'exc' not in kwargs:
@@ -88,7 +88,7 @@ class MuOperation(object):
                 self.result.mu_type = int1_t
         except Exception:
             pass
-        
+
     def __str__(self):
         cls = self.__class__
         rhs = "%s %s" % (self.opname, cls.__dict__['_fnc_str'](self))
@@ -319,5 +319,9 @@ NATIVE_EXPOSE = _newcomminst("uvm.native.expose", "func cookie",
 NATIVE_UNEXPOSE = _newcomminst("uvm.native.unexpose", "value",
                                lambda (value, ): void_t,
                                lambda op: "(%s)" % op.value.mu_name)
+
+GET_THREADLOCAL = _newcomminst("uvm.get_threadlocal", "", lambda args: MuRef(void_t), lambda op: "")
+
+SET_THREADLOCAL = _newcomminst("uvm.set_threadlocal", "ref", lambda args: void_t, lambda op: "(%s)" % op.ref)
 
 # TODO: a few more?
