@@ -935,11 +935,17 @@ def _llop2mu_raw_load(adr, ofs, res, llopname='raw_load'):
 
 
 def _llop2mu_raw_store(adr, ofs, val, res=None, llopname='raw_store'):
-    ops = _MuOpList()
-    loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
-    loc_ptr = ops.append(muops.PTRCAST(loc_adr, mutype.MuUPtr(val.mu_type)))
-    ops.append(muops.STORE(loc_ptr, val))
-    return ops
+    if isinstance(adr.mu_type, mutype.MuInt):
+        ops = _MuOpList()
+        loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
+        loc_ptr = ops.append(muops.PTRCAST(loc_adr, mutype.MuUPtr(val.mu_type)))
+        ops.append(muops.STORE(loc_ptr, val))
+        return ops
+    elif isinstance(adr.mu_type, mutype.MuRef):
+        assert isinstance(ofs.value, CDefinedIntSymbolic)
+        assert ofs.value.expr.startswith("RPY_TLOFS_")  # threadlocalref_set case
+        return _ll2mu_op('setfield', [adr, Constant(ofs.value.expr[10:], lltype.Void), val], result=res)
+
 
 for op in "add sub lt le eq ne gt ge".split(' '):
     globals()['_llop2mu_adr_' + op] = lambda adr1, adr2, res, llopname:\
@@ -1091,6 +1097,21 @@ def _llop2mu_threadlocalref_set(ofs, val, res=None, llopname='threadlocalref_set
     tlref_stt = ops.extend(_ll2mu_op('cast_pointer', [Constant(mutype.MuRef(tlstt_t), mutype.void_t), tlref_void]))
     fld = ofs.value.expr[10:]
     ops.extend(_ll2mu_op('setfield', [tlref_stt, Constant(fld, lltype.Void), val]))
+    return ops
+
+
+def _llop2mu_threadlocalref_addr(res=None, llopname='threadlocalref_addr'):
+    ops = _MuOpList()
+
+    # Hack!
+    tlstt_t = globals().get('__mu_threadlocalstt_t', None)
+    assert tlstt_t
+
+    tlref_void = ops.append(muops.GET_THREADLOCAL())
+    reftlstt_t = mutype.MuRef(tlstt_t)
+    res.mu_type = reftlstt_t
+    ops.extend(_ll2mu_op('cast_pointer', [Constant(reftlstt_t, mutype.void_t), tlref_void], result=res))
+
     return ops
 
 # TODO: rest of the operations
