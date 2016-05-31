@@ -9,7 +9,7 @@ RPYC_DIR = ../../c
 RPYC_SRC_DIR = $(RPYC_DIR)/src
 PYPY_MOD_DIR = ../../../../pypy/module
 CC = cc
-OBJS = dtoa.o utils.o errno.o tscmp.o
+OBJS = dtoa.o utils.o errno.o tscmp.o linux_debug.o
 FLAGS = -D__MU__
 
 dtoa.o: $(RPYC_SRC_DIR)/dtoa.c $(RPYC_SRC_DIR)/dtoa.h
@@ -23,6 +23,9 @@ errno.o: src/errno.c
 
 tscmp.o: $(PYPY_MOD_DIR)/operator/tscmp.c $(PYPY_MOD_DIR)/operator/tscmp.h
 	$(CC) -fPIC $(FLAGS) -c  -I $(RPYC_DIR) -o $@ $<
+
+linux_debug.o: src/linux_debug.c
+	$(CC) -fPIC $(FLAGS) -c -o $@ $<
 
 librpyc.so: $(OBJS)
 	$(CC) -shared -o $@ $(OBJS)
