@@ -60,7 +60,10 @@
    Any function or global variable declared with no attribute at all is
    a bug; please report or fix it.
 */
-#ifdef __GNUC__
+#ifdef __MU__ /* Mu backend HACK */
+#  define RPY_EXTERN /* nothing */
+#endif
+#if defined(__GNUC__)
 #  define RPY_EXPORTED extern __attribute__((visibility("default")))
 #  define _RPY_HIDDEN  __attribute__((visibility("hidden")))
 #else

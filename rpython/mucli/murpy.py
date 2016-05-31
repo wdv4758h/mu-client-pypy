@@ -144,20 +144,23 @@ def build_arglist(ctx, argv):
 def load_extfncs(ctx, exfns):
     libc = ctypes.CDLL(ctypes.util.find_library("c"))
     libm = ctypes.CDLL(ctypes.util.find_library("m"))
-
+    libutil = ctypes.CDLL(ctypes.util.find_library("util"))
+    librt = ctypes.CDLL(ctypes.util.find_library("rt"))
     dir_rpython = os.path.dirname(os.path.dirname(__file__))
     dir_librpyc = os.path.join(dir_rpython, 'translator', 'mu', 'rpyc')
     path_librpyc = os.path.join(dir_librpyc, 'librpyc.so')
 
+    _pypy_linux_prefix = "__pypy_mu_linux_"
+    _pypy_macro_prefix = "__pypy_macro_"
+
     try:
         librpyc = ctypes.CDLL(path_librpyc)
     except OSError as e:
-        print("ERROR: library {} not found. "
-                "Please execute 'make' in the directory {}".format(
-                    path_librpyc, dir_librpyc), file=sys.stderr)
+        os.write(2, "ERROR: library {} not found. "
+                    "Please execute 'make' in the directory {}\n".format(path_librpyc, dir_librpyc))
         raise e
 
-    libs = [libc, libm, librpyc]
+    libs = (libc, libm, libutil, librt, librpyc)
     for c_name, fncptr_name, gcl_name, hdrs in exfns:
         with DelayedDisposer() as dd:
             adr = None
@@ -166,8 +169,13 @@ def load_extfncs(ctx, exfns):
                     adr = ctypes.cast(getattr(lib, c_name), ctypes.c_void_p).value
                     break
                 except AttributeError:
-                    adr = None
                     pass
+            if adr is None:
+                for prefix in (_pypy_linux_prefix, _pypy_macro_prefix):
+                    try:
+                        adr = ctypes.cast(getattr(librpyc, prefix + c_name), ctypes.c_void_p).value
+                    except AttributeError:
+                        pass
             if adr is None:
                 os.write(2, "Failed to load function '%(c_name)s'.\n" % locals())
                 raise NotImplementedError
