@@ -53,6 +53,9 @@ def _ll2mu_ty(llt):
         return _lltype2mu_ptr(llt)
     elif isinstance(llt, lltype.OpaqueType):
         return _lltype2mu_opq(llt)
+    elif llt is llmemory.WeakRef:
+        return _lltype2mu_wref(llt)
+
     else:
         raise NotImplementedError("Don't know how to specialise %s using MuTS." % llt)
 # ll2mu_ty = ll.saferecursive(_ll2mu_ty, None)
@@ -193,6 +196,12 @@ def _lltype2mu_opq(llt):
     mut = mutype.int64_t  # values of opaque type are translated to be 64-bit integers
     log.warning("mapping type %r -> %r" % (llt, mut))
     return mut
+
+
+def _lltype2mu_wref(llt):
+    return mutype.MuStruct('WeakRef', (GC_IDHASH_FLD, mutype.int64_t), ('wref', mutype.wrefvoid_t))
+
+
 # ----------------------------------------------------------
 __ll2muval_cache = {}
 __ll2muval_cache_ptr = {}
@@ -253,6 +262,9 @@ def _ll2mu_val(llv):
 
     elif isinstance(llv, lltype._opaque):
         return _llval2mu_opq(llv)
+
+    elif isinstance(llv, llmemory._wref):
+        return _llval2mu_wref(llv)
 
     else:
         raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
@@ -416,6 +428,12 @@ def _llval2mu_opq(llv):
     return muv
 
 
+def _llval2mu_wref(llv):
+    mut = ll2mu_ty(llv._TYPE)
+    stt = mutype._mustruct(mut)
+    setattr(stt, 'wref', ll2mu_val(llv._dereference()))
+
+    return stt
 # ----------------------------------------------------------
 def ll2mu_op(llop):
     tmp = _ll2mu_op(llop.opname, llop.args, llop.result)
@@ -1106,5 +1124,20 @@ def _llop2mu_threadlocalref_addr(res=None, llopname='threadlocalref_addr'):
     ops.extend(_ll2mu_op('cast_pointer', [Constant(reftlstt_t, mutype.void_t), tlref_void], result=res))
 
     return ops
+
+
+def _llop2mu_weakref_create(ptr, res=None, llopname='weakref_create'):
+    ops = _MuOpList()
+
+    stt_t = ll2mu_ty(llmemory.WeakRef)
+    ops.append(muops.NEW(stt_t, result=res))
+    ops.extend(_ll2mu_op('setfield', [res, Constant('wref'), ptr]))
+
+    return ops
+
+
+def _llop2mu_weakref_deref(ptr, res=None, llopname='weakref_deref'):
+    return _ll2mu_op('getfield', [ptr, Constant('wref')], result=res)
+
 
 # TODO: rest of the operations

@@ -974,6 +974,13 @@ class _muufuncptr(_mufuncref):
     pass
 
 
+class MuWeakRef(MuRef):
+    type_prefix = "wrf"
+    type_str_sym = "~"
+    type_constr_name = "weakref"
+
+wrefvoid_t = MuWeakRef(void_t)
+
 # ----------------------------------------------------------
 def mu_typeOf(val):
     try:

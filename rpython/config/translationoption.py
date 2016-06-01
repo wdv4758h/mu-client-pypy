@@ -58,7 +58,7 @@ translation_optiondescription = OptionDescription(
                                 ("translation.backendopt.inline", True),
                                 ("translation.backendopt.mallocs", True),
                                 # ("translation.backendopt.clever_malloc_removal", True),
-                                ("translation.gc", "none")]
+                                ("translation.gc", "incminimark")]  # setting translation.rweakref option
                      },
                  cmdline="-b --backend"),
 
