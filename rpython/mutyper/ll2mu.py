@@ -161,7 +161,7 @@ def _lltype2mu_arr(llt):
     if needs_gcheader(llt):
         flds = ((GC_IDHASH_FLD, mutype.int64_t), ) + flds
 
-    return mutype.MuHybrid(__newtypename("%s" % llt.OF.__name__), *flds)
+    return mutype.MuHybrid(__newtypename("%s" % llt.OF.__name__ if hasattr(llt.OF, '__name__') else str(llt.OF)), *flds)
 
 
 def _lltype2mu_ptr(llt):
@@ -223,7 +223,8 @@ def ll2mu_val(llv):
         return cache[key]
     except KeyError:
         muv = _ll2mu_val(llv)
-        cache[key] = muv
+        if key not in cache:    # may have already been added to cache (in stt to prevent recursion).
+            cache[key] = muv
         return muv
     except TypeError, e:
         if isinstance(llv, llmemory.AddressOffset):
@@ -278,7 +279,8 @@ def _llval2mu_prim(llv):
         if llv.default == '?':
             raise NotImplementedError("Unknown default value for CDefinedIntSymbolic '%s'." % llv.expr)
         llv = llv.default
-    elif isinstance(llv, str):  # char
+    elif isinstance(llv, (str, unicode)):
+        assert len(llv) == 1    # char
         llv = ord(llv)
 
     return mutype._muprimitive(mut, llv)
@@ -299,6 +301,8 @@ def _llval2mu_stt(llv):
 
     mut = ll2mu_ty(llv._TYPE)
     stt = mutype._mustruct(mut)
+
+    __ll2muval_cache[(llv._TYPE, llv)] = stt    # add to cache to prevent recursion.
 
     if len(llv._TYPE._names) != 0:  # origional value struct is non-empty
         for fld in filter(lambda n: n != GC_IDHASH_FLD, mut._names):
@@ -434,7 +438,35 @@ def _llval2mu_wref(llv):
     setattr(stt, 'wref', ll2mu_val(llv._dereference()))
 
     return stt
+
+
 # ----------------------------------------------------------
+class IgnoredLLOp(NotImplementedError):
+    _llops = (
+        "cast_int_to_uint",
+        "cast_uint_to_int",
+        "hint",
+        "likely",
+        "debug_flush",
+        "debug_forked",
+        "debug_offset",
+        "debug_print",
+        "debug_start",
+        "debug_stop",
+        "gc_add_memory_pressure",
+        "gc_set_max_heap_size",
+        "gc_thread_after_fork",
+        "gc_writebarrier",
+        "gc_writebarrier_before_copy",
+        "gc_unpin",
+        "jit_conditional_call",
+        "jit_force_quasi_immutable",
+        "jit_force_virtual",
+        "jit_is_virtual",
+        "jit_marker",
+    )
+
+
 def ll2mu_op(llop):
     tmp = _ll2mu_op(llop.opname, llop.args, llop.result)
     if isinstance(tmp, list):
@@ -446,6 +478,9 @@ def _ll2mu_op(opname, args, result=None):
     try:
         return globals()['_llop2mu_' + opname](*args, res=result, llopname=opname)
     except KeyError:
+        if opname in IgnoredLLOp._llops:  # Making ignoring explicit
+            raise IgnoredLLOp(opname)
+
         # try if it's an integer operation that can be redirected.
         prefixes = ('uint', 'char', 'lllong', 'long')
         if any(n in opname for n in prefixes):
@@ -603,6 +638,8 @@ for cmp in 'lt le gt ge'.split(' '):
     __primop_map['uint_' + cmp] = 'U' + cmp.upper()
     __primop_map['float_' + cmp] = 'FO' + cmp.upper()
     __primop_map['char_' + cmp] = 'U' + cmp.upper()
+__primop_map['unichar_eq'] = 'EQ'
+__primop_map['unichar_ne'] = 'NE'
 
 for key in __primop_map:
     globals()['_llop2mu_' + key] = \
@@ -756,7 +793,7 @@ def _llop2mu_getsubstruct(var, cnst_fldname, res=None, llopname='getsubstruct'):
             ops[-1].result = res
     except KeyError:
         log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
-        raise NotImplementedError
+        raise IgnoredLLOp
     return ops
 
 
@@ -766,7 +803,7 @@ def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
         ops.append(muops.LOAD(iref_fld, result=res))
     except KeyError:
         log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
-        raise NotImplementedError
+        raise IgnoredLLOp
     return ops
 
 
@@ -776,7 +813,7 @@ def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
         ops.append(muops.STORE(iref_fld, val))
     except KeyError:
         log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
-        raise NotImplementedError
+        raise IgnoredLLOp
     return ops
 
 
@@ -789,6 +826,12 @@ def __getarrayitemiref(var, idx):
 def _llop2mu_getarrayitem(var, idx, res=None, llopname='getarrayitem'):
     iref_itm, ops = __getarrayitemiref(var, idx)
     ops.append(muops.LOAD(iref_itm, result=res))
+    return ops
+
+
+def _llop2mu_getarraysubstruct(var, idx, res=None, llopname='getarraysubstruct'):
+    _iref_itm, ops = __getarrayitemiref(var, idx)
+    ops[-1].result = res
     return ops
 
 
@@ -1126,6 +1169,8 @@ def _llop2mu_threadlocalref_addr(res=None, llopname='threadlocalref_addr'):
     return ops
 
 
+# ----------------
+# Weak references
 def _llop2mu_weakref_create(ptr, res=None, llopname='weakref_create'):
     ops = _MuOpList()
 
@@ -1138,6 +1183,22 @@ def _llop2mu_weakref_create(ptr, res=None, llopname='weakref_create'):
 
 def _llop2mu_weakref_deref(ptr, res=None, llopname='weakref_deref'):
     return _ll2mu_op('getfield', [ptr, Constant('wref')], result=res)
+
+
+# ----------------
+# Some dummy gc operations
+for _llopname in ("gc_get_rpy_memory_usage", "gc_get_rpy_type_index"):
+    globals()['_llop2mu_' + _llopname] = lambda res, llopname: ([], _newprimconst(res.mu_type, -1))
+
+for _llopname in ("gc_get_rpy_roots",
+                  "gc_get_rpy_referents",
+                  "gc_is_rpy_instance",
+                  "gc_dump_rpy_heap"):
+    globals()['_llop2mu_' + _llopname] = lambda res, llopname: ([], _newprimconst(res.mu_type, 0))
+
+
+def _llop2mu_gc_thread_before_fork(res=None, llopname='gc_thread_before_fork'):
+    return [], _newprimconst(res.mu_type, 0)
 
 
 # TODO: rest of the operations

@@ -35,7 +35,7 @@ class MuTyper:
 
         # initialise thread local struct type
         if len(translator.annotator.bookkeeper.thread_local_fields) == 0:
-            self.tlstt_t = None
+            self.tlstt_t = mutype.MuStruct('mu_threadlocal', ('dummy', mutype.char_t))  # use a dummy struct when empty
         else:
             _tlflds = []
             for tlf in translator.annotator.bookkeeper.thread_local_fields:
@@ -157,9 +157,9 @@ class MuTyper:
                     _o.result.mu_name.scope = blk   # Correct the scope of result variables
 
             muops += _muops
-        except NotImplementedError:
-            log.warning("Ignoring '%s'." % op)
-            self._alias[op.result] = op.args[0]
+        except ll2mu.IgnoredLLOp:
+            if len(op.args) == 1:
+                self._alias[op.result] = op.args[0]
 
         return muops
 

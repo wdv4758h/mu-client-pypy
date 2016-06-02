@@ -52,13 +52,12 @@ translation_optiondescription = OptionDescription(
                  requires={
                      "c":      [("translation.type_system", "lltype")],
                      "mu":     [("translation.type_system", "lltype"),
+                                ("translation.gc", "none"),
                                 ("translation.backendopt.raisingop2direct_call", True),
                                 ("translation.backendopt.remove_asserts", True),
                                 ("translation.backendopt.really_remove_asserts", True),
                                 ("translation.backendopt.inline", True),
-                                ("translation.backendopt.mallocs", True),
-                                # ("translation.backendopt.clever_malloc_removal", True),
-                                ("translation.gc", "incminimark")]  # setting translation.rweakref option
+                                ("translation.backendopt.mallocs", True)]
                      },
                  cmdline="-b --backend"),
 
@@ -75,8 +74,9 @@ translation_optiondescription = OptionDescription(
                   "ref", requires={
                      "ref": [("translation.rweakref", False), # XXX
                              ("translation.gctransformer", "ref")],
-                     "none": [("translation.rweakref", False), # XXX
-                             ("translation.gctransformer", "none")],
+                     # "none": [("translation.rweakref", False), # XXX
+                     #         ("translation.gctransformer", "none")],
+                     "none": [("translation.gctransformer", "none")],
                      "semispace": [("translation.gctransformer", "framework")],
                      "statistics": [("translation.gctransformer", "framework")],
                      "generation": [("translation.gctransformer", "framework")],

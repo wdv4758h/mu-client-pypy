@@ -196,6 +196,8 @@ class MuTextIRGenerator:
         for gcl in self.mutyper.ldgcells:
             _trav_refval(gcl.value)
 
+        _recursive_addtype(self.gbltypes, self.mutyper.tlstt_t)
+
 
 def _recursive_addtype(s_types, mut):
     if mut not in s_types:
