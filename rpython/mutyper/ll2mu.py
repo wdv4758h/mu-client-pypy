@@ -445,6 +445,7 @@ class IgnoredLLOp(NotImplementedError):
     _llops = (
         "cast_int_to_uint",
         "cast_uint_to_int",
+        "cast_int_to_unichar",
         "hint",
         "likely",
         "debug_flush",
@@ -550,7 +551,12 @@ def _llop2mu_indirect_call(var_callee, *args, **kwargs):
 # ----------------
 # primitive ops
 def _llop2mu_bool_not(x, res=None, llopname='bool_not'):
-    return [muops.XOR(x, _newprimconst(x.mu_type, 1), result=res)]
+    ops = _MuOpList()
+    if x.mu_type is mutype.int1_t:
+        v = ops.append(muops.ZEXT(x, mutype.bool_t))
+    else:
+        v = x
+    return [muops.XOR(v, _newprimconst(mutype.bool_t, 1), result=res)]
 
 
 def _llop2mu_int_is_true(x, res=None, llopname='int_is_true'):
@@ -715,8 +721,14 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
             return [], x
         return [op(x, RES_MUTYPE, result=res)]
 
-    elif ll2mu_ty(SRC_LLTYPE).__class__ == ll2mu_ty(RES_LLTYPE).__class__:
+    elif SRC_MUTYPE.__class__ == RES_MUTYPE.__class__:
         return [], x
+    elif SRC_MUTYPE is mutype.double_t and isinstance(RES_MUTYPE, mutype.MuInt):
+        return [muops.FPTOSI(x, RES_MUTYPE)]
+    elif isinstance(SRC_MUTYPE, mutype.MuInt) and RES_MUTYPE is mutype.double_t:
+        return [muops.SITOFP(x, RES_MUTYPE)]
+
+    raise NotImplementedError("force_cast(%s) -> %s" % (SRC_LLTYPE, RES_LLTYPE))
 
 _llop2mu_cast_primitive = _llop2mu_force_cast
 
@@ -802,6 +814,9 @@ def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
         ops.append(muops.LOAD(iref_fld, result=res))
     except KeyError:
+        if res and res.concretetype is lltype.Void:     # trying to get a field that can't be translated.
+            raise IgnoredLLOp
+
         log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
         raise IgnoredLLOp
     return ops
@@ -812,6 +827,9 @@ def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
         ops.append(muops.STORE(iref_fld, val))
     except KeyError:
+        if val.concretetype is lltype.Void:     # trying to set a field with a value that can't be translated.
+            raise IgnoredLLOp
+
         log.error("Field '%s' not found in type '%s'." % (cnst_fldname.value, var.mu_type.TO))
         raise IgnoredLLOp
     return ops
@@ -870,16 +888,26 @@ def __getinterioriref(var, offsets):
 
 
 def _llop2mu_getinteriorfield(var, *offsets, **kwargs):
-    iref, ops = __getinterioriref(var, offsets)
     res = kwargs['res'] if 'res' in kwargs else None
-    ops.append(muops.LOAD(iref, result=res))
+    try:
+        iref, ops = __getinterioriref(var, offsets)
+        ops.append(muops.LOAD(iref, result=res))
+    except KeyError:
+        if res and res.concretetype is lltype.Void:     # trying to get a field that can't be translated.
+            raise IgnoredLLOp
+        raise TypeError     # unknown type error
     return ops
 
 
 def _llop2mu_setinteriorfield(var, *offsets_val, **kwards):
     offsets, val = offsets_val[:-1], offsets_val[-1]
-    iref, ops = __getinterioriref(var, offsets)
-    ops.append(muops.STORE(iref, val))
+    try:
+        iref, ops = __getinterioriref(var, offsets)
+        ops.append(muops.STORE(iref, val))
+    except KeyError:
+        if val.concretetype is lltype.Void:
+            raise IgnoredLLOp
+        raise TypeError     # unknown type error
     return ops
 
 
@@ -1018,6 +1046,14 @@ def _llop2mu_cast_ptr_to_adr(ptr, res=None, llopname='cast_ptr_to_adr'):
         adr = ops.append(muops.NATIVE_PIN(ptr))
 
     ops.append(muops.PTRCAST(adr, ll2mu_ty(llmemory.Address), result=res))
+    return ops
+
+
+def _llop2mu_cast_ptr_to_int(ptr, res=None, llopname='cast_ptr_to_int'):
+    ops = _MuOpList()
+    ops.extend(_ll2mu_op('cast_ptr_to_adr', [ptr], result=res))
+    if isinstance(ptr.mu_type, mutype.MuRef):
+        ops.extend(_ll2mu_op('keepalive', [ptr]))
     return ops
 
 

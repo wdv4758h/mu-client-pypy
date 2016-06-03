@@ -39,7 +39,8 @@ def chop(graphs, g_entry):
                             ref[callee] = True
                             visit(callee)
                     except AttributeError:
-                        log.error("Error: \"%s\" function does not have a graph" % fnc._name)
+                        # log.error("Error: \"%s\" function does not have a graph" % fnc._name)
+                        pass
                     except AssertionError:
                         log.error("Error: \"%s\" graph not found" % callee._name)
                 elif op.opname == 'indirect_call':
@@ -66,6 +67,7 @@ _OPS_ALLOW_LLTYPE_ARGS += [_op for _op in LL_OPERATIONS if _op.startswith("adr_"
 
 
 def _keep_arg(arg, opname=''):
+    _OPS_KEEP_ALL_ARGS = ('setfield', 'setinteriorfield')
     # Returns True if the argument/parameter is to be kept
     if 'malloc' in opname:
         return True
@@ -78,6 +80,8 @@ def _keep_arg(arg, opname=''):
             return True
         elif isinstance(arg.value, lltype.LowLevelType):
             return opname in _OPS_ALLOW_LLTYPE_ARGS
+    if opname in _OPS_KEEP_ALL_ARGS:
+        return True
     log.keep_arg("Throwing argument %(arg)r from operation %(opname)s" % locals())
     return False
 
