@@ -209,7 +209,7 @@ class MuTyper:
                             gcl = self._cnst_gcell_dict[arg]
                         return self._get_ldgcell_var(gcl, blk)
                 except (NotImplementedError, AssertionError, TypeError):
-                    log.info("can not process '%(arg)s' in mutyper, ignored." % locals())
+                    log.warning("can not process '%(arg)s' in mutyper, ignored." % locals())
                     pass
 
         return arg

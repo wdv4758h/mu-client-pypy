@@ -435,8 +435,8 @@ def _llval2mu_opq(llv):
 def _llval2mu_wref(llv):
     mut = ll2mu_ty(llv._TYPE)
     stt = mutype._mustruct(mut)
-    setattr(stt, 'wref', ll2mu_val(llv._dereference()))
-
+    llobj = llv._dereference()
+    setattr(stt, 'wref', ll2mu_val(llobj) if llobj else mutype._munullref(mut.wref))
     return stt
 
 
@@ -531,7 +531,7 @@ def _llop2mu_direct_call(cst_fnc, *args, **kwargs):
         fnc_sig = fr._TYPE.Sig
         rtn_t = mutype.void_t if fnc_sig._voidrtn() else _ref2uptrvoid(fnc_sig.RTNS[0])
         extfnc = muni.MuExternalFunc(fr.fncname, tuple(map(_ref2uptrvoid, fnc_sig.ARGS)),
-                                     rtn_t, fr.compilation_info.includes)
+                                     rtn_t, map(str, fr.compilation_info.includes))
         ldfncptr = ops.append(muops.LOAD(extfnc))
         callee = ldfncptr
         call_op = muops.CCALL

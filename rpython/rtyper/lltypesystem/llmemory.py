@@ -783,7 +783,7 @@ def ann_cast_int_to_adr(s):
 
 class _WeakRefType(lltype.ContainerType):
     _gckind = 'gc'
-
+    __name__ = "WeakRef"
     def __str__(self):
         return "WeakRef"
 

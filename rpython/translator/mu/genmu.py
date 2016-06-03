@@ -165,8 +165,12 @@ class MuTextIRGenerator:
                         if dst:
                             _trav_symbol(dst.args)
 
+        _seen_sttval = set()
         def _trav_refval(ref):
             def _trav_sttval(obj):
+                if obj in _seen_sttval:
+                    return
+                _seen_sttval.add(obj)
                 _recursive_addtype(self.gbltypes, obj._TYPE)
                 for fld in obj._TYPE._names:
                     fldval = getattr(obj, fld)
@@ -194,6 +198,7 @@ class MuTextIRGenerator:
                             fn(itm)
 
         for gcl in self.mutyper.ldgcells:
+            _seen_sttval = set()
             _trav_refval(gcl.value)
 
         _recursive_addtype(self.gbltypes, self.mutyper.tlstt_t)

@@ -8,6 +8,7 @@ from rpython.flowspace.model import Constant, Variable
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.rtyper.lltypesystem.lloperation import LL_OPERATIONS
 from copy import copy
+import re
 
 log = AnsiLogger("preps")
 
@@ -115,7 +116,7 @@ def prepare(graphs, entry_graph, name_dic={}):
                 gs.append(g)
                 ctr += 1
                 name_dic[name] = (gs, ctr)
-        g.name = "%s_%d" % (name, ctr)
+        g.name = "%s_%d" % (re.sub(r':', '_', name), ctr)
 
         for blk in g.iterblocks():
             # remove the input args that are Void as well.

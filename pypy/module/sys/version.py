@@ -65,7 +65,8 @@ def _make_version_template(PYPY_VERSION=PYPY_VERSION):
 _VERSION_TEMPLATE = _make_version_template()
 
 def get_version(space):
-    return space.wrap(_VERSION_TEMPLATE % compilerinfo.get_compiler_info())
+    # return space.wrap(_VERSION_TEMPLATE % compilerinfo.get_compiler_info())
+    return space.wrap(_VERSION_TEMPLATE % "Mu")
 
 def get_winver(space):
     return space.wrap("%d.%d" % (
