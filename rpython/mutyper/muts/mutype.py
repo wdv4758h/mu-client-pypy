@@ -156,7 +156,8 @@ class _muprimitive(_muobject):
         return repr_str
 
     def __hash__(self):
-        return hash(self.val)
+        return hash((self._TYPE, self.val))
+
 
 # ----------------------------------------------------------
 class MuContainerType(MuType):

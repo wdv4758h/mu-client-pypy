@@ -7,17 +7,24 @@ from rpython.mutyper.muts.muentity import MuName
 from rpython.mutyper.muts.muops import CALL, THREAD_EXIT, STORE, GETIREF
 from rpython.mutyper.muts import mutype
 from rpython.mutyper.tools.textgraph import print_graph
+from rpython.tool.ansi_mandelbrot import Driver
 from .hail import HAILGenerator
 from StringIO import StringIO
 import zipfile
 import json
+from rpython.tool.ansi_print import AnsiLogger
 
+
+log = AnsiLogger("MuTextIRGenerator")
 
 try:
     import zlib
     zip_compression = zipfile.ZIP_DEFLATED
 except ImportError:
     zip_compression = zipfile.ZIP_STORED
+
+
+mdb = Driver()
 
 
 class MuTextIRGenerator:
@@ -67,6 +74,7 @@ class MuTextIRGenerator:
         strio_graphs = StringIO()
         self.codegen(strio_ir, strio_hail, strio_exfn, strio_graphs)
 
+        log.zipbundle("generate zip bundle...")
         zf = zipfile.ZipFile(bdlpath.strpath, mode="w", compression=zip_compression)
 
         def _writefrom(entry_name, strio):
@@ -79,12 +87,23 @@ class MuTextIRGenerator:
         _writefrom(bdlpath.basename.replace('.mu', '.exfn'), strio_exfn)
         _writefrom(bdlpath.basename.replace('.mu', '.txt'), strio_graphs)
         zf.close()
+        log.zipbundle("done.")
 
     def codegen(self, fp_ir, fp_hail, fp_exfn, fp_rpy_graphs=None):
         """
         Generate bundle code to a writable file fp.
         """
+        log.collect_gbldefs("start collecting...")
         self._collect_gbldefs()
+        log.collect_gbldefs("finished.")
+
+        log.hailgen("start adding global cells...")
+        hailgen = HAILGenerator()
+        for gcl in self.mutyper.ldgcells:
+            hailgen.add_gcell(gcl)
+        log.hailgen("finished.")
+
+        log.codegen("generating bundle code...")
         for t in self.gbltypes:
             fp_ir.write("%s %s = %s\n" % (".funcsig" if isinstance(t, mutype.MuFuncSig) else ".typedef",
                                           t.mu_name, t.mu_constructor))
@@ -92,10 +111,9 @@ class MuTextIRGenerator:
         for cst in self.gblcnsts:
             fp_ir.write(".const %s <%s> = %r\n" % (cst.mu_name, cst.mu_type.mu_name, cst.value))
 
-        hailgen = HAILGenerator()
         for gcell in self.mutyper.ldgcells:
             fp_ir.write(".global %s <%s>\n" % (gcell.mu_name, gcell._T.mu_name))
-            hailgen.add_gcell(gcell)
+
         hailgen.codegen(fp_hail)
 
         fncs = []
@@ -113,6 +131,8 @@ class MuTextIRGenerator:
         if fp_rpy_graphs:
             for g in self.graphs:
                 print_graph(g, fp_rpy_graphs)
+
+        log.codegen("finished.")
 
     def _genblocks(self, g, fp):
         idt = 4     # indentation
@@ -139,6 +159,7 @@ class MuTextIRGenerator:
                     v.__init__(v.value)     # rehash
                     self.gblcnsts.add(v)
 
+        log.collect_gbldefs("traversing graphs...")
         for g in self.graphs:
             _trav_symbol(g)
             for blk in g.iterblocks():
@@ -164,6 +185,7 @@ class MuTextIRGenerator:
                         dst = getattr(op.exc, attr)
                         if dst:
                             _trav_symbol(dst.args)
+            mdb.dot()
 
         _seen_sttval = set()
         def _trav_refval(ref):
@@ -197,9 +219,12 @@ class MuTextIRGenerator:
                         for itm in arr:
                             fn(itm)
 
+        mdb.restart()
+        log.collect_gbldefs("traversing global cells...")
         for gcl in self.mutyper.ldgcells:
             _seen_sttval = set()
             _trav_refval(gcl.value)
+            mdb.dot()
 
         _recursive_addtype(self.gbltypes, self.mutyper.tlstt_t)
 

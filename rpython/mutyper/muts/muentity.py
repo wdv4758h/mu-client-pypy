@@ -1,6 +1,8 @@
 """
 Definition of a general entity in Mu.
 """
+import re
+
 
 SCOPE_GLOBAL = "global"
 
@@ -13,6 +15,7 @@ class MuName(object):
     """
     _namectr_dic = {} # Name counter dictionary
     _cache = {}
+    _pattern = r'[^0-9a-zA-Z_\-.]'
 
     def __new__(cls, str_name, scope=SCOPE_GLOBAL, **kwargs):
         key = (str_name, scope)
@@ -28,7 +31,7 @@ class MuName(object):
         :param str_name: name string
         :param scope: MuGraph, MuBlock defines local scope; default is SCOPE_GLOBAL
         """
-        self._name = str_name
+        self._name = re.sub(MuName._pattern, '_', str_name)     # ensures that the name is valid.
         self.scope = scope
 
     def is_global(self):

@@ -424,7 +424,7 @@ def _llval2mu_opq(llv):
     if hasattr(llv, 'container'):
         container = llv._normalizedcontainer()
         muv = _ll2mu_val(container)
-        log.ll2mu_val("%(llv)r really is %(muv)r" % locals())
+        # log.ll2mu_val("%(llv)r really is %(muv)r" % locals())
         return muv
 
     muv = mutype.int64_t(randint(0, 0xffffffff))  # randomise it.
@@ -776,7 +776,7 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
         ops.extend(_ops)
         ops.append(muops.STORE(_rflenfld, n))
     except KeyError:  # doesn't have a length field
-        log.malloc_varsize("Ignored setting length field in type '%s'." % obj)
+        # log.malloc_varsize("Ignored setting length field in type '%s'." % obj)
         pass
     return ops
 
@@ -949,14 +949,14 @@ def _llop2mu_ptr_ne(ptr1, ptr2, res=None, llopname='ptr_eq'):
 def _llop2mu_ptr_nonzero(ptr, res=None, llopname='ptr_nonzero'):
     cst = Constant(mutype._munullref(ptr.mu_type))
     cst.mu_type = ptr.mu_type
-    cst.mu_name = MuName("NULL_%s" % ptr.mu_type.mu_name._name)
+    cst.mu_name = MuName("%s_%s" % (str(cst.value), ptr.mu_type.mu_name._name))
     return _llop2mu_ptr_ne(ptr, cst, res)
 
 
 def _llop2mu_ptr_iszero(ptr, res=None, llopname='ptr_zero'):
     cst = Constant(mutype._munullref(ptr.mu_type))
     cst.mu_type = ptr.mu_type
-    cst.mu_name = MuName("NULL_%s" % ptr.mu_type.mu_name._name)
+    cst.mu_name = MuName("%s_%s" % (str(cst.value), ptr.mu_type.mu_name._name))
     return _llop2mu_ptr_eq(ptr, cst, res)
 
 

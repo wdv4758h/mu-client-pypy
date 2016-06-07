@@ -28,33 +28,44 @@ def chop(graphs, g_entry):
     for g in graphs:
         ref[g] = False
 
+    def is_fncptr_cnst(c):
+        if isinstance(c, Constant) and isinstance(c.value, lltype._ptr):
+            obj = c.value._obj
+            if isinstance(obj, lltype._func):
+                return True
+        return False
+
     def visit(graph):
+        def _visit(callee):
+            try:
+                assert callee in graphs
+                if not ref[callee]:
+                    ref[callee] = True
+                    visit(callee)
+            except AssertionError:
+                log.error("Error: \"%s\" graph not found" % callee._name)
+
         for blk in graph.iterblocks():
             for op in blk.operations:
                 if op.opname == 'direct_call':
                     fnc = op.args[0].value._obj
                     try:
-                        callee = fnc.graph
-                        assert callee in graphs
-                        if not ref[callee]:
-                            ref[callee] = True
-                            visit(callee)
+                        _visit(fnc.graph)
                     except AttributeError:
                         # log.error("Error: \"%s\" function does not have a graph" % fnc._name)
                         pass
-                    except AssertionError:
-                        log.error("Error: \"%s\" graph not found" % callee._name)
                 elif op.opname == 'indirect_call':
                     possible_graphs = op.args[-1].value
                     if possible_graphs:
                         for callee in possible_graphs:
-                            try:
-                                assert callee in graphs
-                                if not ref[callee]:
-                                    ref[callee] = True
-                                    visit(callee)
-                            except AssertionError:
-                                log.error("Error: \"%s\" graph not found" % callee._name)
+                            _visit(callee)
+                else:
+                    for arg in filter(is_fncptr_cnst, op.args):
+                        fnc = arg.value._obj
+                        try:
+                            _visit(fnc.graph)
+                        except AttributeError:
+                            pass
 
     ref[g_entry] = True
     visit(g_entry)
@@ -83,7 +94,7 @@ def _keep_arg(arg, opname=''):
             return opname in _OPS_ALLOW_LLTYPE_ARGS
     if opname in _OPS_KEEP_ALL_ARGS:
         return True
-    log.keep_arg("Throwing argument %(arg)r from operation %(opname)s" % locals())
+    # log.keep_arg("Throwing argument %(arg)r from operation %(opname)s" % locals())
     return False
 
 
@@ -116,7 +127,7 @@ def prepare(graphs, entry_graph, name_dic={}):
                 gs.append(g)
                 ctr += 1
                 name_dic[name] = (gs, ctr)
-        g.name = "%s_%d" % (re.sub(r':', '_', name), ctr)
+        g.name = "%s_%d" % (name, ctr)
 
         for blk in g.iterblocks():
             # remove the input args that are Void as well.

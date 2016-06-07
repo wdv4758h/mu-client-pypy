@@ -13,11 +13,13 @@ from rpython.translator.backendopt.all import backend_optimizations
 from .muts import mutype
 from .muts import muops as muop
 from . import ll2mu
+from rpython.tool.ansi_mandelbrot import Driver
 
 from rpython.tool.ansi_print import AnsiLogger
 
 
 log = AnsiLogger("MuTyper")
+mdb = Driver()
 
 
 class MuTyper:
@@ -60,7 +62,7 @@ class MuTyper:
         self.tlr.graphs = self.graphs = self.graphs + self.helper_graphs.values()
 
     def specialise(self, g):
-        log.info("specialising graph '%s'" % g.name)
+        # log.info("specialising graph '%s'" % g.name)
         g.mu_name = MuName(g.name)
         get_arg_types = lambda lst: map(ll2mu.ll2mu_ty, map(lambda arg: arg.concretetype, lst))
         g.mu_type = mutype.MuFuncRef(mutype.MuFuncSig(get_arg_types(g.startblock.mu_inputargs),
@@ -76,6 +78,8 @@ class MuTyper:
             self.specialise_block(blk)
 
         self.proc_gcells()
+
+        mdb.dot()
 
     def specialise_block(self, blk):
         muops = ll2mu._MuOpList()
@@ -189,8 +193,8 @@ class MuTyper:
                         muv = ll2mu.ll2mu_val(llv)
                         mut = ll2mu.ll2mu_ty(arg.concretetype)
                         if isinstance(muv, mutype._muprimitive) and muv._TYPE != mut:
-                            log.warning("correcting the type of '%(muv)s' from '%(type1)s' to '%(type2)s'." %
-                                        {'muv': muv, 'type1': muv._TYPE, 'type2': mut})
+                            # log.warning("correcting the type of '%(muv)s' from '%(type1)s' to '%(type2)s'." %
+                            #             {'muv': muv, 'type1': muv._TYPE, 'type2': mut})
                             muv._TYPE = mut
                         # fix the type mismatch, all heap constants must be refs
                         if not isinstance(muv, mutype._munullref) and isinstance(muv._TYPE, mutype.MuUPtr):
@@ -209,7 +213,7 @@ class MuTyper:
                             gcl = self._cnst_gcell_dict[arg]
                         return self._get_ldgcell_var(gcl, blk)
                 except (NotImplementedError, AssertionError, TypeError):
-                    log.warning("can not process '%(arg)s' in mutyper, ignored." % locals())
+                    # log.warning("can not process '%(arg)s' in mutyper, ignored." % locals())
                     pass
 
         return arg
