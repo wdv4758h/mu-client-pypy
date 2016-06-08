@@ -8,7 +8,7 @@ syntax: glob
 .pydevproject
 __pycache__
 librpyc.so
-mubknd
+rpython-mu
 
 syntax: regexp
 ^testresult$
