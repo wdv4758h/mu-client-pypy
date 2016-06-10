@@ -6,6 +6,7 @@ from rpython.mutyper.ll2mu import _MuOpList
 from rpython.mutyper.muts.muentity import MuName
 from rpython.mutyper.muts.muops import CALL, THREAD_EXIT, STORE, GETIREF
 from rpython.mutyper.muts import mutype
+from rpython.translator.mu.hail import HAILGenerator
 from rpython.tool.ansi_mandelbrot import Driver
 from rpython.tool.ansi_print import AnsiLogger
 log = AnsiLogger("MuTextIRGenerator")
@@ -21,7 +22,7 @@ class MuDatabase:
         self.prog_entry = entry_graph
         self.gbltypes = {}      # type -> set(Mutype)
         self.gblcnsts = set()
-
+        self.hailgen = HAILGenerator()
         graphs.append(self._create_bundle_entry(self.prog_entry))
         self.graphs = graphs
 
@@ -96,48 +97,19 @@ class MuDatabase:
                             _trav_symbol(dst.args)
             mdb.dot()
 
-        _seen_sttval = set()
-        def _trav_refval(ref):
-            def _trav_sttval(obj):
-                if obj in _seen_sttval:
-                    return
-                _seen_sttval.add(obj)
-                self._recursive_addtype(obj._TYPE)
-                for fld in obj._TYPE._names:
-                    fldval = getattr(obj, fld)
-                    if isinstance(fldval, mutype._muref):
-                        _trav_refval(fldval)
-                    elif isinstance(fldval, mutype._mustruct):
-                        _trav_sttval(fldval)
-
-            if not isinstance(ref, mutype._munullref):
-                self._recursive_addtype(ref._TYPE)
-                obj = ref._obj0
-                if isinstance(obj, mutype._mustruct):
-                    _trav_sttval(obj._top_container())
-                elif isinstance(obj, mutype._muhybrid):
-                    arr = getattr(obj, obj._TYPE._varfld)
-
-                    if isinstance(arr._OF, mutype.MuRef):
-                        fn = _trav_refval
-                    elif isinstance(arr._OF, mutype.MuStruct):
-                        fn = _trav_sttval
-                    else:
-                        fn = None
-                    if fn:
-                        for itm in arr:
-                            fn(itm)
-
-        mdb.restart()
-        log.collect_gbldefs("traversing global cells...")
-        _seen_sttval = set()
-        for gcl in self.mutyper.ldgcells:
-            _trav_refval(gcl.value)
-            mdb.dot()
-
         self._recursive_addtype(self.mutyper.tlstt_t)
 
         mdb.restart()
+
+        log.hailgen("start adding global cells...")
+        for gcl in self.mutyper.ldgcells:
+            self.hailgen.add_gcell(gcl)
+
+        for t in self.hailgen.get_types():
+            self._recursive_addtype(t)
+
+        log.hailgen("finished.")
+
         log.collect_gbldefs("finished.")
 
     def _recursive_addtype(self, mut):

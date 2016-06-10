@@ -55,6 +55,13 @@ class HAILGenerator:
                     itm = obj[i]
                     self._find_refs(itm)
 
+    def get_types(self):
+        s = set()
+        for r in self._refs:
+            obj_t = mutype.mu_typeOf(r)
+            s.add(obj_t)
+        return s
+
     def codegen(self, fp):
         # Allocate everything first
         for r, n in self._refs.items():

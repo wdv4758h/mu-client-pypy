@@ -4,9 +4,7 @@ MuIR builder -- builds IR bundle via API calls
 This defines an abstract builder that needs to be implemented concretely.
 """
 from .api import *
-import zipfile
 from rpython.tool.ansi_print import AnsiLogger
-from rpython.translator.mu.hail import HAILGenerator
 from rpython.mutyper.muts import mutype
 from rpython.mutyper.tools.textgraph import print_graph
 from StringIO import StringIO
@@ -57,11 +55,7 @@ class MuTextIRBuilder(AbstructMuBundleBuildingAPI):
         """
         Generate bundle code to a writable file fp.
         """
-        log.hailgen("start adding global cells...")
-        hailgen = HAILGenerator()
-        for gcl in self.db.mutyper.ldgcells:
-            hailgen.add_gcell(gcl)
-        log.hailgen("finished.")
+
 
         log.codegen("generating bundle code...")
         for cls in self.db.gbltypes:
@@ -75,7 +69,7 @@ class MuTextIRBuilder(AbstructMuBundleBuildingAPI):
         for gcell in self.db.mutyper.ldgcells:
             fp_ir.write(".global %s <%s>\n" % (gcell.mu_name, gcell._T.mu_name))
 
-        hailgen.codegen(fp_hail)
+        self.db.hailgen.codegen(fp_hail)
 
         fncs = []
         for gcl in self.db.mutyper.externfncs:
