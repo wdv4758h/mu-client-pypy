@@ -61,6 +61,8 @@ class MuTyper:
 
         self.tlr.graphs = self.graphs = self.graphs + self.helper_graphs.values()
 
+        mdb.restart()
+
     def specialise(self, g):
         # log.info("specialising graph '%s'" % g.name)
         g.mu_name = MuName(g.name)

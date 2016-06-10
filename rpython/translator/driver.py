@@ -2,6 +2,7 @@ import sys, os
 import os.path
 import shutil
 
+from rpython.libmu.textbuilder import MuTextIRBuilder
 from rpython.mutyper.mutyper import MuTyper
 from rpython.translator.translator import TranslationContext
 from rpython.translator.tool.taskengine import SimpleTaskEngine
@@ -15,7 +16,7 @@ from rpython.rlib.entrypoint import secondary_entrypoints,\
      annotated_jit_entrypoints
 from .mu.preps import prepare
 from .mu.exctran import MuExceptionTransformer
-from .mu.genmu import MuTextIRGenerator
+from .mu.database import MuDatabase
 
 import py
 from rpython.tool.ansi_print import AnsiLogger
@@ -557,12 +558,15 @@ class TranslationDriver(SimpleTaskEngine):
     def task_compile_mu(self):
         self.log.info("Task compile_mu")
         target_name = self.compute_exe_name()
-        if target_name.ext != MuTextIRGenerator.bundle_suffix:
-            bundle_name = target_name + MuTextIRGenerator.bundle_suffix
+        if target_name.ext != MuDatabase.bundle_suffix:
+            bundle_name = target_name + MuDatabase.bundle_suffix
         else:
             bundle_name = target_name
-        irgen = MuTextIRGenerator(self.translator.graphs, self.mutyper, self.translator.entry_point_graph)
-        irgen.bundlegen(bundle_name)
+        mudb = MuDatabase(self.translator.graphs, self.mutyper, self.translator.entry_point_graph)
+        mudb.collect_gbldefs()
+
+        builder = MuTextIRBuilder(mudb)
+        builder.bundlegen(bundle_name)
 
     def proceed(self, goals):
         if not goals:

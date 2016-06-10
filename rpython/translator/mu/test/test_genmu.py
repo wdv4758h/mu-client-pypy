@@ -3,7 +3,7 @@ from StringIO import StringIO
 from rpython.mutyper.mutyper import MuTyper
 from rpython.mutyper.tools.textgraph import print_graph
 from rpython.mutyper.tools.search import search_op
-from ..genmu import MuTextIRGenerator
+from ..database import MuDatabase
 from rpython.rtyper.test.test_llinterp import gengraph
 from ..preps import prepare
 
@@ -22,7 +22,7 @@ def test_genmu():
         print_graph(_g)
         mutyper.specialise(_g)
 
-    gen = MuTextIRGenerator(t.graphs, mutyper, g)
+    gen = MuDatabase(t.graphs, mutyper, g)
 
     strio_uir = StringIO()
     strio_hail = StringIO()
