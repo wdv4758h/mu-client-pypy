@@ -1,5 +1,7 @@
 .hg
 .svn
+.idea
+
 
 # VIM
 *.swp
@@ -9,6 +11,7 @@
 *.pyo
 *~
 __pycache__/
+librpyc.so
 
 bin/pypy-c
 include/*.h
