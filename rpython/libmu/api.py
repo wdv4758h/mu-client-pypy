@@ -152,360 +152,449 @@ class AbstractMuInstNode(AbstractMuChildNode):          pass
 # --------------------------------
 # Classes
 class AbstractMuBundleBuildingAPI:
-    def new_bundle(self):
-        # type: (AbstractMuBundleBuildingAPI) -> MuBundleNode
+    @staticmethod
+    def new_bundle():
+        # type: () -> MuBundleNode
         pass
 
-    def load_bundle_from_node(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> None
+    @staticmethod
+    def load_bundle_from_node(b):
+        # type: (MuBundleNode) -> None
         pass
 
-    def abort_bundle_node(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> None
+    @staticmethod
+    def abort_bundle_node(b):
+        # type: (MuBundleNode) -> None
         pass
 
-    def get_node(self, b, id):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuID) -> MuChildNode
+    @staticmethod
+    def get_node(b, id):
+        # type: (MuBundleNode, MuID) -> MuChildNode
         pass
 
-    def get_id(self, b, node):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuChildNode) -> MuID
+    @staticmethod
+    def get_id(b, node):
+        # type: (MuBundleNode, MuChildNode) -> MuID
         pass
 
-    def set_name(self, b, node, name):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuChildNode, MuName) -> None
+    @staticmethod
+    def set_name(b, node, name):
+        # type: (MuBundleNode, MuChildNode, MuName) -> None
         pass
 
-    def new_type_int(self, b, len):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, int) -> MuTypeNode
+    @staticmethod
+    def new_type_int(b, len):
+        # type: (MuBundleNode, int) -> MuTypeNode
         pass
 
-    def new_type_float(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_float(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def new_type_double(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_double(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def new_type_uptr(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_uptr(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def set_type_uptr(self, uptr, ty):
-        # type: (AbstractMuBundleBuildingAPI, MuTypeNode, MuTypeNode) -> None
+    @staticmethod
+    def set_type_uptr(uptr, ty):
+        # type: (MuTypeNode, MuTypeNode) -> None
         pass
 
-    def new_type_ufuncptr(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_ufuncptr(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def set_type_ufuncptr(self, ufuncptr, sig):
-        # type: (AbstractMuBundleBuildingAPI, MuTypeNode, MuFuncSigNode) -> None
+    @staticmethod
+    def set_type_ufuncptr(ufuncptr, sig):
+        # type: (MuTypeNode, MuFuncSigNode) -> None
         pass
 
-    def new_type_struct(self, b, fieldtys):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, [MuTypeNode]) -> MuTypeNode
+    @staticmethod
+    def new_type_struct(b, fieldtys):
+        # type: (MuBundleNode, [MuTypeNode]) -> MuTypeNode
         pass
 
-    def new_type_hybrid(self, b, fixedtys, varty):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, [MuTypeNode], MuTypeNode) -> MuTypeNode
+    @staticmethod
+    def new_type_hybrid(b, fixedtys, varty):
+        # type: (MuBundleNode, [MuTypeNode], MuTypeNode) -> MuTypeNode
         pass
 
-    def new_type_array(self, b, elemty, len):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuTypeNode, uint64_t) -> MuTypeNode
+    @staticmethod
+    def new_type_array(b, elemty, len):
+        # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuTypeNode
         pass
 
-    def new_type_vector(self, b, elemty, len):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuTypeNode, uint64_t) -> MuTypeNode
+    @staticmethod
+    def new_type_vector(b, elemty, len):
+        # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuTypeNode
         pass
 
-    def new_type_void(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_void(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def new_type_ref(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_ref(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def set_type_ref(self, ref, ty):
-        # type: (AbstractMuBundleBuildingAPI, MuTypeNode, MuTypeNode) -> None
+    @staticmethod
+    def set_type_ref(ref, ty):
+        # type: (MuTypeNode, MuTypeNode) -> None
         pass
 
-    def new_type_iref(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_iref(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def set_type_iref(self, iref, ty):
-        # type: (AbstractMuBundleBuildingAPI, MuTypeNode, MuTypeNode) -> None
+    @staticmethod
+    def set_type_iref(iref, ty):
+        # type: (MuTypeNode, MuTypeNode) -> None
         pass
 
-    def new_type_weakref(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_weakref(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def set_type_weakref(self, weakref, ty):
-        # type: (AbstractMuBundleBuildingAPI, MuTypeNode, MuTypeNode) -> None
+    @staticmethod
+    def set_type_weakref(weakref, ty):
+        # type: (MuTypeNode, MuTypeNode) -> None
         pass
 
-    def new_type_funcref(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_funcref(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def set_type_funcref(self, funcref, sig):
-        # type: (AbstractMuBundleBuildingAPI, MuTypeNode, MuFuncSigNode) -> None
+    @staticmethod
+    def set_type_funcref(funcref, sig):
+        # type: (MuTypeNode, MuFuncSigNode) -> None
         pass
 
-    def new_type_tagref64(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_tagref64(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def new_type_threadref(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_threadref(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def new_type_stackref(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_stackref(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def new_type_framecursorref(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_framecursorref(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def new_type_irnoderef(self, b):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode) -> MuTypeNode
+    @staticmethod
+    def new_type_irnoderef(b):
+        # type: (MuBundleNode) -> MuTypeNode
         pass
 
-    def new_funcsig(self, b, paramtys, rettys):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, [MuTypeNode], [MuTypeNode]) -> MuFuncSigNode
+    @staticmethod
+    def new_funcsig(b, paramtys, rettys):
+        # type: (MuBundleNode, [MuTypeNode], [MuTypeNode]) -> MuFuncSigNode
         pass
 
-    def new_const_int(self, b, ty, value):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuTypeNode, uint64_t) -> MuConstNode
+    @staticmethod
+    def new_const_int(b, ty, value):
+        # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuConstNode
         pass
 
-    def new_const_int_ex(self, b, ty, values):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuTypeNode, [uint64_t]) -> MuConstNode
+    @staticmethod
+    def new_const_int_ex(b, ty, values):
+        # type: (MuBundleNode, MuTypeNode, [uint64_t]) -> MuConstNode
         pass
 
-    def new_const_float(self, b, ty, value):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuTypeNode, float) -> MuConstNode
+    @staticmethod
+    def new_const_float(b, ty, value):
+        # type: (MuBundleNode, MuTypeNode, float) -> MuConstNode
         pass
 
-    def new_const_double(self, b, ty, value):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuTypeNode, double) -> MuConstNode
+    @staticmethod
+    def new_const_double(b, ty, value):
+        # type: (MuBundleNode, MuTypeNode, double) -> MuConstNode
         pass
 
-    def new_const_null(self, b, ty):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuTypeNode) -> MuConstNode
+    @staticmethod
+    def new_const_null(b, ty):
+        # type: (MuBundleNode, MuTypeNode) -> MuConstNode
         pass
 
-    def new_const_seq(self, b, ty, elems):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuTypeNode, [MuConstNode]) -> MuConstNode
+    @staticmethod
+    def new_const_seq(b, ty, elems):
+        # type: (MuBundleNode, MuTypeNode, [MuConstNode]) -> MuConstNode
         pass
 
-    def new_global_cell(self, b, ty):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuTypeNode) -> MuGlobalNode
+    @staticmethod
+    def new_global_cell(b, ty):
+        # type: (MuBundleNode, MuTypeNode) -> MuGlobalNode
         pass
 
-    def new_func(self, b, sig):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuFuncSigNode) -> MuFuncNode
+    @staticmethod
+    def new_func(b, sig):
+        # type: (MuBundleNode, MuFuncSigNode) -> MuFuncNode
         pass
 
-    def new_func_ver(self, b, func):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuFuncNode) -> MuFuncVerNode
+    @staticmethod
+    def new_func_ver(b, func):
+        # type: (MuBundleNode, MuFuncNode) -> MuFuncVerNode
         pass
 
-    def new_exp_func(self, b, func, callconv, cookie):
-        # type: (AbstractMuBundleBuildingAPI, MuBundleNode, MuFuncNode, MuCallConv, MuConstNode) -> MuExpFuncNode
+    @staticmethod
+    def new_exp_func(b, func, callconv, cookie):
+        # type: (MuBundleNode, MuFuncNode, MuCallConv, MuConstNode) -> MuExpFuncNode
         pass
 
-    def new_bb(self, fv):
-        # type: (AbstractMuBundleBuildingAPI, MuFuncVerNode) -> MuBBNode
+    @staticmethod
+    def new_bb(fv):
+        # type: (MuFuncVerNode) -> MuBBNode
         pass
 
-    def new_nor_param(self, bb, ty):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode) -> MuNorParamNode
+    @staticmethod
+    def new_nor_param(bb, ty):
+        # type: (MuBBNode, MuTypeNode) -> MuNorParamNode
         pass
 
-    def new_exc_param(self, bb):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode) -> MuExcParamNode
+    @staticmethod
+    def new_exc_param(bb):
+        # type: (MuBBNode) -> MuExcParamNode
         pass
 
-    def new_inst_res(self, inst):
-        # type: (AbstractMuBundleBuildingAPI, MuInstNode) -> MuInstResNode
+    @staticmethod
+    def new_inst_res(inst):
+        # type: (MuInstNode) -> MuInstResNode
         pass
 
-    def add_dest(self, inst, kind, dest, vars):
-        # type: (AbstractMuBundleBuildingAPI, MuInstNode, MuDestKind, MuBBNode, [MuVarNode]) -> None
+    @staticmethod
+    def add_dest(inst, kind, dest, vars):
+        # type: (MuInstNode, MuDestKind, MuBBNode, [MuVarNode]) -> None
         pass
 
-    def add_keepalives(self, inst, vars):
-        # type: (AbstractMuBundleBuildingAPI, MuInstNode, [MuLocalVarNode]) -> None
+    @staticmethod
+    def add_keepalives(inst, vars):
+        # type: (MuInstNode, [MuLocalVarNode]) -> None
         pass
 
-    def new_binop(self, bb, optr, ty, opnd1, opnd2):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuBinOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_binop(bb, optr, ty, opnd1, opnd2):
+        # type: (MuBBNode, MuBinOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_cmp(self, bb, optr, ty, opnd1, opnd2):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuCmpOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_cmp(bb, optr, ty, opnd1, opnd2):
+        # type: (MuBBNode, MuCmpOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_conv(self, bb, optr, from_ty, to_ty, opnd):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuConvOptr, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_conv(bb, optr, from_ty, to_ty, opnd):
+        # type: (MuBBNode, MuConvOptr, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_select(self, bb, cond_ty, opnd_ty, cond, if_true, if_false):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_select(bb, cond_ty, opnd_ty, cond, if_true, if_false):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_branch(self, bb):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode) -> MuInstNode
+    @staticmethod
+    def new_branch(bb):
+        # type: (MuBBNode) -> MuInstNode
         pass
 
-    def new_branch2(self, bb, cond):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_branch2(bb, cond):
+        # type: (MuBBNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_switch(self, bb, opnd_ty, opnd):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_switch(bb, opnd_ty, opnd):
+        # type: (MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
         pass
 
-    def add_switch_dest(self, sw, key, dest, vars):
-        # type: (AbstractMuBundleBuildingAPI, MuInstNode, MuConstNode, MuBBNode, [MuVarNode]) -> None
+    @staticmethod
+    def add_switch_dest(sw, key, dest, vars):
+        # type: (MuInstNode, MuConstNode, MuBBNode, [MuVarNode]) -> None
         pass
 
-    def new_call(self, bb, sig, callee, args):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
+    @staticmethod
+    def new_call(bb, sig, callee, args):
+        # type: (MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
         pass
 
-    def new_tailcall(self, bb, sig, callee, args):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
+    @staticmethod
+    def new_tailcall(bb, sig, callee, args):
+        # type: (MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
         pass
 
-    def new_ret(self, bb, rvs):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, [MuVarNode]) -> MuInstNode
+    @staticmethod
+    def new_ret(bb, rvs):
+        # type: (MuBBNode, [MuVarNode]) -> MuInstNode
         pass
 
-    def new_throw(self, bb, exc):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_throw(bb, exc):
+        # type: (MuBBNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_extractvalue(self, bb, strty, index, opnd):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, int, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_extractvalue(bb, strty, index, opnd):
+        # type: (MuBBNode, MuTypeNode, int, MuVarNode) -> MuInstNode
         pass
 
-    def new_insertvalue(self, bb, strty, index, opnd, newval):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, int, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_insertvalue(bb, strty, index, opnd, newval):
+        # type: (MuBBNode, MuTypeNode, int, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_extractelement(self, bb, seqty, indty, opnd, index):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_extractelement(bb, seqty, indty, opnd, index):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_insertelement(self, bb, seqty, indty, opnd, index, newval):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_insertelement(bb, seqty, indty, opnd, index, newval):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_shufflevector(self, bb, vecty, maskty, vec1, vec2, mask):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_shufflevector(bb, vecty, maskty, vec1, vec2, mask):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_new(self, bb, allocty):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode) -> MuInstNode
+    @staticmethod
+    def new_new(bb, allocty):
+        # type: (MuBBNode, MuTypeNode) -> MuInstNode
         pass
 
-    def new_newhybrid(self, bb, allocty, lenty, length):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_newhybrid(bb, allocty, lenty, length):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_alloca(self, bb, allocty):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode) -> MuInstNode
+    @staticmethod
+    def new_alloca(bb, allocty):
+        # type: (MuBBNode, MuTypeNode) -> MuInstNode
         pass
 
-    def new_allocahybrid(self, bb, allocty, lenty, length):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_allocahybrid(bb, allocty, lenty, length):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_getiref(self, bb, refty, opnd):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_getiref(bb, refty, opnd):
+        # type: (MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_getfieldiref(self, bb, is_ptr, refty, index, opnd):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, int, MuTypeNode, int, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_getfieldiref(bb, is_ptr, refty, index, opnd):
+        # type: (MuBBNode, int, MuTypeNode, int, MuVarNode) -> MuInstNode
         pass
 
-    def new_getelemiref(self, bb, is_ptr, refty, indty, opnd, index):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, int, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_getelemiref(bb, is_ptr, refty, indty, opnd, index):
+        # type: (MuBBNode, int, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_shiftiref(self, bb, is_ptr, refty, offty, opnd, offset):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, int, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_shiftiref(bb, is_ptr, refty, offty, opnd, offset):
+        # type: (MuBBNode, int, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_getvarpartiref(self, bb, is_ptr, refty, opnd):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, int, MuTypeNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_getvarpartiref(bb, is_ptr, refty, opnd):
+        # type: (MuBBNode, int, MuTypeNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_load(self, bb, is_ptr, ord, refty, loc):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, int, MuMemOrd, MuTypeNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_load(bb, is_ptr, ord, refty, loc):
+        # type: (MuBBNode, int, MuMemOrd, MuTypeNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_store(self, bb, is_ptr, ord, refty, loc, newval):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, int, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_store(bb, is_ptr, ord, refty, loc, newval):
+        # type: (MuBBNode, int, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_cmpxchg(self, bb, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, int, int, MuMemOrd, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_cmpxchg(bb, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired):
+        # type: (MuBBNode, int, int, MuMemOrd, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_atomicrmw(self, bb, is_ptr, ord, optr, refTy, loc, opnd):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, int, MuMemOrd, MuAtomicRMWOp, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_atomicrmw(bb, is_ptr, ord, optr, refTy, loc, opnd):
+        # type: (MuBBNode, int, MuMemOrd, MuAtomicRMWOp, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_fence(self, bb, ord):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuMemOrd) -> MuInstNode
+    @staticmethod
+    def new_fence(bb, ord):
+        # type: (MuBBNode, MuMemOrd) -> MuInstNode
         pass
 
-    def new_trap(self, bb, rettys):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, [MuTypeNode]) -> MuInstNode
+    @staticmethod
+    def new_trap(bb, rettys):
+        # type: (MuBBNode, [MuTypeNode]) -> MuInstNode
         pass
 
-    def new_watchpoint(self, bb, wpid, rettys):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuWPID, [MuTypeNode]) -> MuInstNode
+    @staticmethod
+    def new_watchpoint(bb, wpid, rettys):
+        # type: (MuBBNode, MuWPID, [MuTypeNode]) -> MuInstNode
         pass
 
-    def new_wpbranch(self, bb, wpid):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuWPID) -> MuInstNode
+    @staticmethod
+    def new_wpbranch(bb, wpid):
+        # type: (MuBBNode, MuWPID) -> MuInstNode
         pass
 
-    def new_ccall(self, bb, callconv, callee_ty, sig, callee, args):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuCallConv, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
+    @staticmethod
+    def new_ccall(bb, callconv, callee_ty, sig, callee, args):
+        # type: (MuBBNode, MuCallConv, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
         pass
 
-    def new_newthread(self, bb, stack, threadlocal):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuVarNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_newthread(bb, stack, threadlocal):
+        # type: (MuBBNode, MuVarNode, MuVarNode) -> MuInstNode
         pass
 
-    def new_swapstack_ret(self, bb, swappee, ret_tys):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuVarNode, [MuTypeNode]) -> MuInstNode
+    @staticmethod
+    def new_swapstack_ret(bb, swappee, ret_tys):
+        # type: (MuBBNode, MuVarNode, [MuTypeNode]) -> MuInstNode
         pass
 
-    def new_swapstack_kill(self, bb, swappee):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuVarNode) -> MuInstNode
+    @staticmethod
+    def new_swapstack_kill(bb, swappee):
+        # type: (MuBBNode, MuVarNode) -> MuInstNode
         pass
 
-    def set_newstack_pass_values(self, inst, tys, vars):
-        # type: (AbstractMuBundleBuildingAPI, MuInstNode, MuTypeNode, [MuVarNode]) -> None
+    @staticmethod
+    def set_newstack_pass_values(inst, tys, vars):
+        # type: (MuInstNode, MuTypeNode, [MuVarNode]) -> None
         pass
 
-    def set_newstack_throw_exc(self, inst, exc):
-        # type: (AbstractMuBundleBuildingAPI, MuInstNode, MuVarNode) -> None
+    @staticmethod
+    def set_newstack_throw_exc(inst, exc):
+        # type: (MuInstNode, MuVarNode) -> None
         pass
 
-    def new_comminst(self, bb, opcode, flags, tys, sigs, args):
-        # type: (AbstractMuBundleBuildingAPI, MuBBNode, MuCommInst, [MuFlag], [MuTypeNode], [MuFuncSigNode], [MuVarNode]) -> MuInstNode
+    @staticmethod
+    def new_comminst(bb, opcode, flags, tys, sigs, args):
+        # type: (MuBBNode, MuCommInst, [MuFlag], [MuTypeNode], [MuFuncSigNode], [MuVarNode]) -> MuInstNode
         pass
 
 
