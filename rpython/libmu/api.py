@@ -129,24 +129,24 @@ MuIRNode
 
 """
 
-class AbstractMuIRNode(object):                 raise NotImplementedError("abstract base")
-class AbstractMuBundleNode(AbstractMuIRNode):           raise NotImplementedError("abstract base")
-class AbstractMuChildNode(AbstractMuIRNode):            raise NotImplementedError("abstract base")
-class AbstractMuTypeNode(AbstractMuChildNode):          raise NotImplementedError("abstract base")
-class AbstractMuFuncSigNode(AbstractMuChildNode):       raise NotImplementedError("abstract base")
-class AbstractMuVarNode(AbstractMuChildNode):           raise NotImplementedError("abstract base")
-class AbstractMuGlobalVarNode(AbstractMuVarNode):       raise NotImplementedError("abstract base")
-class AbstractMuConstNode(AbstractMuGlobalVarNode):     raise NotImplementedError("abstract base")
-class AbstractMuGlobalNode(AbstractMuGlobalVarNode):    raise NotImplementedError("abstract base")
-class AbstractMuFuncNode(AbstractMuGlobalVarNode):      raise NotImplementedError("abstract base")
-class AbstractMuExpFuncNode(AbstractMuGlobalVarNode):   raise NotImplementedError("abstract base")
-class AbstractMuLocalVarNode(AbstractMuVarNode):        raise NotImplementedError("abstract base")
-class AbstractMuNorParamNode(AbstractMuLocalVarNode):   raise NotImplementedError("abstract base")
-class AbstractMuExcParamNode(AbstractMuLocalVarNode):   raise NotImplementedError("abstract base")
-class AbstractMuInstResNode(AbstractMuLocalVarNode):    raise NotImplementedError("abstract base")
-class AbstractMuFuncVerNode(AbstractMuChildNode):       raise NotImplementedError("abstract base")
-class AbstractMuBBNode(AbstractMuChildNode):            raise NotImplementedError("abstract base")
-class AbstractMuInstNode(AbstractMuChildNode):          raise NotImplementedError("abstract base")
+class AbstractMuIRNode(object):                 pass
+class AbstractMuBundleNode(AbstractMuIRNode):           pass
+class AbstractMuChildNode(AbstractMuIRNode):            pass
+class AbstractMuTypeNode(AbstractMuChildNode):          pass
+class AbstractMuFuncSigNode(AbstractMuChildNode):       pass
+class AbstractMuVarNode(AbstractMuChildNode):           pass
+class AbstractMuGlobalVarNode(AbstractMuVarNode):       pass
+class AbstractMuConstNode(AbstractMuGlobalVarNode):     pass
+class AbstractMuGlobalNode(AbstractMuGlobalVarNode):    pass
+class AbstractMuFuncNode(AbstractMuGlobalVarNode):      pass
+class AbstractMuExpFuncNode(AbstractMuGlobalVarNode):   pass
+class AbstractMuLocalVarNode(AbstractMuVarNode):        pass
+class AbstractMuNorParamNode(AbstractMuLocalVarNode):   pass
+class AbstractMuExcParamNode(AbstractMuLocalVarNode):   pass
+class AbstractMuInstResNode(AbstractMuLocalVarNode):    pass
+class AbstractMuFuncVerNode(AbstractMuChildNode):       pass
+class AbstractMuBBNode(AbstractMuChildNode):            pass
+class AbstractMuInstNode(AbstractMuChildNode):          pass
 
 
 # --------------------------------
