@@ -18,15 +18,26 @@ class MuTextBundleNode(MuTextIRNode):
         self.buffer = []
         self._childnodes = dict()
         self._reftypenodes = dict()     # to be processed later
+        self._fndeclnodes = dict()
+        self._fndefnodes = dict()
+
+    def _add_node(self, dic, node):
+        dic[node.id] = node
 
     def add_node(self, node):
-        self._childnodes[node.id] = node
+        self._add_node(self._childnodes, node)
 
     def get_node(self, id):
         return self._childnodes[id]
 
     def add_reftypenode(self, node):
-        self._reftypenodes[node.id] = node
+        self._add_node(self._reftypenodes, node)
+
+    def add_fndeclnode(self, node):
+        self._add_node(self._fndeclnodes, node)
+
+    def add_fndefnode(self, node):
+        self._add_node(self._fndefnodes, node)
 
 
 class MuTextChildNode(MuTextIRNode):
@@ -45,16 +56,46 @@ class MuTextTypeNode(MuTextChildNode):
 class MuTextFuncSigNode(MuTextChildNode):       pass
 class MuTextVarNode(MuTextChildNode):           pass
 class MuTextGlobalVarNode(MuTextVarNode):       pass
-class MuTextConstNode(MuTextGlobalVarNode):     pass
-class MuTextGlobalNode(MuTextGlobalVarNode):    pass
-class MuTextFuncNode(MuTextGlobalVarNode):      pass
+class MuTextConstNode(MuTextGlobalVarNode):
+    def __init__(self, name, ty, val):
+        MuTextChildNode.__init__(self, name)
+        self.type = ty
+        self.value = val
+
+
+class MuTextGlobalNode(MuTextGlobalVarNode):
+    def __init__(self, name, ty):
+        MuTextChildNode.__init__(self, name)
+        self.type = ty
+
+
+class MuTextFuncNode(MuTextGlobalVarNode):
+    def __init__(self, bundle, name="", sig=None):
+        MuTextChildNode.__init__(self, name)
+        self.sig = sig
+        self.bdl = bundle
+        self.vers = []
+
 class MuTextExpFuncNode(MuTextGlobalVarNode):   pass
 class MuTextLocalVarNode(MuTextVarNode):        pass
 class MuTextNorParamNode(MuTextLocalVarNode):   pass
 class MuTextExcParamNode(MuTextLocalVarNode):   pass
 class MuTextInstResNode(MuTextLocalVarNode):    pass
-class MuTextFuncVerNode(MuTextChildNode):       pass
-class MuTextBBNode(MuTextChildNode):            pass
+class MuTextFuncVerNode(MuTextChildNode):
+    def __init__(self, fncnd, verno):
+        MuTextChildNode.__init__(self, "%s_v%d" % (fncnd.name, verno))
+        self.fncnd = fncnd
+        self.bdl = fncnd.bdl
+        self.blknds = []
+
+
+class MuTextBBNode(MuTextChildNode):
+    def __init__(self, fncvnd, blkno):
+        MuTextChildNode.__init__(self, "%s.blk%d" % (fncvnd.name, blkno))
+        self.fncvernd = fncvnd
+        self.bdl = fncvnd.bdl
+        self.opnds = []
+
 class MuTextInstNode(MuTextChildNode):          pass
 
 
@@ -245,44 +286,91 @@ class MuTextBundleBuildingAPI(AbstractMuBundleBuildingAPI):
         return nd
 
     @staticmethod
+    def __primval_repr(val, type_char):
+        def _scistr(f):
+            # fix case where the scientific notation doesn't contain a '.', like 1e-08
+            s = str(f)
+            if 'e' in s:
+                i = s.index('e')
+                if '.' not in s[:i]:
+                    s = '%s.0%s' % (s[:i], s[i:])
+            # fix infinity case
+            if 'inf' in s and val > 0:
+                s = '+' + s  # prepend a '+' for +inf value whose '+' sign is omitted.
+            return s
+
+        if type_char == 'f':
+            return "%sf" % _scistr(val)
+        elif type_char == 'd':
+            return "%sd" % _scistr(val)
+        else:
+            return "%d" % int(val)
+
+    @staticmethod
     def new_const_int(b, ty, value):
         # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuConstNode
-        pass
+        reprstr = MuTextBundleBuildingAPI.__primval_repr(value, 'i')
+        nd = MuTextConstNode("%s_%s" % (reprstr.replace('+', 'p'), ty.name), ty, value)
+        b.buffer.append(".const %s <%s> = %s" % ("@"+nd.name, "@"+ty.name, reprstr))
+        b.add_node(nd)
+        return nd
 
     @staticmethod
     def new_const_int_ex(b, ty, values):
         # type: (MuBundleNode, MuTypeNode, [uint64_t]) -> MuConstNode
-        pass
+        raise NotImplementedError("'new_const_int_ex' not yet supported.")
 
     @staticmethod
     def new_const_float(b, ty, value):
         # type: (MuBundleNode, MuTypeNode, float) -> MuConstNode
-        pass
+        reprstr = MuTextBundleBuildingAPI.__primval_repr(value, 'f')
+        nd = MuTextConstNode("%s_%s" % (reprstr.replace('+', 'p'), ty.name), ty, value)
+        b.buffer.append(".const %s <%s> = %s" % ("@" + nd.name, "@" + ty.name, reprstr))
+        b.add_node(nd)
+        return nd
 
     @staticmethod
     def new_const_double(b, ty, value):
         # type: (MuBundleNode, MuTypeNode, double) -> MuConstNode
-        pass
+        reprstr = MuTextBundleBuildingAPI.__primval_repr(value, 'd')
+        nd = MuTextConstNode("%s_%s" % (reprstr.replace('+', 'p'), ty.name), ty, value)
+        b.buffer.append(".const %s <%s> = %s" % ("@" + nd.name, "@" + ty.name, reprstr))
+        b.add_node(nd)
+        return nd
 
     @staticmethod
     def new_const_null(b, ty):
         # type: (MuBundleNode, MuTypeNode) -> MuConstNode
-        pass
+        nd = MuTextConstNode("NULL_%s" % ty.name, ty, 0)
+        b.buffer.append(".const %s <%s> = %s" % (
+            "@"+nd.name, "@"+ty.name,
+            "0" if ty.name[:3] in ("ptr", "fnp") else "0"
+        ))
+        b.add_node(nd)
+        return nd
 
     @staticmethod
     def new_const_seq(b, ty, elems):
         # type: (MuBundleNode, MuTypeNode, [MuConstNode]) -> MuConstNode
-        pass
+        nd = MuTextConstNode("seq%d%s" % (len(elems), ty.name), ty, [elems])
+        b.buffer.append(".const %s <%s> = {%s}" % ("@"+nd.name, "@"+ty.name, " ".join(["@"+e.name for e in elems])))
+        b.add_node(nd)
+        return nd
 
     @staticmethod
     def new_global_cell(b, ty):
         # type: (MuBundleNode, MuTypeNode) -> MuGlobalNode
-        pass
+        nd = MuTextGlobalNode("gcl%s" % ty.name, ty)
+        b.buffer.append(".global %s <%s>" % ("@"+nd.name, "@"+ty.name))
+        b.add_node(nd)
+        return nd
 
     @staticmethod
     def new_func(b, sig):
         # type: (MuBundleNode, MuFuncSigNode) -> MuFuncNode
-        pass
+        nd = MuTextFuncNode(b, "fn"+sig.name, sig)
+        b.add_fndeclnode(nd)
+        return nd
 
     @staticmethod
     def new_func_ver(b, func):
