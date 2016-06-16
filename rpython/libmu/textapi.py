@@ -4,107 +4,164 @@ Implementation of bundle building API for generating a text bundle.
 This file aims to be RPython compliant.
 """
 from .api import *
-from rpython.rlib.objectmodel import compute_unique_id
+from rpython.rlib.objectmodel import compute_unique_id as id
 
 
 # -----------------------------------------------------------------------------
 # Nodes
-class MuTextIRNode(AbstractMuIRNode):
+class MuIRNode(AbstractMuIRNode):
     pass
 
 
-class MuTextBundleNode(MuTextIRNode):
+class MuBundleNode(MuIRNode):
     def __init__(self):
         self.buffer = []
         self._childnodes = dict()
-        self._reftypenodes = dict()     # to be processed later
-        self._fndeclnodes = dict()
-        self._fndefnodes = dict()
-
-    def _add_node(self, dic, node):
-        dic[node.id] = node
 
     def add_node(self, node):
-        self._add_node(self._childnodes, node)
+        self._childnodes[node.id] = node
+        return node
 
     def get_node(self, id):
         return self._childnodes[id]
 
-    def add_reftypenode(self, node):
-        self._add_node(self._reftypenodes, node)
 
-    def add_fndeclnode(self, node):
-        self._add_node(self._fndeclnodes, node)
-
-    def add_fndefnode(self, node):
-        self._add_node(self._fndefnodes, node)
-
-
-class MuTextChildNode(MuTextIRNode):
-    def __init__(self, name=None):
-        self.id = compute_unique_id(self)
-        self.name = name
+def _new_name(dic, name):
+    if name in dic:
+        dic[name] += 1
+        return "%s_%d" % (name, dic[name] - 1)
+    dic[name] = 0
+    return name + "_0"
 
 
-class MuTextTypeNode(MuTextChildNode):
-    def __init__(self, name=None, reftype=None, refrnt=None):
-        MuTextChildNode.__init__(self, name)
-        self.refrnt = refrnt
-        self.reftype = reftype
+class MuChildNode(MuIRNode):
+    __slots__ = ('id', 'name')
+
+    def __init__(self):
+        self.id = id(self)
+        cls = self.__class__
+        self.name = _new_name(cls._namedic, cls._name)
+
+    def defstr(self):
+        raise NotImplementedError
 
 
-class MuTextFuncSigNode(MuTextChildNode):       pass
-class MuTextVarNode(MuTextChildNode):           pass
-class MuTextGlobalVarNode(MuTextVarNode):       pass
-class MuTextConstNode(MuTextGlobalVarNode):
-    def __init__(self, name, ty, val):
-        MuTextChildNode.__init__(self, name)
-        self.type = ty
-        self.value = val
+class MuTypeNode(MuChildNode):
+    __slots__ = ('fmt_str', 'fmt_args')
+    _namedic = {}
+    _name = "type"
+
+    def __init__(self, fmt_str, fmt_args=None):
+        MuChildNode.__init__(self)
+        self.fmt_str = fmt_str
+        self.fmt_args = fmt_args
+
+    def __str__(self):
+        return "@" + self.name
+
+    def constr(self):
+        if self.fmt_args:
+            return self.fmt_str % self.fmt_args
+        else:
+            return self.fmt_str
+
+    def defstr(self):
+        return ".typedef @%s = %s" % (self.name, self.constr())
 
 
-class MuTextGlobalNode(MuTextGlobalVarNode):
-    def __init__(self, name, ty):
-        MuTextChildNode.__init__(self, name)
-        self.type = ty
+class MuFuncSigNode(MuChildNode):
+    __slots__ = ('argnds', 'retnds')
+    _namedic = {}
+    _name = "sig"
+
+    def __init__(self, argnds, retnds):
+        MuChildNode.__init__(self)
+        self.argnds = argnds
+        self.retnds = retnds
+
+    def __str__(self):
+        return "@" + self.name
+
+    def constr(self):
+        return "(%s) -> (%s)" % (" ".join(['@' + a.name for a in self.argnds]),
+                                 " ".join(['@' + r.name for r in self.retnds]))
+
+    def defstr(self):
+        return ".funcsig @%s = %s" % (self.name, self.constr())
 
 
-class MuTextFuncNode(MuTextGlobalVarNode):
-    def __init__(self, bundle, name="", sig=None):
-        MuTextChildNode.__init__(self, name)
-        self.sig = sig
-        self.bdl = bundle
-        self.vers = []
+class MuVarNode(MuChildNode):           pass
+class MuGlobalVarNode(MuVarNode):       pass
+class MuConstNode(MuGlobalVarNode):
+    __slots__ = ("typend, value")
+    _namedic = {}
+    _name = "const"
 
-class MuTextExpFuncNode(MuTextGlobalVarNode):   pass
-class MuTextLocalVarNode(MuTextVarNode):        pass
-class MuTextNorParamNode(MuTextLocalVarNode):   pass
-class MuTextExcParamNode(MuTextLocalVarNode):   pass
-class MuTextInstResNode(MuTextLocalVarNode):    pass
-class MuTextFuncVerNode(MuTextChildNode):
-    def __init__(self, fncnd, verno):
-        MuTextChildNode.__init__(self, "%s_v%d" % (fncnd.name, verno))
-        self.fncnd = fncnd
-        self.bdl = fncnd.bdl
-        self.blknds = []
+    def __init__(self, typend, value, constructor=None):
+        MuChildNode.__init__(self)
+        self.typend = typend
+        self.value = value
+        self.constructor = constructor
+
+    def constr(self):
+        def _scistr(f):
+            # fix case where the scientific notation doesn't contain a '.', like 1e-08
+            s = str(f)
+            if 'e' in s:
+                i = s.index('e')
+                if '.' not in s[:i]:
+                    s = '%s.0%s' % (s[:i], s[i:])
+            # fix infinity case
+            if 'inf' in s and f > 0:
+                s = '+' + s  # prepend a '+' for +inf value whose '+' sign is omitted.
+            return s
+        if self.constructor is None:
+            type_constr = self.typend.constr()
+            if type_constr == "float":
+                return "%sf" % _scistr(self.value)
+            elif type_constr == "double":
+                return "%sd" % _scistr(self.value)
+            elif type_constr[:3] == "int":
+                return "%d" % int(self.value)
+            else:
+                return "{%s}" % " ".join(["@" + e.name for e in self.value])
+        else:
+            return self.constructor
+
+    def defstr(self):
+        return ".const @%s <@%s> = %s" % (self.name, self.typend.name, self.constr())
 
 
-class MuTextBBNode(MuTextChildNode):
-    def __init__(self, fncvnd, blkno):
-        MuTextChildNode.__init__(self, "%s.blk%d" % (fncvnd.name, blkno))
-        self.fncvernd = fncvnd
-        self.bdl = fncvnd.bdl
-        self.opnds = []
+class MuGlobalNode(MuGlobalVarNode):
+    __slots__ = ("typend", )
+    _namedic = {}
+    _name = "gcl"
 
-class MuTextInstNode(MuTextChildNode):          pass
+    def __init__(self, typend):
+        MuChildNode.__init__(self)
+        self.typend = typend
+
+    def defstr(self):
+        return ".global @%s <@%s>" % (self.name, self.typend.name)
+
+
+class MuFuncNode(MuGlobalVarNode):      pass
+class MuExpFuncNode(MuGlobalVarNode):   pass
+class MuLocalVarNode(MuVarNode):        pass
+class MuNorParamNode(MuLocalVarNode):   pass
+class MuExcParamNode(MuLocalVarNode):   pass
+class MuInstResNode(MuLocalVarNode):    pass
+class MuFuncVerNode(MuChildNode):       pass
+class MuBBNode(MuChildNode):            pass
+class MuInstNode(MuChildNode):          pass
 
 
 # -----------------------------------------------------------------------------
-class MuTextBundleBuildingAPI(AbstractMuBundleBuildingAPI):
+class MuBundleBuildingAPI(AbstractMuBundleBuildingAPI):
     @staticmethod
     def new_bundle():
         # type: () -> MuBundleNode
-        return MuTextBundleNode()
+        return MuBundleNode()
 
     @staticmethod
     def abort_bundle_node(b):
@@ -126,194 +183,140 @@ class MuTextBundleBuildingAPI(AbstractMuBundleBuildingAPI):
         node.name = name
 
     @staticmethod
-    def _new_typenode(b, name, constructor):
-        nd = MuTextTypeNode(name)
-        b.buffer.append(".typedef @%s = %s" % (name, constructor))
-        b.add_node(nd)
-        return nd
-
-    @staticmethod
     def new_type_int(b, len):
         # type: (MuBundleNode, int) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "i%d" % len, "int<%d>" % len)
+        return b.add_node(MuTypeNode("int<%d>", (len, )))
 
     @staticmethod
     def new_type_float(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "flt", "float")
+        return b.add_node(MuTypeNode("float"))
 
     @staticmethod
     def new_type_double(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "dbl", "double")
-
-    @staticmethod
-    def _new_reftypenode(b, reft):
-        nd = MuTextTypeNode(reftype=reft)
-        b.add_reftypenode(nd)
-        return nd
+        return b.add_node(MuTypeNode("double"))
 
     @staticmethod
     def new_type_uptr(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_reftypenode(b, 'uptr')
+        return b.add_node(MuTypeNode("uptr<%s>"))
 
     @staticmethod
     def set_type_uptr(uptr, ty):
         # type: (MuTypeNode, MuTypeNode) -> None
-        uptr.refrnt = ty
-        uptr.name = "ptr" + ty.name
+        uptr.fmt_args = ("@" + ty.name, )
 
     @staticmethod
     def new_type_ufuncptr(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_reftypenode(b, 'ufuncptr')
+        return b.add_node(MuTypeNode("ufuncptr<%s>"))
 
     @staticmethod
     def set_type_ufuncptr(ufuncptr, sig):
         # type: (MuTypeNode, MuFuncSigNode) -> None
-        ufuncptr.refrnt = sig
-        ufuncptr.name = "fnp" + sig.name
+        ufuncptr.fmt_args = ("@" + sig.name, )
 
     @staticmethod
     def new_type_struct(b, fieldtys):
         # type: (MuBundleNode, [MuTypeNode]) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b,
-                                                     "stt%s" % "".join([f.name for f in fieldtys]),
-                                                     "struct<%s>" % " ".join(["@" + f.name for f in fieldtys]))
+        return b.add_node(MuTypeNode("struct<%s>", " ".join(["@" + f.name for f in fieldtys])))
 
     @staticmethod
     def new_type_hybrid(b, fixedtys, varty):
         # type: (MuBundleNode, [MuTypeNode], MuTypeNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b,
-                                                     "hyb%s%s" % ("".join([f.name for f in fixedtys]), varty),
-                                                     "hybrid<%s %s>" % (
-                                                         " ".join(["@" + f.name for f in fixedtys]),
-                                                         "@" + varty.name))
+        return b.add_node(MuTypeNode("hybrid<%s %s>", (" ".join(["@" + f.name for f in fixedtys]),
+                                                           "@" + varty.name)))
 
     @staticmethod
     def new_type_array(b, elemty, len):
         # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "arr%d%s" % (len, elemty.name),
-                                                     "array<%s %d>" % ("@" + elemty.name, len))
+        return b.add_node(MuTypeNode("array<%s %d>", ("@" + elemty.name, len)))
 
     @staticmethod
     def new_type_vector(b, elemty, len):
         # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "vec%d%s" % (len, elemty.name),
-                                                     "vector<%s %d>" % ("@" + elemty.name, len))
+        return b.add_node(MuTypeNode("vector<%s %d>", ("@" + elemty.name, len)))
 
     @staticmethod
     def new_type_void(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "void", "void")
+        return b.add_node(MuTypeNode("void"))
 
     @staticmethod
     def new_type_ref(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_reftypenode(b, 'ref')
+        return b.add_node(MuTypeNode("ref<%s>"))
 
     @staticmethod
     def set_type_ref(ref, ty):
         # type: (MuTypeNode, MuTypeNode) -> None
-        ref.refrnt = ty
-        ref.name = "ref" + ty.name
+        ref.fmt_args = ("@" + ty.name, )
 
     @staticmethod
     def new_type_iref(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_reftypenode(b, 'iref')
+        return b.add_node(MuTypeNode("iref<%s>"))
 
     @staticmethod
     def set_type_iref(iref, ty):
         # type: (MuTypeNode, MuTypeNode) -> None
-        iref.refrnt = ty
-        iref.name = "iref" + ty.name
+        iref.fmt_args = ("@" + ty.name,)
 
     @staticmethod
     def new_type_weakref(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_reftypenode(b, 'weakref')
+        return b.add_node(MuTypeNode("weakref<%s>"))
 
     @staticmethod
     def set_type_weakref(weakref, ty):
         # type: (MuTypeNode, MuTypeNode) -> None
-        weakref.refrnt = ty
-        weakref.name = "wrf" + ty.name
+        weakref.fmt_args = ("@" + ty.name,)
 
     @staticmethod
     def new_type_funcref(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_reftypenode(b, 'funcref')
+        return b.add_node(MuTypeNode("funcref<%s>"))
 
     @staticmethod
     def set_type_funcref(funcref, sig):
         # type: (MuTypeNode, MuFuncSigNode) -> None
-        funcref.refrnt = sig
-        funcref.name = "fnr" + sig.name
+        funcref.fmt_args = ("@" + sig.name,)
 
     @staticmethod
     def new_type_tagref64(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "tag", "tagref64")
+        return b.add_node(MuTypeNode("tagref64"))
 
     @staticmethod
     def new_type_threadref(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "thr", "threadref")
+        return b.add_node(MuTypeNode("threadref"))
 
     @staticmethod
     def new_type_stackref(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "stk", "stackref")
+        return b.add_node(MuTypeNode("stackref"))
 
     @staticmethod
     def new_type_framecursorref(b):
-        return MuTextBundleBuildingAPI._new_typenode(b, "fmc", "framecursorref")
+        return b.add_node(MuTypeNode("framecursorref"))
 
     @staticmethod
     def new_type_irnoderef(b):
         # type: (MuBundleNode) -> MuTypeNode
-        return MuTextBundleBuildingAPI._new_typenode(b, "ndr", "irnoderef")
+        return b.add_node(MuTypeNode("irnoderef"))
 
     @staticmethod
     def new_funcsig(b, paramtys, rettys):
         # type: (MuBundleNode, [MuTypeNode], [MuTypeNode]) -> MuFuncSigNode
-        nd = MuTextFuncSigNode("%s_%s" % ([f.name for f in paramtys], [f.name for f in rettys]))
-        b.buffer.append(".funcsig %s = (%s) -> (%s)" %
-                        (nd.name, ["@"+f.name for f in paramtys], ["@"+f.name for f in rettys]))
-        b.add_node(nd)
-        return nd
-
-    @staticmethod
-    def __primval_repr(val, type_char):
-        def _scistr(f):
-            # fix case where the scientific notation doesn't contain a '.', like 1e-08
-            s = str(f)
-            if 'e' in s:
-                i = s.index('e')
-                if '.' not in s[:i]:
-                    s = '%s.0%s' % (s[:i], s[i:])
-            # fix infinity case
-            if 'inf' in s and val > 0:
-                s = '+' + s  # prepend a '+' for +inf value whose '+' sign is omitted.
-            return s
-
-        if type_char == 'f':
-            return "%sf" % _scistr(val)
-        elif type_char == 'd':
-            return "%sd" % _scistr(val)
-        else:
-            return "%d" % int(val)
+        nd = MuFuncSigNode(paramtys, rettys)
+        return b.add_node(nd)
 
     @staticmethod
     def new_const_int(b, ty, value):
         # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuConstNode
-        reprstr = MuTextBundleBuildingAPI.__primval_repr(value, 'i')
-        nd = MuTextConstNode("%s_%s" % (reprstr.replace('+', 'p'), ty.name), ty, value)
-        b.buffer.append(".const %s <%s> = %s" % ("@"+nd.name, "@"+ty.name, reprstr))
-        b.add_node(nd)
-        return nd
+        return b.add_node(MuConstNode(ty, value))
 
     @staticmethod
     def new_const_int_ex(b, ty, values):
@@ -323,54 +326,33 @@ class MuTextBundleBuildingAPI(AbstractMuBundleBuildingAPI):
     @staticmethod
     def new_const_float(b, ty, value):
         # type: (MuBundleNode, MuTypeNode, float) -> MuConstNode
-        reprstr = MuTextBundleBuildingAPI.__primval_repr(value, 'f')
-        nd = MuTextConstNode("%s_%s" % (reprstr.replace('+', 'p'), ty.name), ty, value)
-        b.buffer.append(".const %s <%s> = %s" % ("@" + nd.name, "@" + ty.name, reprstr))
-        b.add_node(nd)
-        return nd
+        return b.add_node(MuConstNode(ty, value))
 
     @staticmethod
     def new_const_double(b, ty, value):
         # type: (MuBundleNode, MuTypeNode, double) -> MuConstNode
-        reprstr = MuTextBundleBuildingAPI.__primval_repr(value, 'd')
-        nd = MuTextConstNode("%s_%s" % (reprstr.replace('+', 'p'), ty.name), ty, value)
-        b.buffer.append(".const %s <%s> = %s" % ("@" + nd.name, "@" + ty.name, reprstr))
-        b.add_node(nd)
-        return nd
+        return b.add_node(MuConstNode(ty, value))
 
     @staticmethod
     def new_const_null(b, ty):
         # type: (MuBundleNode, MuTypeNode) -> MuConstNode
-        nd = MuTextConstNode("NULL_%s" % ty.name, ty, 0)
-        b.buffer.append(".const %s <%s> = %s" % (
-            "@"+nd.name, "@"+ty.name,
-            "0" if ty.name[:3] in ("ptr", "fnp") else "0"
-        ))
-        b.add_node(nd)
-        return nd
+        constr = "0" if ty.name[:3] in ("ptr", "fnp") else "0"
+        return b.add_node(MuConstNode(ty, None, constr))
 
     @staticmethod
     def new_const_seq(b, ty, elems):
         # type: (MuBundleNode, MuTypeNode, [MuConstNode]) -> MuConstNode
-        nd = MuTextConstNode("seq%d%s" % (len(elems), ty.name), ty, [elems])
-        b.buffer.append(".const %s <%s> = {%s}" % ("@"+nd.name, "@"+ty.name, " ".join(["@"+e.name for e in elems])))
-        b.add_node(nd)
-        return nd
+        return b.add_node(MuConstNode(ty, elems))
 
     @staticmethod
     def new_global_cell(b, ty):
         # type: (MuBundleNode, MuTypeNode) -> MuGlobalNode
-        nd = MuTextGlobalNode("gcl%s" % ty.name, ty)
-        b.buffer.append(".global %s <%s>" % ("@"+nd.name, "@"+ty.name))
-        b.add_node(nd)
-        return nd
+        return b.add_node(MuGlobalNode(ty))
 
     @staticmethod
     def new_func(b, sig):
         # type: (MuBundleNode, MuFuncSigNode) -> MuFuncNode
-        nd = MuTextFuncNode(b, "fn"+sig.name, sig)
-        b.add_fndeclnode(nd)
-        return nd
+        pass
 
     @staticmethod
     def new_func_ver(b, func):
