@@ -145,13 +145,37 @@ class MuGlobalNode(MuGlobalVarNode):
         return ".global @%s <@%s>" % (self.name, self.typend.name)
 
 
-class MuFuncNode(MuGlobalVarNode):      pass
+class MuFuncNode(MuGlobalVarNode):
+    __slots__ = ("sig", )
+    _namedic = {}
+    _name = "fnc"
+
+    def __init__(self, sig):
+        MuChildNode.__init__(self)
+        self.sig = sig
+
+    def defstr(self):
+        return ".funcdecl @%s <@%s>" % (self.name, self.sig.name)
+
+
 class MuExpFuncNode(MuGlobalVarNode):   pass
 class MuLocalVarNode(MuVarNode):        pass
 class MuNorParamNode(MuLocalVarNode):   pass
 class MuExcParamNode(MuLocalVarNode):   pass
 class MuInstResNode(MuLocalVarNode):    pass
-class MuFuncVerNode(MuChildNode):       pass
+class MuFuncVerNode(MuChildNode):
+    __slots__ = ("fncnd", "blknds")
+    _namedic = {}
+    _name = "fncver"
+
+    def __init__(self, fncnd):
+        MuChildNode.__init__(self)
+        self.fncnd = fncnd
+        self.blknds = []
+
+    def defstr(self):
+        return ""
+
 class MuBBNode(MuChildNode):            pass
 class MuInstNode(MuChildNode):          pass
 
@@ -352,7 +376,7 @@ class MuBundleBuildingAPI(AbstractMuBundleBuildingAPI):
     @staticmethod
     def new_func(b, sig):
         # type: (MuBundleNode, MuFuncSigNode) -> MuFuncNode
-        pass
+        return b.add_node(MuFuncNode(sig))
 
     @staticmethod
     def new_func_ver(b, func):
