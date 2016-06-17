@@ -160,7 +160,7 @@ class Link(object):
 
     def show(self):
         from rpython.translator.tool.graphpage import try_show
-        try_show(self)
+        return try_show(self)
 
     view = show
 
@@ -175,6 +175,9 @@ class Block(object):
         self.exitswitch = None            # a variable or
                                           #  Constant(last_exception), see below
         self.exits = []                   # list of Link(s)
+
+    def is_final_block(self):
+        return self.operations == ()      # return or except block
 
     def at(self):
         if self.operations and self.operations[0].offset >= 0:
@@ -243,7 +246,7 @@ class Block(object):
 
     def show(self):
         from rpython.translator.tool.graphpage import try_show
-        try_show(self)
+        return try_show(self)
 
     def _slowly_get_graph(self):
         import gc
@@ -681,7 +684,7 @@ def checkgraph(graph):
             assert len(allexitcases) == len(block.exits)
             vars_previous_blocks.update(vars)
 
-    except AssertionError, e:
+    except AssertionError as e:
         # hack for debug tools only
         #graph.show()  # <== ENABLE THIS TO SEE THE BROKEN GRAPH
         if block and not hasattr(e, '__annotator_block'):
