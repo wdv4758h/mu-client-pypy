@@ -3,7 +3,6 @@ MuIR builder -- builds IR bundle via API calls
 
 This defines an abstract builder that needs to be implemented concretely.
 """
-from .api import *
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.mutyper.muts import mutype
 from rpython.mutyper.tools.textgraph import print_graph
@@ -24,7 +23,7 @@ except ImportError:
 mdb = Driver()
 
 
-class MuTextIRBuilder(AbstructMuBundleBuildingAPI):
+class MuTextIRBuilder(object):
     def __init__(self, db):
         self.db = db
         self.graphs = db.graphs
