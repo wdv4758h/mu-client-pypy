@@ -1,9 +1,8 @@
 """
-Implementation of bundle building API for generating a text bundle.
-
-This file aims to be RPython compliant.
+Bundle building API should be used in AOT.
+API calls flesh out to be C function calls.
 """
-from .api import *
+from rpython.libmu.api.interface import *
 from rpython.rlib.objectmodel import compute_unique_id as id
 
 
