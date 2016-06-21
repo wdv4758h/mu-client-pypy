@@ -651,6 +651,8 @@ for key in __primop_map:
     globals()['_llop2mu_' + key] = \
         lambda a, b, res, llopname: [getattr(muops, __primop_map[llopname])(a, b, result=res)]
 
+_llop2mu_int_add_nonneg_ovf = lambda a, b, res, llopname: [getattr(muops, __primop_map['int_add'])(a, b, result=res)]
+
 
 # ----------------
 # primitive cast ops
