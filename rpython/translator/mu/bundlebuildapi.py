@@ -5,8 +5,6 @@ Two distinct cases to direct the API function calls:
 JIT --> common instructions.
 AOT --> C API calls using Python binding in Mu implementation.
 """
-
-from libmu import *
 from rpython.rlib.objectmodel import we_are_translated
 
 """
@@ -42,6 +40,7 @@ def new_context(vmopts={}):
     if we_are_translated():  # JIT
         return JITContext()
     else:  # AOT
+        from libmu import MuRefImpl2StartDLL
         """
         Note that you may need to use DelayedDisposer (see pythonbinding/libmu)
         Also don't forget to call close_context() at the end.
