@@ -1,15 +1,62 @@
 """
-Reflection of the C API to RPython.
-It lays out the essential interface,
-and concrete implementations need to be made with respect to it.
+Mu bundle building API.
 
-At this moment I can envision three implementations:
-- JIT: eventually translates the method calls into corresponding COMMINSTs. (RPython)
-- Image writer (not implemented): using ctypes to call into IW and writes out an executable. (Python)
-- Text bundle: generate a text form bundle in the end. (Python)
-
-This interface is in RPython.
+Two distinct cases to direct the API function calls:
+JIT --> common instructions.
+AOT --> C API calls using Python binding in Mu implementation.
 """
+
+from libmu import *
+from rpython.rlib.objectmodel import we_are_translated
+
+"""
+Node type hierarchy (intuitively):
+
+MuIRNode
+ +-- MuBundleNode
+ +-- MuChildNode
+     +-- MuFuncSigNode
+     +-- MuInstNode
+     +-- MuVarNode
+     |   +-- MuLocalVarNode
+     |   |   +-- MuInstResNode
+     |   |   +-- MuNorParamNode
+     |   |   +-- MuExcParamNode
+     |   +-- MuGlobalVarNode
+     |       +-- MuExpFuncNode
+     |       +-- MuConstNode
+     |       +-- MuFuncNode
+     |       +-- MuGlobalNode
+     +-- MuTypeNode
+     +-- MuFuncVerNode
+     +-- MuBBNode
+
+"""
+
+
+def new_context(vmopts={}):
+    """
+    Calls this function to create a 'context'
+    from which the rest of API calls are done.
+    """
+    if we_are_translated():  # JIT
+        return JITContext()
+    else:  # AOT
+        """
+        Note that you may need to use DelayedDisposer (see pythonbinding/libmu)
+        Also don't forget to call close_context() at the end.
+        """
+        opts = {
+            "vmLog": "ERROR",
+            "sourceInfo": False,
+            "staticCheck": True,
+        }
+        opts.update(vmopts)
+
+        dll = MuRefImpl2StartDLL("libmurefimpl2start.so")
+        mu = dll.mu_refimpl2_new_ex(**opts)
+
+        return mu.new_context()
 
 
 # --------------------------------
@@ -22,6 +69,8 @@ class MuDestKind:
     MU_DEST_DEFAULT = 0x05
     MU_DEST_DISABLED = 0x06
     MU_DEST_ENABLED = 0x07
+
+
 class MuBinOptr:
     MU_BINOP_ADD = 0x01
     MU_BINOP_SUB = 0x02
@@ -41,6 +90,8 @@ class MuBinOptr:
     MU_BINOP_FMUL = 0xB2
     MU_BINOP_FDIV = 0xB3
     MU_BINOP_FREM = 0xB4
+
+
 class MuCmpOptr:
     MU_CMP_EQ = 0x20
     MU_CMP_NE = 0x21
@@ -68,6 +119,8 @@ class MuCmpOptr:
     MU_CMP_FOGE = 0xCD
     MU_CMP_FOLT = 0xCE
     MU_CMP_FOLE = 0xCF
+
+
 class MuConvOptr:
     MU_CONV_TRUNC = 0x30
     MU_CONV_ZEXT = 0x31
@@ -81,6 +134,8 @@ class MuConvOptr:
     MU_CONV_BITCAST = 0x39
     MU_CONV_REFCAST = 0x3A
     MU_CONV_PTRCAST = 0x3B
+
+
 class MuMemOrd:
     MU_ORD_NOT_ATOMIC = 0x00
     MU_ORD_RELAXED = 0x01
@@ -89,6 +144,8 @@ class MuMemOrd:
     MU_ORD_RELEASE = 0x04
     MU_ORD_ACQ_REL = 0x05
     MU_ORD_SEQ_CST = 0x06
+
+
 class MuAtomicRMWOp:
     MU_ARMW_XCHG = 0x00
     MU_ARMW_ADD = 0x01
@@ -101,500 +158,371 @@ class MuAtomicRMWOp:
     MU_ARMW_MIN = 0x08
     MU_ARMW_UMAX = 0x09
     MU_ARMW_UMIN = 0x0A
+
+
 class MuFlag:
     MU_CC_DEFAULT = 0x00
 
 
-"""
-Node type hierarchy:
-
-MuIRNode
- +-- MuBundleNode
- +-- MuChildNode
-     +-- MuFuncSigNode
-     +-- MuInstNode
-     +-- MuVarNode
-     |   +-- MuLocalVarNode
-     |   |   +-- MuInstResNode
-     |   |   +-- MuNorParamNode
-     |   |   +-- MuExcParamNode
-     |   +-- MuGlobalVarNode
-     |       +-- MuExpFuncNode
-     |       +-- MuConstNode
-     |       +-- MuFuncNode
-     |       +-- MuGlobalNode
-     +-- MuTypeNode
-     +-- MuFuncVerNode
-     +-- MuBBNode
-
-"""
-
-class AbstractMuIRNode(object):                 pass
-class AbstractMuBundleNode(AbstractMuIRNode):           pass
-class AbstractMuChildNode(AbstractMuIRNode):            pass
-class AbstractMuTypeNode(AbstractMuChildNode):          pass
-class AbstractMuFuncSigNode(AbstractMuChildNode):       pass
-class AbstractMuVarNode(AbstractMuChildNode):           pass
-class AbstractMuGlobalVarNode(AbstractMuVarNode):       pass
-class AbstractMuConstNode(AbstractMuGlobalVarNode):     pass
-class AbstractMuGlobalNode(AbstractMuGlobalVarNode):    pass
-class AbstractMuFuncNode(AbstractMuGlobalVarNode):      pass
-class AbstractMuExpFuncNode(AbstractMuGlobalVarNode):   pass
-class AbstractMuLocalVarNode(AbstractMuVarNode):        pass
-class AbstractMuNorParamNode(AbstractMuLocalVarNode):   pass
-class AbstractMuExcParamNode(AbstractMuLocalVarNode):   pass
-class AbstractMuInstResNode(AbstractMuLocalVarNode):    pass
-class AbstractMuFuncVerNode(AbstractMuChildNode):       pass
-class AbstractMuBBNode(AbstractMuChildNode):            pass
-class AbstractMuInstNode(AbstractMuChildNode):          pass
-
-
 # --------------------------------
-# Classes
-class AbstractMuBundleBuildingAPI:
-    @staticmethod
-    def new_bundle():
+# Implementing API for JIT
+# NOTE: This is RPython.
+class JITContext:
+    def new_bundle(self):
         # type: () -> MuBundleNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def load_bundle_from_node(b):
+    def load_bundle_from_node(self, b):
         # type: (MuBundleNode) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def abort_bundle_node(b):
+    def abort_bundle_node(self, b):
         # type: (MuBundleNode) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def get_node(b, id):
+    def get_node(self, b, id):
         # type: (MuBundleNode, MuID) -> MuChildNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def get_id(b, node):
+    def get_id(self, b, node):
         # type: (MuBundleNode, MuChildNode) -> MuID
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def set_name(b, node, name):
+    def set_name(self, b, node, name):
         # type: (MuBundleNode, MuChildNode, MuName) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_int(b, len):
+    def new_type_int(self, b, len):
         # type: (MuBundleNode, int) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_float(b):
+    def new_type_float(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_double(b):
+    def new_type_double(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_uptr(b):
+    def new_type_uptr(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def set_type_uptr(uptr, ty):
+    def set_type_uptr(self, uptr, ty):
         # type: (MuTypeNode, MuTypeNode) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_ufuncptr(b):
+    def new_type_ufuncptr(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def set_type_ufuncptr(ufuncptr, sig):
+    def set_type_ufuncptr(self, ufuncptr, sig):
         # type: (MuTypeNode, MuFuncSigNode) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_struct(b, fieldtys):
+    def new_type_struct(self, b, fieldtys):
         # type: (MuBundleNode, [MuTypeNode]) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_hybrid(b, fixedtys, varty):
+    def new_type_hybrid(self, b, fixedtys, varty):
         # type: (MuBundleNode, [MuTypeNode], MuTypeNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_array(b, elemty, len):
+    def new_type_array(self, b, elemty, len):
         # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_vector(b, elemty, len):
+    def new_type_vector(self, b, elemty, len):
         # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_void(b):
+    def new_type_void(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_ref(b):
+    def new_type_ref(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def set_type_ref(ref, ty):
+    def set_type_ref(self, ref, ty):
         # type: (MuTypeNode, MuTypeNode) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_iref(b):
+    def new_type_iref(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def set_type_iref(iref, ty):
+    def set_type_iref(self, iref, ty):
         # type: (MuTypeNode, MuTypeNode) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_weakref(b):
+    def new_type_weakref(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def set_type_weakref(weakref, ty):
+    def set_type_weakref(self, weakref, ty):
         # type: (MuTypeNode, MuTypeNode) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_funcref(b):
+    def new_type_funcref(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def set_type_funcref(funcref, sig):
+    def set_type_funcref(self, funcref, sig):
         # type: (MuTypeNode, MuFuncSigNode) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_tagref64(b):
+    def new_type_tagref64(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_threadref(b):
+    def new_type_threadref(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_stackref(b):
+    def new_type_stackref(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_framecursorref(b):
+    def new_type_framecursorref(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_type_irnoderef(b):
+    def new_type_irnoderef(self, b):
         # type: (MuBundleNode) -> MuTypeNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_funcsig(b, paramtys, rettys):
+    def new_funcsig(self, b, paramtys, rettys):
         # type: (MuBundleNode, [MuTypeNode], [MuTypeNode]) -> MuFuncSigNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_const_int(b, ty, value):
+    def new_const_int(self, b, ty, value):
         # type: (MuBundleNode, MuTypeNode, uint64_t) -> MuConstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_const_int_ex(b, ty, values):
+    def new_const_int_ex(self, b, ty, values):
         # type: (MuBundleNode, MuTypeNode, [uint64_t]) -> MuConstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_const_float(b, ty, value):
+    def new_const_float(self, b, ty, value):
         # type: (MuBundleNode, MuTypeNode, float) -> MuConstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_const_double(b, ty, value):
+    def new_const_double(self, b, ty, value):
         # type: (MuBundleNode, MuTypeNode, double) -> MuConstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_const_null(b, ty):
+    def new_const_null(self, b, ty):
         # type: (MuBundleNode, MuTypeNode) -> MuConstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_const_seq(b, ty, elems):
+    def new_const_seq(self, b, ty, elems):
         # type: (MuBundleNode, MuTypeNode, [MuConstNode]) -> MuConstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_global_cell(b, ty):
+    def new_global_cell(self, b, ty):
         # type: (MuBundleNode, MuTypeNode) -> MuGlobalNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_func(b, sig):
+    def new_func(self, b, sig):
         # type: (MuBundleNode, MuFuncSigNode) -> MuFuncNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_func_ver(b, func):
+    def new_func_ver(self, b, func):
         # type: (MuBundleNode, MuFuncNode) -> MuFuncVerNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_exp_func(b, func, callconv, cookie):
+    def new_exp_func(self, b, func, callconv, cookie):
         # type: (MuBundleNode, MuFuncNode, MuCallConv, MuConstNode) -> MuExpFuncNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_bb(fv):
+    def new_bb(self, fv):
         # type: (MuFuncVerNode) -> MuBBNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_nor_param(bb, ty):
+    def new_nor_param(self, bb, ty):
         # type: (MuBBNode, MuTypeNode) -> MuNorParamNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_exc_param(bb):
+    def new_exc_param(self, bb):
         # type: (MuBBNode) -> MuExcParamNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_inst_res(inst):
+    def new_inst_res(self, inst):
         # type: (MuInstNode) -> MuInstResNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def add_dest(inst, kind, dest, vars):
+    def add_dest(self, inst, kind, dest, vars):
         # type: (MuInstNode, MuDestKind, MuBBNode, [MuVarNode]) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def add_keepalives(inst, vars):
+    def add_keepalives(self, inst, vars):
         # type: (MuInstNode, [MuLocalVarNode]) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_binop(bb, optr, ty, opnd1, opnd2):
+    def new_binop(self, bb, optr, ty, opnd1, opnd2):
         # type: (MuBBNode, MuBinOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_cmp(bb, optr, ty, opnd1, opnd2):
+    def new_cmp(self, bb, optr, ty, opnd1, opnd2):
         # type: (MuBBNode, MuCmpOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_conv(bb, optr, from_ty, to_ty, opnd):
+    def new_conv(self, bb, optr, from_ty, to_ty, opnd):
         # type: (MuBBNode, MuConvOptr, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_select(bb, cond_ty, opnd_ty, cond, if_true, if_false):
+    def new_select(self, bb, cond_ty, opnd_ty, cond, if_true, if_false):
         # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_branch(bb):
+    def new_branch(self, bb):
         # type: (MuBBNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_branch2(bb, cond):
+    def new_branch2(self, bb, cond):
         # type: (MuBBNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_switch(bb, opnd_ty, opnd):
+    def new_switch(self, bb, opnd_ty, opnd):
         # type: (MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def add_switch_dest(sw, key, dest, vars):
+    def add_switch_dest(self, sw, key, dest, vars):
         # type: (MuInstNode, MuConstNode, MuBBNode, [MuVarNode]) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_call(bb, sig, callee, args):
+    def new_call(self, bb, sig, callee, args):
         # type: (MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_tailcall(bb, sig, callee, args):
+    def new_tailcall(self, bb, sig, callee, args):
         # type: (MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_ret(bb, rvs):
+    def new_ret(self, bb, rvs):
         # type: (MuBBNode, [MuVarNode]) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_throw(bb, exc):
+    def new_throw(self, bb, exc):
         # type: (MuBBNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_extractvalue(bb, strty, index, opnd):
+    def new_extractvalue(self, bb, strty, index, opnd):
         # type: (MuBBNode, MuTypeNode, int, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_insertvalue(bb, strty, index, opnd, newval):
+    def new_insertvalue(self, bb, strty, index, opnd, newval):
         # type: (MuBBNode, MuTypeNode, int, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_extractelement(bb, seqty, indty, opnd, index):
+    def new_extractelement(self, bb, seqty, indty, opnd, index):
         # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_insertelement(bb, seqty, indty, opnd, index, newval):
+    def new_insertelement(self, bb, seqty, indty, opnd, index, newval):
         # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_shufflevector(bb, vecty, maskty, vec1, vec2, mask):
+    def new_shufflevector(self, bb, vecty, maskty, vec1, vec2, mask):
         # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_new(bb, allocty):
+    def new_new(self, bb, allocty):
         # type: (MuBBNode, MuTypeNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_newhybrid(bb, allocty, lenty, length):
+    def new_newhybrid(self, bb, allocty, lenty, length):
         # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_alloca(bb, allocty):
+    def new_alloca(self, bb, allocty):
         # type: (MuBBNode, MuTypeNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_allocahybrid(bb, allocty, lenty, length):
+    def new_allocahybrid(self, bb, allocty, lenty, length):
         # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_getiref(bb, refty, opnd):
+    def new_getiref(self, bb, refty, opnd):
         # type: (MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_getfieldiref(bb, is_ptr, refty, index, opnd):
+    def new_getfieldiref(self, bb, is_ptr, refty, index, opnd):
         # type: (MuBBNode, int, MuTypeNode, int, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_getelemiref(bb, is_ptr, refty, indty, opnd, index):
+    def new_getelemiref(self, bb, is_ptr, refty, indty, opnd, index):
         # type: (MuBBNode, int, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_shiftiref(bb, is_ptr, refty, offty, opnd, offset):
+    def new_shiftiref(self, bb, is_ptr, refty, offty, opnd, offset):
         # type: (MuBBNode, int, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_getvarpartiref(bb, is_ptr, refty, opnd):
+    def new_getvarpartiref(self, bb, is_ptr, refty, opnd):
         # type: (MuBBNode, int, MuTypeNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_load(bb, is_ptr, ord, refty, loc):
+    def new_load(self, bb, is_ptr, ord, refty, loc):
         # type: (MuBBNode, int, MuMemOrd, MuTypeNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_store(bb, is_ptr, ord, refty, loc, newval):
+    def new_store(self, bb, is_ptr, ord, refty, loc, newval):
         # type: (MuBBNode, int, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_cmpxchg(bb, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired):
+    def new_cmpxchg(self, bb, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired):
         # type: (MuBBNode, int, int, MuMemOrd, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_atomicrmw(bb, is_ptr, ord, optr, refTy, loc, opnd):
+    def new_atomicrmw(self, bb, is_ptr, ord, optr, refTy, loc, opnd):
         # type: (MuBBNode, int, MuMemOrd, MuAtomicRMWOp, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_fence(bb, ord):
+    def new_fence(self, bb, ord):
         # type: (MuBBNode, MuMemOrd) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_trap(bb, rettys):
+    def new_trap(self, bb, rettys):
         # type: (MuBBNode, [MuTypeNode]) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_watchpoint(bb, wpid, rettys):
+    def new_watchpoint(self, bb, wpid, rettys):
         # type: (MuBBNode, MuWPID, [MuTypeNode]) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_wpbranch(bb, wpid):
+    def new_wpbranch(self, bb, wpid):
         # type: (MuBBNode, MuWPID) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_ccall(bb, callconv, callee_ty, sig, callee, args):
+    def new_ccall(self, bb, callconv, callee_ty, sig, callee, args):
         # type: (MuBBNode, MuCallConv, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_newthread(bb, stack, threadlocal):
+    def new_newthread(self, bb, stack, threadlocal):
         # type: (MuBBNode, MuVarNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_swapstack_ret(bb, swappee, ret_tys):
+    def new_swapstack_ret(self, bb, swappee, ret_tys):
         # type: (MuBBNode, MuVarNode, [MuTypeNode]) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_swapstack_kill(bb, swappee):
+    def new_swapstack_kill(self, bb, swappee):
         # type: (MuBBNode, MuVarNode) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def set_newstack_pass_values(inst, tys, vars):
+    def set_newstack_pass_values(self, inst, tys, vars):
         # type: (MuInstNode, MuTypeNode, [MuVarNode]) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def set_newstack_throw_exc(inst, exc):
+    def set_newstack_throw_exc(self, inst, exc):
         # type: (MuInstNode, MuVarNode) -> None
         raise NotImplementedError("abstract base")
 
-    @staticmethod
-    def new_comminst(bb, opcode, flags, tys, sigs, args):
+    def new_comminst(self, bb, opcode, flags, tys, sigs, args):
         # type: (MuBBNode, MuCommInst, [MuFlag], [MuTypeNode], [MuFuncSigNode], [MuVarNode]) -> MuInstNode
         raise NotImplementedError("abstract base")
 
-
+    def close_context(self):
+        pass  # Nothing

@@ -1,25 +1,24 @@
-import sys, os
+import os
 import os.path
 import shutil
+import sys
 
-from rpython.libmu.textbuilder import MuTextIRBuilder
-from rpython.mutyper.mutyper import MuTyper
-from rpython.translator.translator import TranslationContext
-from rpython.translator.tool.taskengine import SimpleTaskEngine
-from rpython.translator.goal import query
-from rpython.translator.goal.timing import Timer
-from rpython.annotator.listdef import s_list_of_strings
+import py
 from rpython.annotator import policy as annpolicy
-from rpython.tool.udir import udir
+from rpython.annotator.listdef import s_list_of_strings
+from rpython.mutyper.mutyper import MuTyper
 from rpython.rlib.debug import debug_start, debug_print, debug_stop
 from rpython.rlib.entrypoint import secondary_entrypoints,\
      annotated_jit_entrypoints
-from .mu.preps import prepare
-from .mu.exctran import MuExceptionTransformer
-from .mu.database import MuDatabase
-
-import py
 from rpython.tool.ansi_print import AnsiLogger
+from rpython.tool.udir import udir
+from rpython.translator.goal import query
+from rpython.translator.goal.timing import Timer
+from rpython.translator.mu.genmu import MuTextIRBuilder
+from rpython.translator.tool.taskengine import SimpleTaskEngine
+from rpython.translator.translator import TranslationContext
+from .mu.database import MuDatabase
+from .mu.exctran import MuExceptionTransformer
 
 log = AnsiLogger("translation")
 
