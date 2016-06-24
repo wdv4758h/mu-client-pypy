@@ -4,16 +4,18 @@ from pypy.objspace.std.mapdict import *
 class Config:
     class objspace:
         class std:
+            withsmalldicts = False
             withcelldict = False
-            methodcachesizeexp = 11
-            withmethodcachecounter = False
+            withmethodcache = False
+            withidentitydict = False
+            withmapdict = True
 
 space = FakeSpace()
 space.config = Config
 
 class Class(object):
     def __init__(self, hasdict=True):
-        self.hasdict = hasdict
+        self.hasdict = True
         if hasdict:
             self.terminator = DictTerminator(space, self)
         else:
@@ -22,16 +24,9 @@ class Class(object):
     def instantiate(self, sp=None):
         if sp is None:
             sp = space
-        if self.hasdict:
-            result = Object()
-        else:
-            result = ObjectWithoutDict()
+        result = Object()
         result.user_setup(sp, self)
         return result
-
-class ObjectWithoutDict(ObjectWithoutDict):
-    class typedef:
-        hasdict = False
 
 class Object(Object):
     class typedef:
@@ -436,9 +431,6 @@ def test_slots_no_dict():
     assert obj.getslotvalue(b) == 60
     assert obj.storage == [50, 60]
     assert not obj.setdictvalue(space, "a", 70)
-    assert obj.getdict(space) is None
-    assert obj.getdictvalue(space, "a") is None
-
 
 def test_getdict():
     cls = Class()
@@ -599,20 +591,15 @@ def test_setdict():
 
 
 def test_specialized_class():
-    from pypy.objspace.std.mapdict import _make_storage_mixin_size_n
     from pypy.objspace.std.objectobject import W_ObjectObject
-    classes = [_make_storage_mixin_size_n(i) for i in range(2, 10)]
+    classes = memo_get_subclass_of_correct_size(space, W_ObjectObject)
     w1 = W_Root()
     w2 = W_Root()
     w3 = W_Root()
     w4 = W_Root()
     w5 = W_Root()
     w6 = W_Root()
-    for mixin in classes:
-        class objectcls(W_ObjectObject):
-            objectmodel.import_from_mixin(BaseUserClassMapdict)
-            objectmodel.import_from_mixin(MapdictDictSupport)
-            objectmodel.import_from_mixin(mixin)
+    for objectcls in classes:
         cls = Class()
         obj = objectcls()
         obj.user_setup(space, cls)
@@ -659,6 +646,7 @@ def test_specialized_class():
 # XXX write more
 
 class AppTestWithMapDict(object):
+    spaceconfig = {"objspace.std.withmapdict": True}
 
     def test_simple(self):
         class A(object):
@@ -875,7 +863,8 @@ class AppTestWithMapDict(object):
 
 
 class AppTestWithMapDictAndCounters(object):
-    spaceconfig = {"objspace.std.withmethodcachecounter": True}
+    spaceconfig = {"objspace.std.withmapdict": True,
+                   "objspace.std.withmethodcachecounter": True}
 
     def setup_class(cls):
         from pypy.interpreter import gateway
@@ -1218,7 +1207,8 @@ class AppTestWithMapDictAndCounters(object):
         assert got == 'd'
 
 class AppTestGlobalCaching(AppTestWithMapDict):
-    spaceconfig = {"objspace.std.withmethodcachecounter": True}
+    spaceconfig = {"objspace.std.withmethodcachecounter": True,
+                   "objspace.std.withmapdict": True}
 
     def test_mix_classes(self):
         import __pypy__
@@ -1275,7 +1265,8 @@ class AppTestGlobalCaching(AppTestWithMapDict):
             assert 0, "failed: got %r" % ([got[1] for got in seen],)
 
 class TestDictSubclassShortcutBug(object):
-    spaceconfig = {"objspace.std.withmethodcachecounter": True}
+    spaceconfig = {"objspace.std.withmapdict": True,
+                   "objspace.std.withmethodcachecounter": True}
 
     def test_bug(self):
         w_dict = self.space.appexec([], """():

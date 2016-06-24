@@ -4,7 +4,7 @@ Implementation of the interpreter-level functions in the module unicodedata.
 
 from pypy.interpreter.gateway import interp2app, unwrap_spec
 from pypy.interpreter.baseobjspace import W_Root
-from pypy.interpreter.error import OperationError, oefmt
+from pypy.interpreter.error import OperationError
 from pypy.interpreter.typedef import TypeDef, interp_attrproperty
 from rpython.rlib.rarithmetic import r_longlong
 from rpython.rlib.objectmodel import we_are_translated
@@ -34,36 +34,34 @@ if MAXUNICODE > 0xFFFF:
     # Target is wide build
     def unichr_to_code_w(space, w_unichr):
         if not space.isinstance_w(w_unichr, space.w_unicode):
-            raise oefmt(
-                space.w_TypeError, 'argument 1 must be unicode, not %T',
-                w_unichr)
+            raise OperationError(space.w_TypeError, space.wrap(
+                'argument 1 must be unicode'))
 
         if not we_are_translated() and sys.maxunicode == 0xFFFF:
             # Host CPython is narrow build, accept surrogates
             try:
                 return ord_accepts_surrogate(space.unicode_w(w_unichr))
             except TypeError:
-                raise oefmt(space.w_TypeError,
-                            "need a single Unicode character as parameter")
+                raise OperationError(space.w_TypeError, space.wrap(
+                    'need a single Unicode character as parameter'))
         else:
             if not space.len_w(w_unichr) == 1:
-                raise oefmt(space.w_TypeError,
-                            "need a single Unicode character as parameter")
+                raise OperationError(space.w_TypeError, space.wrap(
+                    'need a single Unicode character as parameter'))
             return space.int_w(space.ord(w_unichr))
 
 else:
     # Target is narrow build
     def unichr_to_code_w(space, w_unichr):
         if not space.isinstance_w(w_unichr, space.w_unicode):
-            raise oefmt(
-                space.w_TypeError, 'argument 1 must be unicode, not %T',
-                w_unichr)
+            raise OperationError(space.w_TypeError, space.wrap(
+                'argument 1 must be unicode'))
 
         if not we_are_translated() and sys.maxunicode > 0xFFFF:
             # Host CPython is wide build, forbid surrogates
             if not space.len_w(w_unichr) == 1:
-                raise oefmt(space.w_TypeError,
-                            "need a single Unicode character as parameter")
+                raise OperationError(space.w_TypeError, space.wrap(
+                    'need a single Unicode character as parameter'))
             return space.int_w(space.ord(w_unichr))
 
         else:
@@ -71,8 +69,8 @@ else:
             try:
                 return ord_accepts_surrogate(space.unicode_w(w_unichr))
             except TypeError:
-                raise oefmt(space.w_TypeError,
-                            "need a single Unicode character as parameter")
+                raise OperationError(space.w_TypeError, space.wrap(
+                    'need a single Unicode character as parameter'))
 
 
 class UCD(W_Root):
@@ -119,7 +117,7 @@ class UCD(W_Root):
         except KeyError:
             if w_default is not None:
                 return w_default
-            raise oefmt(space.w_ValueError, "no such name")
+            raise OperationError(space.w_ValueError, space.wrap('no such name'))
         return space.wrap(name)
 
     def decimal(self, space, w_unichr, w_default=None):
@@ -130,7 +128,7 @@ class UCD(W_Root):
             pass
         if w_default is not None:
             return w_default
-        raise oefmt(space.w_ValueError, "not a decimal")
+        raise OperationError(space.w_ValueError, space.wrap('not a decimal'))
 
     def digit(self, space, w_unichr, w_default=None):
         code = unichr_to_code_w(space, w_unichr)
@@ -140,7 +138,7 @@ class UCD(W_Root):
             pass
         if w_default is not None:
             return w_default
-        raise oefmt(space.w_ValueError, "not a digit")
+        raise OperationError(space.w_ValueError, space.wrap('not a digit'))
 
     def numeric(self, space, w_unichr, w_default=None):
         code = unichr_to_code_w(space, w_unichr)
@@ -150,7 +148,8 @@ class UCD(W_Root):
             pass
         if w_default is not None:
             return w_default
-        raise oefmt(space.w_ValueError, "not a numeric character")
+        raise OperationError(space.w_ValueError,
+                             space.wrap('not a numeric character'))
 
     def category(self, space, w_unichr):
         code = unichr_to_code_w(space, w_unichr)
@@ -180,9 +179,7 @@ class UCD(W_Root):
     @unwrap_spec(form=str)
     def normalize(self, space, form, w_unistr):
         if not space.isinstance_w(w_unistr, space.w_unicode):
-            raise oefmt(
-                space.w_TypeError, 'argument 2 must be unicode, not %T',
-                w_unistr)
+            raise OperationError(space.w_TypeError, space.wrap('argument 2 must be unicode'))
         if form == 'NFC':
             composed = True
             decomposition = self._canon_decomposition
@@ -196,7 +193,8 @@ class UCD(W_Root):
             composed = False
             decomposition = self._compat_decomposition
         else:
-            raise oefmt(space.w_ValueError, "invalid normalization form")
+            raise OperationError(space.w_ValueError,
+                                 space.wrap('invalid normalization form'))
 
         strlen = space.len_w(w_unistr)
         result = [0] * (strlen + strlen / 10 + 10)

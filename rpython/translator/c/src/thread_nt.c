@@ -18,8 +18,7 @@
 typedef struct RPyOpaque_ThreadLock NRMUTEX, *PNRMUTEX;
 
 typedef struct {
-	void (*func)(void *);
-	void *arg;
+	void (*func)(void);
 	long id;
 	HANDLE done;
 } callobj;
@@ -31,29 +30,20 @@ bootstrap(void *call)
 {
 	callobj *obj = (callobj*)call;
 	/* copy callobj since other thread might free it before we're done */
-	void (*func)(void *) = obj->func;
-	void *arg = obj->arg;
+	void (*func)(void) = obj->func;
 
 	obj->id = GetCurrentThreadId();
 	ReleaseSemaphore(obj->done, 1, NULL);
-	func(arg);
+	func();
 }
 
 long RPyThreadStart(void (*func)(void))
-{
-    /* a kind-of-invalid cast, but the 'func' passed here doesn't expect
-       any argument, so it's unlikely to cause problems */
-    return RPyThreadStartEx((void(*)(void *))func, NULL);
-}
-
-long RPyThreadStartEx(void (*func)(void *), void *arg)
 {
 	unsigned long rv;
 	callobj obj;
 
 	obj.id = -1;	/* guilty until proved innocent */
 	obj.func = func;
-	obj.arg = arg;
 	obj.done = CreateSemaphore(NULL, 0, 1, NULL);
 	if (obj.done == NULL)
 		return -1;

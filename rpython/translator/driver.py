@@ -404,8 +404,8 @@ class TranslationDriver(SimpleTaskEngine):
             from rpython.translator.platform import CompilationError
             try:
                 configure_boehm(self.translator.platform)
-            except CompilationError as e:
-                i = 'Boehm GC not installed.  Try e.g. "translate.py --gc=minimark"'
+            except CompilationError, e:
+                i = 'Boehm GC not installed.  Try e.g. "translate.py --gc=hybrid"'
                 raise Exception(str(e) + '\n' + i)
 
     @taskdef([STACKCHECKINSERTION, '?'+BACKENDOPT, RTYPE, '?annotate'],
@@ -582,16 +582,16 @@ class TranslationDriver(SimpleTaskEngine):
         self.log.info('usession directory: %s' % (udir,))
         return result
 
-    @classmethod
-    def from_targetspec(cls, targetspec_dic, config=None, args=None,
+    @staticmethod
+    def from_targetspec(targetspec_dic, config=None, args=None,
                         empty_translator=None,
                         disable=[],
                         default_goal=None):
         if args is None:
             args = []
 
-        driver = cls(config=config, default_goal=default_goal,
-                     disable=disable)
+        driver = TranslationDriver(config=config, default_goal=default_goal,
+                                   disable=disable)
         target = targetspec_dic['target']
         spec = target(driver, args)
 

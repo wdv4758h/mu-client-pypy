@@ -7,7 +7,7 @@ from pypy.interpreter import pycode
 from pypy.interpreter.pyparser import future, pyparse, error as parseerror
 from pypy.interpreter.astcompiler import (astbuilder, codegen, consts, misc,
                                           optimize, ast)
-from pypy.interpreter.error import OperationError, oefmt
+from pypy.interpreter.error import OperationError
 
 
 class AbstractCompiler(object):
@@ -55,21 +55,21 @@ class AbstractCompiler(object):
         try:
             code = self.compile(source, filename, mode, flags)
             return code   # success
-        except OperationError as err:
+        except OperationError, err:
             if not err.match(space, space.w_SyntaxError):
                 raise
 
         try:
             self.compile(source + "\n", filename, mode, flags)
             return None   # expect more
-        except OperationError as err1:
+        except OperationError, err1:
             if not err1.match(space, space.w_SyntaxError):
                 raise
 
         try:
             self.compile(source + "\n\n", filename, mode, flags)
             raise     # uh? no error with \n\n.  re-raise the previous error
-        except OperationError as err2:
+        except OperationError, err2:
             if not err2.match(space, space.w_SyntaxError):
                 raise
 
@@ -116,7 +116,8 @@ class PythonAstCompiler(PyCodeCompiler):
         else:
             check = True
         if not check:
-            raise oefmt(self.space.w_TypeError, "invalid node type")
+            raise OperationError(self.space.w_TypeError, self.space.wrap(
+                "invalid node type"))
 
         fut = misc.parse_future(node, self.future_flags.compiler_features)
         f_flags, f_lineno, f_col = fut
@@ -130,8 +131,9 @@ class PythonAstCompiler(PyCodeCompiler):
         try:
             mod = optimize.optimize_ast(space, node, info)
             code = codegen.compile_ast(space, mod, info)
-        except parseerror.SyntaxError as e:
-            raise OperationError(space.w_SyntaxError, e.wrap_info(space))
+        except parseerror.SyntaxError, e:
+            raise OperationError(space.w_SyntaxError,
+                                 e.wrap_info(space))
         return code
 
     def compile_to_ast(self, source, filename, mode, flags):
@@ -143,10 +145,12 @@ class PythonAstCompiler(PyCodeCompiler):
         try:
             parse_tree = self.parser.parse_source(source, info)
             mod = astbuilder.ast_from_node(space, parse_tree, info)
-        except parseerror.IndentationError as e:
-            raise OperationError(space.w_IndentationError, e.wrap_info(space))
-        except parseerror.SyntaxError as e:
-            raise OperationError(space.w_SyntaxError, e.wrap_info(space))
+        except parseerror.IndentationError, e:
+            raise OperationError(space.w_IndentationError,
+                                 e.wrap_info(space))
+        except parseerror.SyntaxError, e:
+            raise OperationError(space.w_SyntaxError,
+                                 e.wrap_info(space))
         return mod
 
     def compile(self, source, filename, mode, flags, hidden_applevel=False):

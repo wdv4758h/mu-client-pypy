@@ -18,7 +18,7 @@ class Module(MixedModule):
 
     app_names = ['__delslice__', '__getslice__', '__repeat__', '__setslice__',
                  'countOf', 'delslice', 'getslice', 'indexOf',
-                 'isNumberType',
+                 'isMappingType', 'isNumberType', 'isSequenceType',
                  'repeat', 'setslice',
                  'attrgetter', 'itemgetter', 'methodcaller',
     ]
@@ -36,8 +36,7 @@ class Module(MixedModule):
                     'sub', 'truediv', 'truth', 'xor',
                     'iadd', 'iand', 'iconcat', 'idiv', 'ifloordiv',
                     'ilshift', 'imod', 'imul', 'ior', 'ipow', 'irepeat',
-                    'irshift', 'isub', 'itruediv', 'ixor', '_length_hint',
-                    'isSequenceType', 'isMappingType']
+                    'irshift', 'isub', 'itruediv', 'ixor', '_length_hint']
 
     interpleveldefs = {
         '_compare_digest': 'tscmp.compare_digest',

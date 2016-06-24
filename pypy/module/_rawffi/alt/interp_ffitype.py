@@ -4,7 +4,7 @@ from rpython.rlib import jit
 from pypy.interpreter.baseobjspace import W_Root
 from pypy.interpreter.typedef import TypeDef, interp_attrproperty
 from pypy.interpreter.gateway import interp2app
-from pypy.interpreter.error import oefmt
+from pypy.interpreter.error import OperationError
 
 
 class W_FFIType(W_Root):
@@ -39,8 +39,8 @@ class W_FFIType(W_Root):
         try:
             return space.wrap(self.sizeof())
         except ValueError:
-            raise oefmt(space.w_ValueError,
-                        "Operation not permitted on an incomplete type")
+            msg = "Operation not permitted on an incomplete type"
+            raise OperationError(space.w_ValueError, space.wrap(msg))
 
     def sizeof(self):
         return intmask(self.get_ffitype().c_size)

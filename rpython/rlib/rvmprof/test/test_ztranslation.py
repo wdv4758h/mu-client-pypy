@@ -19,7 +19,7 @@ class MyCode:
 def setup_module(mod):
     try:
         rvmprof.register_code_object_class(MyCode, MyCode.get_name)
-    except rvmprof.VMProfPlatformUnsupported as e:
+    except rvmprof.VMProfPlatformUnsupported, e:
         py.test.skip(str(e))
 
 

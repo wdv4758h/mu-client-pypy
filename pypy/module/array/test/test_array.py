@@ -99,13 +99,12 @@ class BaseArrayTests:
 
         for tc in 'BHIL':
             a = self.array(tc)
-            itembits = a.itemsize * 8
-            vals = [0, 2 ** itembits - 1]
+            vals = [0, 2 ** a.itemsize - 1]
             a.fromlist(vals)
             assert a.tolist() == vals
 
             a = self.array(tc.lower())
-            vals = [-1 * (2 ** itembits) / 2,  (2 ** itembits) / 2 - 1]
+            vals = [-1 * (2 ** a.itemsize) / 2,  (2 ** a.itemsize) / 2 - 1]
             a.fromlist(vals)
             assert a.tolist() == vals
 

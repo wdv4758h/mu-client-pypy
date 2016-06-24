@@ -67,8 +67,7 @@ def frame_realize(space, py_obj):
     track_reference(space, py_obj, w_obj)
     return w_obj
 
-@cpython_api([PyThreadState, PyCodeObject, PyObject, PyObject], PyFrameObject,
-             result_is_ll=True)
+@cpython_api([PyThreadState, PyCodeObject, PyObject, PyObject], PyFrameObject)
 def PyFrame_New(space, tstate, w_code, w_globals, w_locals):
     typedescr = get_typedescr(PyFrame.typedef)
     py_obj = typedescr.allocate(space, space.gettypeobject(PyFrame.typedef))

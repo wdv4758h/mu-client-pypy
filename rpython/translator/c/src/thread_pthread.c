@@ -58,14 +58,13 @@
 
 static long _pypythread_stacksize = 0;
 
-long RPyThreadStart(void (*func)(void))
+static void *bootstrap_pthread(void *func)
 {
-    /* a kind-of-invalid cast, but the 'func' passed here doesn't expect
-       any argument, so it's unlikely to cause problems */
-    return RPyThreadStartEx((void(*)(void *))func, NULL);
+  ((void(*)(void))func)();
+  return NULL;
 }
 
-long RPyThreadStartEx(void (*func)(void *), void *arg)
+long RPyThreadStart(void (*func)(void))
 {
 	pthread_t th;
 	int status;
@@ -95,12 +94,8 @@ long RPyThreadStartEx(void (*func)(void *), void *arg)
 #else
 				 (pthread_attr_t*)NULL,
 #endif
-    /* the next line does an invalid cast: pthread_create() will see a
-       function that returns random garbage.  The code is the same as
-       CPython: this random garbage will be stored for pthread_join() 
-       to return, but in this case pthread_join() is never called. */
-				 (void* (*)(void *))func,
-				 (void *)arg
+				 bootstrap_pthread,
+				 (void *)func
 				 );
 
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)

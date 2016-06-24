@@ -243,11 +243,10 @@ def test_string_arg():
 
 
 def test_dont_write_source_files():
-    from rpython.annotator.listdef import s_list_of_strings
-    def f(argv):
-        return len(argv)*2
+    def f(x):
+        return x*2
     t = TranslationContext()
-    t.buildannotator().build_types(f, [s_list_of_strings])
+    t.buildannotator().build_types(f, [int])
     t.buildrtyper().specialize()
 
     t.config.translation.countmallocs = True

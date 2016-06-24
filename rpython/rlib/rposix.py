@@ -189,7 +189,6 @@ def _errno_after(save_err):
             rthread.tlfield_alt_errno.setraw(_get_errno())
         else:
             rthread.tlfield_rpy_errno.setraw(_get_errno())
-            # ^^^ keep fork() up-to-date too, below
 
 
 if os.name == 'nt':
@@ -766,19 +765,17 @@ c_openpty = external('openpty',
                      save_err=rffi.RFFI_SAVE_ERRNO)
 c_forkpty = external('forkpty',
                      [rffi.INTP, rffi.VOIDP, rffi.VOIDP, rffi.VOIDP],
-                     rffi.PID_T, _nowrapper = True)
+                     rffi.PID_T,
+                     save_err=rffi.RFFI_SAVE_ERRNO)
 
 @replace_os_function('fork')
 @jit.dont_look_inside
 def fork():
     # NB. keep forkpty() up-to-date, too
-    # lots of custom logic here, to do things in the right order
     ofs = debug.debug_offset()
     opaqueaddr = rthread.gc_thread_before_fork()
     childpid = c_fork()
-    errno = _get_errno()
     rthread.gc_thread_after_fork(childpid, opaqueaddr)
-    rthread.tlfield_rpy_errno.setraw(errno)
     childpid = handle_posix_error('fork', childpid)
     if childpid == 0:
         debug.debug_forked(ofs)
@@ -802,14 +799,11 @@ def openpty():
 def forkpty():
     master_p = lltype.malloc(rffi.INTP.TO, 1, flavor='raw')
     master_p[0] = rffi.cast(rffi.INT, -1)
-    null = lltype.nullptr(rffi.VOIDP.TO)
     try:
         ofs = debug.debug_offset()
         opaqueaddr = rthread.gc_thread_before_fork()
-        childpid = c_forkpty(master_p, null, null, null)
-        errno = _get_errno()
+        childpid = c_forkpty(master_p, None, None, None)
         rthread.gc_thread_after_fork(childpid, opaqueaddr)
-        rthread.tlfield_rpy_errno.setraw(errno)
         childpid = handle_posix_error('forkpty', childpid)
         if childpid == 0:
             debug.debug_forked(ofs)
@@ -1045,23 +1039,15 @@ def rename(path1, path2):
         win32traits = make_win32_traits(traits)
         path1 = traits.as_str0(path1)
         path2 = traits.as_str0(path2)
-        if not win32traits.MoveFileEx(path1, path2, 0):
+        if not win32traits.MoveFile(path1, path2):
             raise rwin32.lastSavedWindowsError()
 
 @specialize.argtype(0, 1)
 def replace(path1, path2):
-    if _WIN32:
-        traits = _preferred_traits(path1)
-        win32traits = make_win32_traits(traits)
-        path1 = traits.as_str0(path1)
-        path2 = traits.as_str0(path2)
-        ret = win32traits.MoveFileEx(path1, path2,
-                     win32traits.MOVEFILE_REPLACE_EXISTING)
-        if not ret:
-            raise rwin32.lastSavedWindowsError()
-    else:
-        ret = rename(path1, path2)
-    return ret
+    if os.name == 'nt':
+        raise NotImplementedError(
+            'On windows, os.replace() should overwrite the destination')
+    return rename(path1, path2)
 
 #___________________________________________________________________
 
@@ -1219,14 +1205,21 @@ def utime(path, times):
         if times is None:
             error = c_utime(path, lltype.nullptr(UTIMBUFP.TO))
         else:
+            actime, modtime = times
             if HAVE_UTIMES:
-                with lltype.scoped_alloc(TIMEVAL2P.TO, 2) as l_timeval2p:
-                    times_to_timeval2p(times, l_timeval2p)
-                    error = c_utimes(path, l_timeval2p)
+                import math
+                l_times = lltype.malloc(TIMEVAL2P.TO, 2, flavor='raw')
+                fracpart, intpart = math.modf(actime)
+                rffi.setintfield(l_times[0], 'c_tv_sec', int(intpart))
+                rffi.setintfield(l_times[0], 'c_tv_usec', int(fracpart * 1e6))
+                fracpart, intpart = math.modf(modtime)
+                rffi.setintfield(l_times[1], 'c_tv_sec', int(intpart))
+                rffi.setintfield(l_times[1], 'c_tv_usec', int(fracpart * 1e6))
+                error = c_utimes(path, l_times)
+                lltype.free(l_times, flavor='raw')
             else:
                 # we only have utime(), which does not allow
                 # sub-second resolution
-                actime, modtime = times
                 l_utimbuf = lltype.malloc(UTIMBUFP.TO, flavor='raw')
                 l_utimbuf.c_actime  = rffi.r_time_t(actime)
                 l_utimbuf.c_modtime = rffi.r_time_t(modtime)
@@ -1268,17 +1261,6 @@ def utime(path, times):
             rwin32.CloseHandle(hFile)
             lltype.free(atime, flavor='raw')
             lltype.free(mtime, flavor='raw')
-
-def times_to_timeval2p(times, l_timeval2p):
-    actime, modtime = times
-    _time_to_timeval(actime, l_timeval2p[0])
-    _time_to_timeval(modtime, l_timeval2p[1])
-
-def _time_to_timeval(t, l_timeval):
-    import math
-    fracpart, intpart = math.modf(t)
-    rffi.setintfield(l_timeval, 'c_tv_sec', int(intpart))
-    rffi.setintfield(l_timeval, 'c_tv_usec', int(fracpart * 1e6))
 
 if not _WIN32:
     TMSP = lltype.Ptr(TMS)
@@ -1767,7 +1749,6 @@ class EnvironExtRegistry(ControllerEntryForPrebuilt):
 class CConfig:
     _compilation_info_ = ExternalCompilationInfo(
         includes=['sys/stat.h',
-                  'sys/time.h',
                   'unistd.h',
                   'fcntl.h'],
     )
@@ -1922,36 +1903,6 @@ if HAVE_UTIMENSAT:
         error = c_utimensat(dir_fd, pathname, l_times, flag)
         lltype.free(l_times, flavor='raw')
         handle_posix_error('utimensat', error)
-
-if HAVE_LUTIMES:
-    c_lutimes = external('lutimes',
-        [rffi.CCHARP, TIMEVAL2P], rffi.INT,
-        save_err=rffi.RFFI_SAVE_ERRNO)
-
-    @specialize.argtype(1)
-    def lutimes(pathname, times):
-        if times is None:
-            error = c_lutimes(pathname, lltype.nullptr(TIMEVAL2P.TO))
-        else:
-            with lltype.scoped_alloc(TIMEVAL2P.TO, 2) as l_timeval2p:
-                times_to_timeval2p(times, l_timeval2p)
-                error = c_lutimes(pathname, l_timeval2p)
-        handle_posix_error('lutimes', error)
-
-if HAVE_FUTIMES:
-    c_futimes = external('futimes',
-        [rffi.INT, TIMEVAL2P], rffi.INT,
-        save_err=rffi.RFFI_SAVE_ERRNO)
-
-    @specialize.argtype(1)
-    def futimes(fd, times):
-        if times is None:
-            error = c_futimes(fd, lltype.nullptr(TIMEVAL2P.TO))
-        else:
-            with lltype.scoped_alloc(TIMEVAL2P.TO, 2) as l_timeval2p:
-                times_to_timeval2p(times, l_timeval2p)
-                error = c_futimes(fd, l_timeval2p)
-        handle_posix_error('futimes', error)
 
 if HAVE_MKDIRAT:
     c_mkdirat = external('mkdirat',

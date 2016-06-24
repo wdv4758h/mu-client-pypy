@@ -641,7 +641,6 @@ class LocationCodeBuilder(object):
     SUB = _binaryop('SUB')
     IMUL = _binaryop('IMUL')
     NEG = _unaryop('NEG')
-    MUL = _unaryop('MUL')
 
     CMP = _binaryop('CMP')
     CMP16 = _binaryop('CMP16')

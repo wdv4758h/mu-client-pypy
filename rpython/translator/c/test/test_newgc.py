@@ -69,7 +69,7 @@ class UsingFrameworkTest(object):
             if not fullname.startswith('define'):
                 continue
             keyword = option.keyword
-            if keyword.startswith('test_') and not keyword.endswith(':'):
+            if keyword.startswith('test_'):
                 keyword = keyword[len('test_'):]
                 if keyword not in fullname:
                     continue
@@ -93,7 +93,6 @@ class UsingFrameworkTest(object):
                     funcs1.append(func)
             assert name not in name_to_func
             name_to_func[name] = len(name_to_func)
-        assert name_to_func
 
         def allfuncs(name, arg):
             num = name_to_func[name]

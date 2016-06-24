@@ -17,8 +17,8 @@ def byteorder_converter(space, new_order):
         elif ch in ('s', 'S'):
             endian = NPY.SWAP
         else:
-            raise oefmt(space.w_ValueError,
-                        "%s is an unrecognized byteorder", new_order)
+            raise OperationError(space.w_ValueError, space.wrap(
+                "%s is an unrecognized byteorder" % new_order))
     return endian
 
 
@@ -37,7 +37,8 @@ def clipmode_converter(space, w_mode):
         mode = space.int_w(w_mode)
         if NPY.CLIP <= mode <= NPY.RAISE:
             return mode
-    raise oefmt(space.w_TypeError, "clipmode not understood")
+    raise OperationError(space.w_TypeError,
+                         space.wrap("clipmode not understood"))
 
 
 def searchside_converter(space, w_obj):
@@ -91,11 +92,12 @@ def multi_axis_converter(space, w_axis, ndim):
         if axis < 0:
             axis += ndim
         if axis < 0 or axis >= ndim:
-            raise oefmt(space.w_ValueError,
-                        "'axis' entry %d is out of bounds [-%d, %d)",
-                        item, ndim, ndim)
+            raise OperationError(space.w_ValueError, space.wrap(
+                "'axis' entry %d is out of bounds [-%d, %d)" %
+                (item, ndim, ndim)))
         if out[axis]:
-            raise oefmt(space.w_ValueError, "duplicate value in 'axis'")
+            raise OperationError(space.w_ValueError, space.wrap(
+                "duplicate value in 'axis'"))
         out[axis] = True
     return out
 

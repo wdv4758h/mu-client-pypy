@@ -34,7 +34,7 @@ class CompiledVmprofTest(CCompiledMixin):
 
         try:
             rvmprof.register_code_object_class(MyCode, get_name)
-        except rvmprof.VMProfPlatformUnsupported as e:
+        except rvmprof.VMProfPlatformUnsupported, e:
             py.test.skip(str(e))
 
         def get_unique_id(code):

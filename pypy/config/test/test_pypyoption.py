@@ -11,6 +11,12 @@ def test_required():
 
     assert conf.objspace.usemodules.gc
 
+    conf.objspace.std.withmapdict = True
+    assert conf.objspace.std.withtypeversion
+    conf = get_pypy_config()
+    conf.objspace.std.withtypeversion = False
+    py.test.raises(ConfigError, "conf.objspace.std.withmapdict = True")
+
 def test_conflicting_gcrootfinder():
     conf = get_pypy_config()
     conf.translation.gc = "boehm"
@@ -41,10 +47,18 @@ def test_set_opt_level():
 def test_set_pypy_opt_level():
     conf = get_pypy_config()
     set_pypy_opt_level(conf, '2')
-    assert conf.objspace.std.intshortcut
+    assert conf.objspace.std.getattributeshortcut
     conf = get_pypy_config()
     set_pypy_opt_level(conf, '0')
-    assert not conf.objspace.std.intshortcut
+    assert not conf.objspace.std.getattributeshortcut
+
+def test_rweakref_required():
+    conf = get_pypy_config()
+    conf.translation.rweakref = False
+    set_pypy_opt_level(conf, '3')
+
+    assert not conf.objspace.std.withtypeversion
+    assert not conf.objspace.std.withmethodcache
 
 def test_check_documentation():
     def check_file_exists(fn):

@@ -43,18 +43,22 @@ class W_File(W_AbstractStream):
 
     def __init__(self, space):
         self.space = space
-        self.register_finalizer(space)
 
-    def _finalize_(self):
+    def __del__(self):
         # assume that the file and stream objects are only visible in the
-        # thread that runs _finalize_, so no race condition should be
-        # possible and no locking is done here.
+        # thread that runs __del__, so no race condition should be possible
+        self.clear_all_weakrefs()
         if self.stream is not None:
-            try:
-                self.direct_close()
-            except StreamErrors as e:
-                operr = wrap_streamerror(self.space, e, self.w_name)
-                raise operr
+            self.enqueue_for_destruction(self.space, W_File.destructor,
+                                         'close() method of ')
+
+    def destructor(self):
+        assert isinstance(self, W_File)
+        try:
+            self.direct_close()
+        except StreamErrors, e:
+            operr = wrap_streamerror(self.space, e, self.w_name)
+            raise operr
 
     def fdopenstream(self, stream, fd, mode, w_name=None):
         self.fd = fd
@@ -90,16 +94,19 @@ class W_File(W_AbstractStream):
 
     def check_closed(self):
         if self.stream is None:
-            raise oefmt(self.space.w_ValueError,
-                        "I/O operation on closed file")
+            raise OperationError(self.space.w_ValueError,
+                self.space.wrap("I/O operation on closed file")
+            )
 
     def check_readable(self):
         if not self.readable:
-            raise oefmt(self.space.w_IOError, "File not open for reading")
+            raise OperationError(self.space.w_IOError, self.space.wrap(
+                "File not open for reading"))
 
     def check_writable(self):
         if not self.writable:
-            raise oefmt(self.space.w_IOError, "File not open for writing")
+            raise OperationError(self.space.w_IOError, self.space.wrap(
+                "File not open for writing"))
 
     def getstream(self):
         """Return self.stream or raise an app-level ValueError if missing
@@ -196,7 +203,7 @@ class W_File(W_AbstractStream):
             while n > 0:
                 try:
                     data = stream.read(n)
-                except OSError as e:
+                except OSError, e:
                     # a special-case only for read() (similar to CPython, which
                     # also loses partial data with other methods): if we get
                     # EAGAIN after already some data was received, return it.
@@ -505,9 +512,8 @@ producing strings. This is equivalent to calling write() for each string."""
                     else:
                         line = w_line.charbuf_w(space)
                 except BufferInterfaceNotFound:
-                    raise oefmt(space.w_TypeError,
-                                "writelines() argument must be a sequence of "
-                                "strings")
+                    raise OperationError(space.w_TypeError, space.wrap(
+                        "writelines() argument must be a sequence of strings"))
                 else:
                     lines[i] = space.wrap(line)
         for w_line in lines:

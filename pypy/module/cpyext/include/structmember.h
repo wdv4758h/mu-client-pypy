@@ -78,11 +78,7 @@ typedef struct PyMemberDef {
 
 
 /* API functions. */
-/* Don't include them while building PyPy, RPython also generated signatures
- * which are similar but not identical. */
-#ifndef PYPY_STANDALONE
 #include "pypy_structmember_decl.h"
-#endif
 
 
 #ifdef __cplusplus

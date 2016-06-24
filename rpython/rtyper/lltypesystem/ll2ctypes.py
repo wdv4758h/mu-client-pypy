@@ -231,7 +231,17 @@ def build_ctypes_array(A, delayed_builders, max_n=0):
     assert max_n >= 0
     ITEM = A.OF
     ctypes_item = get_ctypes_type(ITEM, delayed_builders)
-    ctypes_item_ptr = ctypes.POINTER(ctypes_item)
+    # Python 2.5 ctypes can raise OverflowError on 64-bit builds
+    for n in [maxint, 2**31]:
+        MAX_SIZE = n/64
+        try:
+            PtrType = ctypes.POINTER(MAX_SIZE * ctypes_item)
+        except (OverflowError, AttributeError), e:
+            pass      #        ^^^ bah, blame ctypes
+        else:
+            break
+    else:
+        raise e
 
     class CArray(ctypes.Structure):
         if is_emulated_long:
@@ -255,9 +265,35 @@ def build_ctypes_array(A, delayed_builders, max_n=0):
                 bigarray.length = n
             return bigarray
 
+        _ptrtype = None
+
+        @classmethod
+        def _get_ptrtype(cls):
+            if cls._ptrtype:
+                return cls._ptrtype
+            # ctypes can raise OverflowError on 64-bit builds
+            # on windows it raises AttributeError even for 2**31 (_length_ missing)
+            if _MS_WINDOWS:
+                other_limit = 2**31-1
+            else:
+                other_limit = 2**31
+            for n in [maxint, other_limit]:
+                cls.MAX_SIZE = n / ctypes.sizeof(ctypes_item)
+                try:
+                    cls._ptrtype = ctypes.POINTER(cls.MAX_SIZE * ctypes_item)
+                except (OverflowError, AttributeError), e:
+                    pass
+                else:
+                    break
+            else:
+                raise e
+            return cls._ptrtype
+
         def _indexable(self, index):
-            p = ctypes.cast(self.items, ctypes_item_ptr)
-            return p
+            PtrType = self._get_ptrtype()
+            assert index + 1 < self.MAX_SIZE
+            p = ctypes.cast(ctypes.pointer(self.items), PtrType)
+            return p.contents
 
         def _getitem(self, index, boundscheck=True):
             if boundscheck:
@@ -829,7 +865,7 @@ def lltype2ctypes(llobj, normalize=True):
                         llinterp = LLInterpreter.current_interpreter
                         try:
                             llres = llinterp.eval_graph(container.graph, llargs)
-                        except LLException as lle:
+                        except LLException, lle:
                             llinterp._store_exception(lle)
                             return 0
                         #except:
@@ -838,7 +874,7 @@ def lltype2ctypes(llobj, normalize=True):
                     else:
                         try:
                             llres = container._callable(*llargs)
-                        except LLException as lle:
+                        except LLException, lle:
                             llinterp = LLInterpreter.current_interpreter
                             llinterp._store_exception(lle)
                             return 0
@@ -1009,22 +1045,12 @@ def ctypes2lltype(T, cobj):
                     container = _array_of_known_length(T.TO)
                     container._storage = type(cobj)(cobj.contents)
             elif isinstance(T.TO, lltype.FuncType):
-                # cobj is a CFunctionType object.  We naively think
-                # that it should be a function pointer.  No no no.  If
-                # it was read out of an array, say, then it is a *pointer*
-                # to a function pointer.  In other words, the read doesn't
-                # read anything, it just takes the address of the function
-                # pointer inside the array.  If later the array is modified
-                # or goes out of scope, then we crash.  CTypes is fun.
-                # It works if we cast it now to an int and back.
                 cobjkey = intmask(ctypes.cast(cobj, ctypes.c_void_p).value)
                 if cobjkey in _int2obj:
                     container = _int2obj[cobjkey]
                 else:
-                    name = getattr(cobj, '__name__', '?')
-                    cobj = ctypes.cast(cobjkey, type(cobj))
                     _callable = get_ctypes_trampoline(T.TO, cobj)
-                    return lltype.functionptr(T.TO, name,
+                    return lltype.functionptr(T.TO, getattr(cobj, '__name__', '?'),
                                               _callable=_callable)
             elif isinstance(T.TO, lltype.OpaqueType):
                 if T == llmemory.GCREF:
@@ -1152,7 +1178,7 @@ if sys.platform == 'darwin':
         finally:
             try:
                 os.unlink(ccout)
-            except OSError as e:
+            except OSError, e:
                 if e.errno != errno.ENOENT:
                     raise
         res = re.search(expr, trace)

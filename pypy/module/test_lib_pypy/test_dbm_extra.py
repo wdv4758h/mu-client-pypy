@@ -3,7 +3,7 @@ import py
 from rpython.tool.udir import udir
 try:
     from lib_pypy import dbm
-except ImportError as e:
+except ImportError, e:
     py.test.skip(e)
 
 import sys

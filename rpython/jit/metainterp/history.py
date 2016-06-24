@@ -1,4 +1,3 @@
-import sys
 from rpython.rtyper.extregistry import ExtRegistryEntry
 from rpython.rtyper.lltypesystem import lltype, llmemory, rffi
 from rpython.rlib.objectmodel import we_are_translated, Symbolic
@@ -88,10 +87,9 @@ def repr_rpython(box, typechars):
 
 
 class AbstractDescr(AbstractValue):
-    __slots__ = ('descr_index', 'ei_index')
+    __slots__ = ('descr_index',)
     llopaque = True
     descr_index = -1
-    ei_index = sys.maxint
 
     def repr_of_descr(self):
         return '%r' % (self,)

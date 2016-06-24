@@ -129,7 +129,7 @@ class BaseGCTransformer(object):
                                            raise_analyzer,
                                            cleanup=False)
                     must_constfold = True
-                except inline.CannotInline as e:
+                except inline.CannotInline, e:
                     print 'CANNOT INLINE:', e
                     print '\t%s into %s' % (inline_graph, graph)
             cleanup_graph(graph)

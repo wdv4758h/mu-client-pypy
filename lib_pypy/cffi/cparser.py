@@ -29,8 +29,7 @@ _r_int_literal = re.compile(r"-?0?x?[0-9a-f]+[lu]*$", re.IGNORECASE)
 _r_stdcall1 = re.compile(r"\b(__stdcall|WINAPI)\b")
 _r_stdcall2 = re.compile(r"[(]\s*(__stdcall|WINAPI)\b")
 _r_cdecl = re.compile(r"\b__cdecl\b")
-_r_extern_python = re.compile(r'\bextern\s*"'
-                              r'(Python|Python\s*\+\s*C|C\s*\+\s*Python)"\s*.')
+_r_extern_python = re.compile(r'\bextern\s*"Python"\s*.')
 _r_star_const_space = re.compile(       # matches "* const "
     r"[*]\s*((const|volatile|restrict)\b\s*)+")
 
@@ -89,12 +88,6 @@ def _preprocess_extern_python(csource):
     #     void __cffi_extern_python_start;
     #     int foo(int);
     #     void __cffi_extern_python_stop;
-    #
-    # input: `extern "Python+C" int foo(int);`
-    # output:
-    #     void __cffi_extern_python_plus_c_start;
-    #     int foo(int);
-    #     void __cffi_extern_python_stop;
     parts = []
     while True:
         match = _r_extern_python.search(csource)
@@ -105,10 +98,7 @@ def _preprocess_extern_python(csource):
         #print ''.join(parts)+csource
         #print '=>'
         parts.append(csource[:match.start()])
-        if 'C' in match.group(1):
-            parts.append('void __cffi_extern_python_plus_c_start; ')
-        else:
-            parts.append('void __cffi_extern_python_start; ')
+        parts.append('void __cffi_extern_python_start; ')
         if csource[endpos] == '{':
             # grouping variant
             closing = csource.find('}', endpos)
@@ -312,7 +302,7 @@ class Parser(object):
                 break
         #
         try:
-            self._inside_extern_python = '__cffi_extern_python_stop'
+            self._inside_extern_python = False
             for decl in iterator:
                 if isinstance(decl, pycparser.c_ast.Decl):
                     self._parse_decl(decl)
@@ -386,10 +376,8 @@ class Parser(object):
         tp = self._get_type_pointer(tp, quals)
         if self._options.get('dllexport'):
             tag = 'dllexport_python '
-        elif self._inside_extern_python == '__cffi_extern_python_start':
+        elif self._inside_extern_python:
             tag = 'extern_python '
-        elif self._inside_extern_python == '__cffi_extern_python_plus_c_start':
-            tag = 'extern_python_plus_c '
         else:
             tag = 'function '
         self._declare(tag + decl.name, tp)
@@ -433,9 +421,11 @@ class Parser(object):
                     # hack: `extern "Python"` in the C source is replaced
                     # with "void __cffi_extern_python_start;" and
                     # "void __cffi_extern_python_stop;"
-                    self._inside_extern_python = decl.name
+                    self._inside_extern_python = not self._inside_extern_python
+                    assert self._inside_extern_python == (
+                        decl.name == '__cffi_extern_python_start')
                 else:
-                    if self._inside_extern_python !='__cffi_extern_python_stop':
+                    if self._inside_extern_python:
                         raise api.CDefError(
                             "cannot declare constants or "
                             "variables with 'extern \"Python\"'")

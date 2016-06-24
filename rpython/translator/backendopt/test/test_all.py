@@ -135,8 +135,10 @@ class TestLLType(object):
             return 33 + big() + g(10)
 
         t  = self.translateopt(idempotent, [int, int],
+                               raisingop2direct_call=True,
                                constfold=False)
-        #backend_optimizations(t, inline_threshold=0, constfold=False)
+        #backend_optimizations(t, raisingop2direct_call=True,
+        #                      inline_threshold=0, constfold=False)
 
         digest1 = md5digest(t)
 
@@ -153,7 +155,8 @@ class TestLLType(object):
 
         #XXX Inlining and constfold are currently non-idempotent.
         #    Maybe they just renames variables but the graph changes in some way.
-        backend_optimizations(t, inline_threshold=0, constfold=False)
+        backend_optimizations(t, raisingop2direct_call=True,
+                              inline_threshold=0, constfold=False)
         digest3 = md5digest(t)
         compare(digest1, digest3)
 

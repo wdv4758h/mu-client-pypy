@@ -86,7 +86,7 @@ class TestObjSpace:
         """)
         try:
             space.unpackiterable(w_a)
-        except OperationError as o:
+        except OperationError, o:
             if not o.match(space, space.w_ZeroDivisionError):
                 raise Exception("DID NOT RAISE")
         else:
@@ -237,7 +237,7 @@ class TestObjSpace:
                             self.space.getindex_w, w_instance2, self.space.w_IndexError)
         try:
             self.space.getindex_w(self.space.w_tuple, None, "foobar")
-        except OperationError as e:
+        except OperationError, e:
             assert e.match(self.space, self.space.w_TypeError)
             assert "foobar" in e.errorstr(self.space)
         else:

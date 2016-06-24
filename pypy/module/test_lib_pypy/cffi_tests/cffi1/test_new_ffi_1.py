@@ -139,7 +139,7 @@ class TestNewFFI1:
         max = int(max)
         p = ffi.cast(c_decl, min)
         assert p != min       # no __eq__(int)
-        assert bool(p) is bool(min)
+        assert bool(p) is True
         assert int(p) == min
         p = ffi.cast(c_decl, max)
         assert int(p) == max
@@ -351,9 +351,7 @@ class TestNewFFI1:
         assert ffi.new("char*", b"\xff")[0] == b'\xff'
         assert ffi.new("char*")[0] == b'\x00'
         assert int(ffi.cast("char", 300)) == 300 - 256
-        assert not bool(ffi.cast("char", 0))
-        assert bool(ffi.cast("char", 1))
-        assert bool(ffi.cast("char", 255))
+        assert bool(ffi.cast("char", 0))
         py.test.raises(TypeError, ffi.new, "char*", 32)
         py.test.raises(TypeError, ffi.new, "char*", u+"x")
         py.test.raises(TypeError, ffi.new, "char*", b"foo")
@@ -393,11 +391,7 @@ class TestNewFFI1:
             py.test.raises(TypeError, ffi.new, "wchar_t*", u+'\U00012345')
         assert ffi.new("wchar_t*")[0] == u+'\x00'
         assert int(ffi.cast("wchar_t", 300)) == 300
-        assert not bool(ffi.cast("wchar_t", 0))
-        assert bool(ffi.cast("wchar_t", 1))
-        assert bool(ffi.cast("wchar_t", 65535))
-        if SIZE_OF_WCHAR > 2:
-            assert bool(ffi.cast("wchar_t", 65536))
+        assert bool(ffi.cast("wchar_t", 0))
         py.test.raises(TypeError, ffi.new, "wchar_t*", 32)
         py.test.raises(TypeError, ffi.new, "wchar_t*", "foo")
         #

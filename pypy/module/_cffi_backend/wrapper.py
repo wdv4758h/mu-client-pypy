@@ -1,7 +1,6 @@
 from pypy.interpreter.error import oefmt
 from pypy.interpreter.baseobjspace import W_Root
 from pypy.interpreter.typedef import TypeDef, interp_attrproperty
-from pypy.interpreter.typedef import GetSetProperty
 from pypy.interpreter.gateway import interp2app
 from rpython.rlib import jit
 
@@ -25,8 +24,9 @@ class W_FunctionWrapper(W_Root):
     This class cannot be used for variadic functions.
     """
     _immutable_ = True
+    common_doc_str = 'direct call to the C function of the same name'
 
-    def __init__(self, space, ffi, fnptr, directfnptr,
+    def __init__(self, space, fnptr, directfnptr,
                  rawfunctype, fnname, modulename):
         # everything related to the type of the function is accessed
         # as immutable attributes of the 'rawfunctype' object, which
@@ -39,7 +39,6 @@ class W_FunctionWrapper(W_Root):
         assert locs is None or len(ctype.fargs) == len(locs)
         #
         self.space = space
-        self.ffi = ffi
         self.fnptr = fnptr
         self.directfnptr = directfnptr
         self.rawfunctype = rawfunctype
@@ -92,18 +91,7 @@ class W_FunctionWrapper(W_Root):
         return ctype._call(self.fnptr, args_w)
 
     def descr_repr(self, space):
-        doc = self.rawfunctype.repr_fn_type(self.ffi, self.fnname)
-        return space.wrap("<FFIFunctionWrapper '%s'>" % (doc,))
-
-    def descr_get_doc(self, space):
-        doc = self.rawfunctype.repr_fn_type(self.ffi, self.fnname)
-        doc = '%s;\n\nCFFI C function from %s.lib' % (doc, self.modulename)
-        return space.wrap(doc)
-
-    def descr_get(self, space, w_obj, w_type=None):
-        # never bind anything, but a __get__ is still present so that
-        # pydoc displays useful information (namely, the __repr__)
-        return self
+        return space.wrap("<FFIFunctionWrapper for %s()>" % (self.fnname,))
 
 
 @jit.unroll_safe
@@ -140,7 +128,6 @@ W_FunctionWrapper.typedef = TypeDef(
         __call__ = interp2app(W_FunctionWrapper.descr_call),
         __name__ = interp_attrproperty('fnname', cls=W_FunctionWrapper),
         __module__ = interp_attrproperty('modulename', cls=W_FunctionWrapper),
-        __doc__ = GetSetProperty(W_FunctionWrapper.descr_get_doc),
-        __get__ = interp2app(W_FunctionWrapper.descr_get),
+        __doc__ = interp_attrproperty('common_doc_str', cls=W_FunctionWrapper),
         )
 W_FunctionWrapper.typedef.acceptable_as_base_class = False

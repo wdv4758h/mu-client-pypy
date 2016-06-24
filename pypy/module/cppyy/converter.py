@@ -100,8 +100,7 @@ class TypeConverter(object):
         return fieldptr
 
     def _is_abstract(self, space):
-        raise oefmt(space.w_TypeError,
-                    "no converter available for '%s'", self.name)
+        raise OperationError(space.w_TypeError, space.wrap("no converter available for '%s'" % self.name))
 
     def convert_argument(self, space, w_obj, address, call_local):
         self._is_abstract(space)
@@ -182,15 +181,14 @@ class PtrTypeConverterMixin(object):
     def convert_argument(self, space, w_obj, address, call_local):
         w_tc = space.findattr(w_obj, space.wrap('typecode'))
         if w_tc is not None and space.str_w(w_tc) != self.typecode:
-            raise oefmt(space.w_TypeError,
-                        "expected %s pointer type, but received %s",
-                        self.typecode, space.str_w(w_tc))
+            msg = "expected %s pointer type, but received %s" % (self.typecode, space.str_w(w_tc))
+            raise OperationError(space.w_TypeError, space.wrap(msg))
         x = rffi.cast(rffi.VOIDPP, address)
         try:
             x[0] = rffi.cast(rffi.VOIDP, get_rawbuffer(space, w_obj))
         except TypeError:
-            raise oefmt(space.w_TypeError,
-                        "raw buffer interface not supported")
+            raise OperationError(space.w_TypeError,
+                                 space.wrap("raw buffer interface not supported"))
         ba = rffi.cast(rffi.CCHARP, address)
         ba[capi.c_function_arg_typeoffset(space)] = 'o'
 
@@ -210,8 +208,8 @@ class PtrTypeConverterMixin(object):
         try:
             byteptr[0] = buf.get_raw_address()
         except ValueError:
-            raise oefmt(space.w_TypeError,
-                        "raw buffer interface not supported")
+            raise OperationError(space.w_TypeError,
+                                 space.wrap("raw buffer interface not supported"))
 
 
 class NumericTypeConverterMixin(object):
@@ -466,8 +464,8 @@ class InstanceRefConverter(TypeConverter):
                 offset = capi.c_base_offset(space, w_obj.cppclass, self.cppclass, rawobject, 1)
                 obj_address = capi.direct_ptradd(rawobject, offset)
                 return rffi.cast(capi.C_OBJECT, obj_address)
-        raise oefmt(space.w_TypeError,
-                    "cannot pass %T as %s", w_obj, self.cppclass.name)
+        raise oefmt(space.w_TypeError, "cannot pass %T as %s",
+                    w_obj, self.cppclass.name)
 
     def convert_argument(self, space, w_obj, address, call_local):
         x = rffi.cast(rffi.VOIDPP, address)
@@ -500,7 +498,7 @@ class InstancePtrConverter(InstanceRefConverter):
     def _unwrap_object(self, space, w_obj):
         try:
             return InstanceRefConverter._unwrap_object(self, space, w_obj)
-        except OperationError as e:
+        except OperationError, e:
             # if not instance, allow certain special cases
             if is_nullpointer_specialcase(space, w_obj):
                 return capi.C_NULL_OBJECT

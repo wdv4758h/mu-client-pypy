@@ -88,7 +88,8 @@ class W_ExternPython(W_CData):
         ctype = self.ctype
         if not isinstance(ctype, W_CTypeFunc):
             space = self.space
-            raise oefmt(space.w_TypeError, "expected a function ctype")
+            raise OperationError(space.w_TypeError,
+                                 space.wrap("expected a function ctype"))
         return ctype
 
     def hide_object(self):
@@ -112,7 +113,7 @@ class W_ExternPython(W_CData):
             must_leave = space.threadlocals.try_enter_thread(space)
             self.py_invoke(ll_res, ll_args)
             #
-        except Exception as e:
+        except Exception, e:
             # oups! last-level attempt to recover.
             try:
                 os.write(STDERR, "SystemError: callback raised ")
@@ -142,7 +143,7 @@ class W_ExternPython(W_CData):
             w_res = space.call(self.w_callable, w_args)
             extra_line = "Trying to convert the result back to C:\n"
             self.convert_result(ll_res, w_res)
-        except OperationError as e:
+        except OperationError, e:
             self.handle_applevel_exception(e, ll_res, extra_line)
 
     @jit.unroll_safe
@@ -187,7 +188,7 @@ class W_ExternPython(W_CData):
                 w_res = space.call_function(self.w_onerror, w_t, w_v, w_tb)
                 if not space.is_none(w_res):
                     self.convert_result(ll_res, w_res)
-            except OperationError as e2:
+            except OperationError, e2:
                 # double exception! print a double-traceback...
                 self.print_error(e, extra_line)    # original traceback
                 e2.write_unraisable(space, '', with_traceback=True,
@@ -218,8 +219,8 @@ class W_CDataCallback(W_ExternPython):
                                              invoke_callback,
                                              unique_id)
         if rffi.cast(lltype.Signed, res) != clibffi.FFI_OK:
-            raise oefmt(space.w_SystemError,
-                        "libffi failed to build this callback")
+            raise OperationError(space.w_SystemError,
+                space.wrap("libffi failed to build this callback"))
 
     def py_invoke(self, ll_res, ll_args):
         jitdriver1.jit_merge_point(callback=self,
@@ -233,9 +234,9 @@ def convert_from_object_fficallback(fresult, ll_res, w_res,
     space = fresult.space
     if isinstance(fresult, W_CTypeVoid):
         if not space.is_w(w_res, space.w_None):
-            raise oefmt(space.w_TypeError,
-                        "callback with the return type 'void' must return "
-                        "None")
+            raise OperationError(space.w_TypeError,
+                    space.wrap("callback with the return type 'void'"
+                               " must return None"))
         return
     #
     small_result = encode_result_for_libffi and fresult.size < SIZE_OF_FFI_ARG

@@ -405,14 +405,13 @@ def nameof(obj, cache={}):
 def try_show(obj):
     if isinstance(obj, FunctionGraph):
         obj.show()
-        return obj
     elif isinstance(obj, Link):
-        return try_show(obj.prevblock)
+        try_show(obj.prevblock)
     elif isinstance(obj, Block):
         graph = obj._slowly_get_graph()
         if isinstance(graph, FunctionGraph):
             graph.show()
-            return graph
+            return
         graph = IncompleteGraph(graph)
         SingleGraphPage(graph).display()
     else:

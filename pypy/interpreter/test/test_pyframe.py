@@ -376,7 +376,7 @@ class AppTestPyFrame:
         def g():
             try:
                 raise Exception
-            except Exception as e:
+            except Exception, e:
                 import sys
                 raise Exception, e, sys.exc_info()[2]
 

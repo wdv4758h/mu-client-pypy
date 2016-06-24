@@ -36,17 +36,23 @@ def unsupported(space, message):
 # May be called with any object
 def check_readable_w(space, w_obj):
     if not space.is_true(space.call_method(w_obj, 'readable')):
-        raise oefmt(space.w_IOError, "file or stream is not readable")
+        raise OperationError(
+            space.w_IOError,
+            space.wrap("file or stream is not readable"))
 
 # May be called with any object
 def check_writable_w(space, w_obj):
     if not space.is_true(space.call_method(w_obj, 'writable')):
-        raise oefmt(space.w_IOError, "file or stream is not writable")
+        raise OperationError(
+            space.w_IOError,
+            space.wrap("file or stream is not writable"))
 
 # May be called with any object
 def check_seekable_w(space, w_obj):
     if not space.is_true(space.call_method(w_obj, 'seekable')):
-        raise oefmt(space.w_IOError, "file or stream is not seekable")
+        raise OperationError(
+            space.w_IOError,
+            space.wrap("file or stream is not seekable"))
 
 
 class W_IOBase(W_Root):
@@ -59,8 +65,6 @@ class W_IOBase(W_Root):
         self.__IOBase_closed = False
         if add_to_autoflusher:
             get_autoflusher(space).add(self)
-        if self.needs_to_finalize:
-            self.register_finalizer(space)
 
     def getdict(self, space):
         return self.w_dict
@@ -73,7 +77,13 @@ class W_IOBase(W_Root):
             return True
         return False
 
-    def _finalize_(self):
+    def __del__(self):
+        self.clear_all_weakrefs()
+        self.enqueue_for_destruction(self.space, W_IOBase.destructor,
+                                     'internal __del__ of ')
+
+    def destructor(self):
+        assert isinstance(self, W_IOBase)
         space = self.space
         w_closed = space.findattr(self, space.wrap('closed'))
         try:
@@ -86,7 +96,6 @@ class W_IOBase(W_Root):
             # equally as bad, and potentially more frequent (because of
             # shutdown issues).
             pass
-    needs_to_finalize = True
 
     def _CLOSED(self):
         # Use this macro whenever you want to check the internal `closed`
@@ -120,7 +129,9 @@ class W_IOBase(W_Root):
 
     def flush_w(self, space):
         if self._CLOSED():
-            raise oefmt(space.w_ValueError, "I/O operation on closed file")
+            raise OperationError(
+                space.w_ValueError,
+                space.wrap("I/O operation on closed file"))
 
     def seek_w(self, space, w_offset, w_whence=None):
         self._unsupportedoperation(space, "seek")
@@ -181,7 +192,7 @@ class W_IOBase(W_Root):
             if has_peek:
                 try:
                     w_readahead = space.call_method(self, "peek", space.wrap(1))
-                except OperationError as e:
+                except OperationError, e:
                     if trap_eintr(space, e):
                         continue
                     raise
@@ -211,7 +222,7 @@ class W_IOBase(W_Root):
 
             try:
                 w_read = space.call_method(self, "read", space.wrap(nreadahead))
-            except OperationError as e:
+            except OperationError, e:
                 if trap_eintr(space, e):
                     continue
                 raise
@@ -261,14 +272,14 @@ class W_IOBase(W_Root):
         while True:
             try:
                 w_line = space.next(w_iterator)
-            except OperationError as e:
+            except OperationError, e:
                 if not e.match(space, space.w_StopIteration):
                     raise
                 break  # done
             while True:
                 try:
                     space.call_method(self, "write", w_line)
-                except OperationError as e:
+                except OperationError, e:
                     if trap_eintr(space, e):
                         continue
                     raise
@@ -328,7 +339,7 @@ class W_RawIOBase(W_IOBase):
             try:
                 w_data = space.call_method(self, "read",
                                            space.wrap(DEFAULT_BUFFER_SIZE))
-            except OperationError as e:
+            except OperationError, e:
                 if trap_eintr(space, e):
                     continue
                 raise
@@ -338,7 +349,8 @@ class W_RawIOBase(W_IOBase):
                 break
 
             if not space.isinstance_w(w_data, space.w_str):
-                raise oefmt(space.w_TypeError, "read() should return bytes")
+                raise OperationError(space.w_TypeError, space.wrap(
+                    "read() should return bytes"))
             data = space.str_w(w_data)
             if not data:
                 break

@@ -60,7 +60,7 @@ class AppTestProxyInternals(AppProxy):
         try:
             try:
                 1/0
-            except ZeroDivisionError as e:
+            except ZeroDivisionError, e:
                 ex = self.get_proxy(e)
                 raise ex
         except ZeroDivisionError:

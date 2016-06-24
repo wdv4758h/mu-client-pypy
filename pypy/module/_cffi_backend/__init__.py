@@ -3,7 +3,7 @@ from pypy.interpreter.mixedmodule import MixedModule
 from rpython.rlib import rdynload, clibffi, entrypoint
 from rpython.rtyper.lltypesystem import rffi
 
-VERSION = "1.7.0"
+VERSION = "1.5.2"
 
 FFI_DEFAULT_ABI = clibffi.FFI_DEFAULT_ABI
 try:
@@ -46,10 +46,8 @@ class Module(MixedModule):
         '_get_types': 'func._get_types',
         '_get_common_types': 'func._get_common_types',
         'from_buffer': 'func.from_buffer',
-        'gcp': 'func.gcp',
 
         'string': 'func.string',
-        'unpack': 'func.unpack',
         'buffer': 'cbuffer.buffer',
         'memmove': 'func.memmove',
 

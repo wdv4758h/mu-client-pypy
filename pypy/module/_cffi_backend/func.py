@@ -44,7 +44,8 @@ def sizeof(space, w_obj):
             raise oefmt(space.w_ValueError,
                         "ctype '%s' is of unknown size", w_obj.name)
     else:
-        raise oefmt(space.w_TypeError, "expected a 'cdata' or 'ctype' object")
+        raise OperationError(space.w_TypeError,
+                            space.wrap("expected a 'cdata' or 'ctype' object"))
     return space.wrap(size)
 
 @unwrap_spec(w_ctype=ctypeobj.W_CType)
@@ -77,12 +78,6 @@ def string(space, w_cdata, maxlen=-1):
 
 # ____________________________________________________________
 
-@unwrap_spec(w_cdata=cdataobj.W_CData, length=int)
-def unpack(space, w_cdata, length):
-    return w_cdata.unpack(length)
-
-# ____________________________________________________________
-
 def _get_types(space):
     return space.newtuple([space.gettypefor(cdataobj.W_CData),
                            space.gettypefor(ctypeobj.W_CType)])
@@ -108,7 +103,7 @@ def _fetch_as_read_buffer(space, w_x):
     # w.r.t. buffers and memoryviews??
     try:
         buf = space.readbuf_w(w_x)
-    except OperationError as e:
+    except OperationError, e:
         if not e.match(space, space.w_TypeError):
             raise
         buf = space.buffer_w(w_x, space.BUF_SIMPLE)
@@ -117,7 +112,7 @@ def _fetch_as_read_buffer(space, w_x):
 def _fetch_as_write_buffer(space, w_x):
     try:
         buf = space.writebuf_w(w_x)
-    except OperationError as e:
+    except OperationError, e:
         if not e.match(space, space.w_TypeError):
             raise
         buf = space.buffer_w(w_x, space.BUF_WRITABLE)

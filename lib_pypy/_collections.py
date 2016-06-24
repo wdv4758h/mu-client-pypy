@@ -320,7 +320,8 @@ class deque(object):
     def __reduce_ex__(self, proto):
         return type(self), (list(self), self.maxlen)
 
-    __hash__ = None
+    def __hash__(self):
+        raise TypeError("deque objects are unhashable")
 
     def __copy__(self):
         return self.__class__(self, self.maxlen)

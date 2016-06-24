@@ -3866,12 +3866,6 @@ static PyMethodDef _functions[] = {
 #if PY_VERSION_HEX < 0x02030000
 DL_EXPORT(void) init_sre(void)
 #else
-#ifdef __GNUC__
-extern __attribute__((visibility("default")))
-#else
-extern __declspec(dllexport)
-#endif
-
 PyMODINIT_FUNC init_sre(void)
 #endif
 {

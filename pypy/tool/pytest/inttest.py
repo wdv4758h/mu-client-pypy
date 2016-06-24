@@ -30,10 +30,10 @@ class IntTestFunction(py.test.collect.Function):
     def runtest(self):
         try:
             super(IntTestFunction, self).runtest()
-        except OperationError as e:
+        except OperationError, e:
             check_keyboard_interrupt(e)
             raise
-        except Exception as e:
+        except Exception, e:
             cls = e.__class__
             while cls is not Exception:
                 if cls.__name__ == 'DistutilsPlatformError':

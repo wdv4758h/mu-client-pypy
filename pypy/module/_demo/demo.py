@@ -1,4 +1,4 @@
-from pypy.interpreter.error import oefmt
+from pypy.interpreter.error import OperationError
 from pypy.interpreter.baseobjspace import W_Root
 from pypy.interpreter.gateway import interp2app, unwrap_spec
 from pypy.interpreter.typedef import TypeDef, GetSetProperty
@@ -22,7 +22,8 @@ def get(space, name):
 def measuretime(space, repetitions, w_callable):
     if repetitions <= 0:
         w_DemoError = get(space, 'DemoError')
-        raise oefmt(w_DemoError, "repetition count must be > 0")
+        msg = "repetition count must be > 0"
+        raise OperationError(w_DemoError, space.wrap(msg))
     starttime = time(0)
     for i in range(repetitions):
         space.call_function(w_callable)

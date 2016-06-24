@@ -66,7 +66,7 @@ def test_samples( samples ):
         print
         try:
             assert_tuples_equal(pypy_tuples, python_tuples)
-        except AssertionError as e:
+        except AssertionError,e:
             error_path = e.args[-1]
             print "ERROR PATH =", error_path
             print "="*80

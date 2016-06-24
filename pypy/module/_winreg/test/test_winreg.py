@@ -127,7 +127,7 @@ class AppTestFfi:
         import errno
         try:
             QueryInfoKey(0)
-        except EnvironmentError as e:
+        except EnvironmentError, e:
             assert e.winerror == 6
             assert e.errno == errno.EBADF
             # XXX translations...
@@ -157,7 +157,7 @@ class AppTestFfi:
         while 1:
             try:
                 data = EnumValue(sub_key, index)
-            except EnvironmentError as e:
+            except EnvironmentError, e:
                 break
             assert data in self.test_data
             index = index + 1
@@ -227,7 +227,7 @@ class AppTestFfi:
         from _winreg import EnumValue, QueryValueEx, HKEY_PERFORMANCE_DATA
         try:
             EnumValue(HKEY_PERFORMANCE_DATA, 0)
-        except WindowsError as e:
+        except WindowsError, e:
             import errno
             if e.errno in (errno.EPERM, errno.EACCES):
                 skip("access denied to registry key "

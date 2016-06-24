@@ -9,7 +9,7 @@ def test_bug1():
     if '__pypy__' not in sys.builtin_module_names:
         try:
             import cffi
-        except ImportError as e:
+        except ImportError, e:
             py.test.skip(str(e))
 
     cmdline = ['taskset', '-c', '0',

@@ -12,9 +12,9 @@ of C++11.
 The work on the cling backend has so far been done only for CPython, but
 bringing it to PyPy is a lot less work than developing it in the first place.
 
-.. _Reflex: https://root.cern.ch/how/how-use-reflex
-.. _CINT: https://root.cern.ch/introduction-cint
-.. _cling: https://root.cern.ch/cling
+.. _Reflex: http://root.cern.ch/drupal/content/reflex
+.. _CINT: http://root.cern.ch/drupal/content/cint
+.. _cling: http://root.cern.ch/drupal/content/cling
 .. _llvm: http://llvm.org/
 .. _clang: http://clang.llvm.org/
 
@@ -283,8 +283,7 @@ In practical terms, general classes such as ``std::string`` should live in a
 core reflection set, but for the moment assume we want to have it in the
 reflection library that we are building for this example.
 
-The ``genreflex`` script can be steered using a so-called `selection file`_
-(see "Generating Reflex Dictionaries")
+The ``genreflex`` script can be steered using a so-called `selection file`_,
 which is a simple XML file specifying, either explicitly or by using a
 pattern, which classes, variables, namespaces, etc. to select from the given
 header file.
@@ -306,7 +305,7 @@ For our purposes, the following rather straightforward selection will do
         <function name="BaseFactory" />
     </lcgdict>
 
-.. _selection file: https://root.cern.ch/how/how-use-reflex
+.. _selection file: http://root.cern.ch/drupal/content/generating-reflex-dictionaries
 
 Now the reflection info can be generated and compiled::
 
@@ -812,7 +811,7 @@ If you installed ROOT, rather than just Reflex, PyCintex should be available
 immediately if you add ``$ROOTSYS/lib`` to the ``PYTHONPATH`` environment
 variable.
 
-.. _PyROOT: https://root.cern.ch/pyroot
+.. _PyROOT: http://root.cern.ch/drupal/content/pyroot
 
 There are a couple of minor differences between PyCintex and cppyy, most to do
 with naming.

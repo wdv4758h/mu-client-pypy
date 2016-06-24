@@ -39,7 +39,7 @@ class W_LibObject(W_Root):
                     mod = __import__(modname, None, None, ['ffi', 'lib'])
                     return mod.lib""")
                 lib1 = space.interp_w(W_LibObject, w_lib1)
-            except OperationError as e:
+            except OperationError, e:
                 if e.async(space):
                     raise
                 raise oefmt(space.w_ImportError,
@@ -64,8 +64,7 @@ class W_LibObject(W_Root):
         #
         ptr = rffi.cast(rffi.CCHARP, g.c_address)
         assert ptr
-        return W_FunctionWrapper(self.space, self.ffi,
-                                 ptr, g.c_size_or_direct_fn,
+        return W_FunctionWrapper(self.space, ptr, g.c_size_or_direct_fn,
                                  rawfunctype, fnname, self.libname)
 
     @jit.elidable_promote()
@@ -196,13 +195,9 @@ class W_LibObject(W_Root):
                 if is_getattr and attr == '__dict__':
                     return self.full_dict_copy()
                 if is_getattr and attr == '__class__':
-                    # used to be space.type(self).  But HAAAAAACK!
-                    # That makes help() behave correctly.  I couldn't
-                    # find a more reasonable way.  Urgh.
-                    from pypy.interpreter.module import Module
-                    return self.space.gettypeobject(Module.typedef)
+                    return self.space.type(self)
                 if is_getattr and attr == '__name__':
-                    return self.space.wrap("%s.lib" % self.libname)
+                    return self.descr_repr()
                 raise oefmt(self.space.w_AttributeError,
                             "cffi library '%s' has no function, constant "
                             "or global variable named '%s'",

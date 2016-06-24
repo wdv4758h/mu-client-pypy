@@ -1,4 +1,4 @@
-from pypy.interpreter.error import oefmt
+from pypy.interpreter.error import OperationError, oefmt
 from rpython.rlib import jit, rgc
 from rpython.rlib.rarithmetic import ovfcheck
 from rpython.rlib.listsort import make_timsort_class
@@ -251,13 +251,13 @@ class BaseConcreteArray(object):
             w_idx = w_idx.get_scalar_value().item(space)
             if not space.isinstance_w(w_idx, space.w_int) and \
                     not space.isinstance_w(w_idx, space.w_bool):
-                raise oefmt(space.w_IndexError,
-                            "arrays used as indices must be of integer (or "
-                            "boolean) type")
+                raise OperationError(space.w_IndexError, space.wrap(
+                    "arrays used as indices must be of integer (or boolean) type"))
             return [IntegerChunk(w_idx), EllipsisChunk()]
         elif space.is_w(w_idx, space.w_None):
             return [NewAxisChunk(), EllipsisChunk()]
         result = []
+        i = 0
         has_ellipsis = False
         has_filter = False
         for w_item in space.fixedview(w_idx):
@@ -273,6 +273,7 @@ class BaseConcreteArray(object):
                 result.append(NewAxisChunk())
             elif space.isinstance_w(w_item, space.w_slice):
                 result.append(SliceChunk(w_item))
+                i += 1
             elif isinstance(w_item, W_NDimArray) and w_item.get_dtype().is_bool():
                 if has_filter:
                     # in CNumPy, the support for this is incomplete
@@ -285,6 +286,7 @@ class BaseConcreteArray(object):
                 result.append(IntegerChunk(w_item.descr_int(space)))
             else:
                 result.append(IntegerChunk(w_item))
+                i += 1
         if not has_ellipsis:
             result.append(EllipsisChunk())
         return result
@@ -562,7 +564,8 @@ class ConcreteNonWritableArrayWithBase(ConcreteArrayWithBase):
         self.flags &= ~ NPY.ARRAY_WRITEABLE
 
     def descr_setitem(self, space, orig_array, w_index, w_value):
-        raise oefmt(space.w_ValueError, "assignment destination is read-only")
+        raise OperationError(space.w_ValueError, space.wrap(
+            "assignment destination is read-only"))
 
 
 class NonWritableArray(ConcreteArray):
@@ -573,7 +576,8 @@ class NonWritableArray(ConcreteArray):
         self.flags &= ~ NPY.ARRAY_WRITEABLE
 
     def descr_setitem(self, space, orig_array, w_index, w_value):
-        raise oefmt(space.w_ValueError, "assignment destination is read-only")
+        raise OperationError(space.w_ValueError, space.wrap(
+            "assignment destination is read-only"))
 
 
 class SliceArray(BaseConcreteArray):
@@ -667,7 +671,8 @@ class NonWritableSliceArray(SliceArray):
         self.flags &= ~NPY.ARRAY_WRITEABLE
 
     def descr_setitem(self, space, orig_array, w_index, w_value):
-        raise oefmt(space.w_ValueError, "assignment destination is read-only")
+        raise OperationError(space.w_ValueError, space.wrap(
+            "assignment destination is read-only"))
 
 
 class VoidBoxStorage(BaseConcreteArray):

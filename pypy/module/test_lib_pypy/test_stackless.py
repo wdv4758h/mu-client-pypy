@@ -11,7 +11,7 @@ try:
 except ImportError:
     try:
         from lib_pypy import stackless
-    except ImportError as e:
+    except ImportError, e:
         skip('cannot import stackless: %s' % (e,))
 
 SHOW_STRANGE = False
@@ -184,7 +184,7 @@ class Test_Stackless:
         try:
             stackless.run()
         # cheating, can't test for ZeroDivisionError
-        except Exception as e:
+        except Exception, e:
             rlist.append('E')
         stackless.schedule()
         stackless.schedule()
@@ -457,7 +457,7 @@ class Test_Stackless:
         def exp_recv(chan):
             try:
                 val = chan.receive()
-            except Exception as exp:
+            except Exception, exp:
                 assert exp.__class__ is Exception
                 assert str(exp) == 'test'
 

@@ -8,6 +8,6 @@ class BaseAppTest:
     def setup_class(cls):
         try:
             import rpython.rlib.rstacklet
-        except CompilationError as e:
+        except CompilationError, e:
             py.test.skip("cannot import rstacklet: %s" % e)
 

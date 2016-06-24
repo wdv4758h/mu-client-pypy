@@ -2,7 +2,7 @@
 Implementation of interpreter-level 'sys' routines.
 """
 import os
-from pypy import pypydir
+import pypy
 
 # ____________________________________________________________
 #
@@ -20,6 +20,7 @@ class State:
     def setinitialpath(self, space):
         from pypy.module.sys.initpath import compute_stdlib_path
         # Initialize the default path
+        pypydir = os.path.dirname(os.path.abspath(pypy.__file__))
         srcdir = os.path.dirname(pypydir)
         path = compute_stdlib_path(self, srcdir)
         self.w_path = space.newlist([space.wrap(p) for p in path])

@@ -20,7 +20,7 @@ class AppTestInstMethObjectApp:
             def m(self): pass
         try:
             C.m(1)
-        except TypeError as e:
+        except TypeError, e:
             assert str(e) == 'unbound method m() must be called with C instance as first argument (got int instance instead)'
 
     def test_getBound(self):

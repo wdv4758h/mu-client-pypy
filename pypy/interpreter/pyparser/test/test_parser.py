@@ -52,23 +52,24 @@ def tree_from_string(expected, gram):
                 value = "\n"
             else:
                 value = ""
-            n = parser.Terminal(tp, value, 0, 0)
+            children = None
         else:
             tp = gram.symbol_ids[data[0]]
+            value = None
             children = []
-            n = parser.Nonterminal(tp, children)
+        n = parser.Node(tp, value, children, 0, 0)
         new_indent = count_indent(line)
         if new_indent >= last_indent:
             if new_indent == last_indent and node_stack:
                 node_stack.pop()
             if node_stack:
-                node_stack[-1].append_child(n)
+                node_stack[-1].children.append(n)
             node_stack.append(n)
         else:
             diff = last_indent - new_indent
             pop_nodes = diff // 4 + 1
             del node_stack[-pop_nodes:]
-            node_stack[-1].append_child(n)
+            node_stack[-1].children.append(n)
             node_stack.append(n)
         last_indent = new_indent
     return node_stack[0]

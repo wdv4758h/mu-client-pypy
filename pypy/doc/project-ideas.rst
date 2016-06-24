@@ -53,17 +53,15 @@ when doing ``myslice = mylist[a:b]``: the new list is not constructed
 immediately, but only when (and if) ``myslice`` or ``mylist`` are mutated.
 
 
-NumPy rebooted
---------------
+Numpy improvements
+------------------
 
-Our cpyext C-API compatiblity layer can now run upstream NumPy unmodified.
-Release PyPy2.7-v5.3 still fails about 200 of the ~6000 test in the NumPy
-test suite. We could use help analyzing the failures and fixing them either
-as patches to upstream NumPy, or as fixes to PyPy.
+The numpy is rapidly progressing in pypy, so feel free to come to IRC and
+ask for proposed topic. A not necesarilly up-to-date `list of topics`_
+is also available.
 
-We also are looking for help in how to hijack NumPy dtype conversion and
-ufunc calls to allow the JIT to make them fast, using our internal _numpypy
-module.
+.. _list of topics: https://bitbucket.org/pypy/extradoc/src/extradoc/planning/micronumpy.txt
+
 
 Improving the jitviewer
 ------------------------

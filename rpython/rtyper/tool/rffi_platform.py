@@ -836,7 +836,7 @@ def configure_external_library(name, eci, configurations,
             # verify that this eci can be compiled
             try:
                 verify_eci(eci_lib)
-            except CompilationError as e:
+            except CompilationError, e:
                 last_error = e
             else:
                 _cache[key] = eci_lib

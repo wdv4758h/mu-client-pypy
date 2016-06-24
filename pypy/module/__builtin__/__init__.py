@@ -86,8 +86,8 @@ class Module(MixedModule):
         'max'           : 'functional.max',
         'reversed'      : 'functional.reversed',
         'super'         : 'descriptor.W_Super',
-        'staticmethod'  : 'pypy.interpreter.function.StaticMethod',
-        'classmethod'   : 'pypy.interpreter.function.ClassMethod',
+        'staticmethod'  : 'descriptor.StaticMethod',
+        'classmethod'   : 'descriptor.ClassMethod',
         'property'      : 'descriptor.W_Property',
 
         'globals'       : 'interp_inspect.globals',
@@ -102,7 +102,7 @@ class Module(MixedModule):
         space = self.space
         try:
             w_builtin = space.getitem(w_globals, space.wrap('__builtins__'))
-        except OperationError as e:
+        except OperationError, e:
             if not e.match(space, space.w_KeyError):
                 raise
         else:

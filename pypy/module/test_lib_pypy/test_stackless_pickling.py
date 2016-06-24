@@ -5,7 +5,7 @@ try:
 except ImportError:
     try:
         from lib_pypy import stackless as stackless
-    except ImportError as e:
+    except ImportError, e:
         skip('cannot import stackless: %s' % (e,))
 
 

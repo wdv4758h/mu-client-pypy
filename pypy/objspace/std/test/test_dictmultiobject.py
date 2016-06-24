@@ -583,7 +583,7 @@ class AppTest_DictObject:
         for v1 in ['Q', (1,)]:
             try:
                 d[v1]
-            except KeyError as e:
+            except KeyError, e:
                 v2 = e.args[0]
                 assert v1 == v2
             else:
@@ -594,7 +594,7 @@ class AppTest_DictObject:
         for v1 in ['Q', (1,)]:
             try:
                 del d[v1]
-            except KeyError as e:
+            except KeyError, e:
                 v2 = e.args[0]
                 assert v1 == v2
             else:
@@ -605,7 +605,7 @@ class AppTest_DictObject:
         for v1 in ['Q', (1,)]:
             try:
                 d.pop(v1)
-            except KeyError as e:
+            except KeyError, e:
                 v2 = e.args[0]
                 assert v1 == v2
             else:
@@ -1113,9 +1113,11 @@ class FakeSpace:
 class Config:
     class objspace:
         class std:
+            withsmalldicts = False
             withcelldict = False
-            methodcachesizeexp = 11
-            withmethodcachecounter = False
+            withmethodcache = False
+            withidentitydict = False
+            withmapdict = False
 
 FakeSpace.config = Config()
 

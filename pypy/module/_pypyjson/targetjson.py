@@ -126,7 +126,7 @@ def entry_point(argv):
 
     try:
         bench('loads     ', N, myloads,  msg)
-    except OperationError as e:
+    except OperationError, e:
         print 'Error', e._compute_value(fakespace)
 
     return 0

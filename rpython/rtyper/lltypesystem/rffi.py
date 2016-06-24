@@ -481,7 +481,7 @@ for _name in 'short int long'.split():
 TYPES += ['signed char', 'unsigned char',
           'long long', 'unsigned long long',
           'size_t', 'time_t', 'wchar_t',
-          'uintptr_t', 'intptr_t',    # C note: these two are _integer_ types
+          'uintptr_t', 'intptr_t',
           'void*']    # generic pointer type
 
 # This is a bit of a hack since we can't use rffi_platform here.
@@ -810,7 +810,6 @@ def make_string_mappings(strtype):
         while cp[size] != lastchar:
             size += 1
         return assert_str0(charpsize2str(cp, size))
-    charp2str._annenforceargs_ = [lltype.SomePtr(TYPEP)]
 
     # str -> char*, bool, bool
     # Can't inline this because of the raw address manipulation.

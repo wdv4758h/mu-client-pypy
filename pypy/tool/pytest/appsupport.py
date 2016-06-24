@@ -2,12 +2,12 @@ from inspect import CO_VARARGS, CO_VARKEYWORDS
 
 import py
 from pypy.interpreter import gateway, pycode
-from pypy.interpreter.error import OperationError, oefmt
+from pypy.interpreter.error import OperationError
 
 try:
-    from _pytest.assertion.reinterpret import reinterpret as interpret
-except ImportError:
     from _pytest.assertion.newinterpret import interpret
+except ImportError:
+    from _pytest.assertion.oldinterpret import interpret
 
 # ____________________________________________________________
 
@@ -74,7 +74,7 @@ class AppFrame(py.code.Frame):
     def repr(self, w_value):
         try:
             return self.space.unwrap(self.space.repr(w_value))
-        except Exception as e:
+        except Exception, e:
             return "<Sorry, exception while trying to do repr, %r>"%e
 
     def is_true(self, w_value):
@@ -232,8 +232,9 @@ def pypyraises(space, w_ExpectedException, w_expr, __args__):
     args_w, kwds_w = __args__.unpack()
     if space.isinstance_w(w_expr, space.w_str):
         if args_w:
-            raise oefmt(space.w_TypeError,
-                        "raises() takes no argument after a string expression")
+            raise OperationError(space.w_TypeError,
+                                 space.wrap("raises() takes no argument "
+                                            "after a string expression"))
         expr = space.unwrap(w_expr)
         source = py.code.Source(expr)
         frame = space.getexecutioncontext().gettopframe()
@@ -252,18 +253,19 @@ def pypyraises(space, w_ExpectedException, w_expr, __args__):
         try:
             space.exec_(str(source), frame.get_w_globals(), w_locals,
                         filename=filename)
-        except OperationError as e:
+        except OperationError, e:
             if e.match(space, w_ExpectedException):
                 return _exc_info(space, e)
             raise
     else:
         try:
             space.call_args(w_expr, __args__)
-        except OperationError as e:
+        except OperationError, e:
             if e.match(space, w_ExpectedException):
                 return _exc_info(space, e)
             raise
-    raise oefmt(space.w_AssertionError, "DID NOT RAISE")
+    raise OperationError(space.w_AssertionError,
+                         space.wrap("DID NOT RAISE"))
 
 app_raises = gateway.interp2app_temp(pypyraises)
 
@@ -281,6 +283,6 @@ def raises_w(space, w_ExpectedException, *args, **kwds):
         if not value.match(space, w_ExpectedException):
             raise type, value, tb
         return excinfo
-    except py.test.raises.Exception as e:
+    except py.test.raises.Exception, e:
         e.tbindex = getattr(e, 'tbindex', -1) - 1
         raise

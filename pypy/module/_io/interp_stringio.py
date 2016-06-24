@@ -89,8 +89,9 @@ class W_StringIO(W_TextIOBase):
         self.buf = list(initval)
         pos = space.getindex_w(w_pos, space.w_TypeError)
         if pos < 0:
-            raise oefmt(space.w_ValueError,
-                        "position value cannot be negative")
+            raise OperationError(space.w_ValueError,
+                space.wrap("position value cannot be negative")
+            )
         self.pos = pos
         if not space.is_w(w_dict, space.w_None):
             if not space.isinstance_w(w_dict, space.w_dict):
@@ -202,7 +203,9 @@ class W_StringIO(W_TextIOBase):
         elif mode == 0 and pos < 0:
             raise oefmt(space.w_ValueError, "negative seek position: %d", pos)
         elif mode != 0 and pos != 0:
-            raise oefmt(space.w_IOError, "Can't do nonzero cur-relative seeks")
+            raise OperationError(space.w_IOError,
+                space.wrap("Can't do nonzero cur-relative seeks")
+            )
 
         # XXX: this makes almost no sense, but its how CPython does it.
         if mode == 1:

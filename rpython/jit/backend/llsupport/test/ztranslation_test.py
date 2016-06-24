@@ -288,7 +288,7 @@ class TranslationRemoveTypePtrTest(CCompiledMixin):
         def main(i):
             try:
                 myportal(i)
-            except ImDone as e:
+            except ImDone, e:
                 return e.resvalue
 
         # XXX custom fishing, depends on the exact env var and format
@@ -297,7 +297,7 @@ class TranslationRemoveTypePtrTest(CCompiledMixin):
         try:
             res = self.meta_interp(main, [400])
             assert res == main(400)
-        except ConfigError as e:
+        except ConfigError,e:
             assert str(e).startswith('invalid value asmgcc')
             py.test.skip('asmgcc not supported')
         finally:

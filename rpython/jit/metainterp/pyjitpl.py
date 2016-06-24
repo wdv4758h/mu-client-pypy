@@ -201,10 +201,11 @@ class MIFrame(object):
 
     # ------------------------------
 
-    for _opimpl in ['int_add', 'int_sub', 'int_mul',
+    for _opimpl in ['int_add', 'int_sub', 'int_mul', 'int_floordiv', 'int_mod',
                     'int_and', 'int_or', 'int_xor', 'int_signext',
                     'int_rshift', 'int_lshift', 'uint_rshift',
                     'uint_lt', 'uint_le', 'uint_gt', 'uint_ge',
+                    'uint_floordiv',
                     'float_add', 'float_sub', 'float_mul', 'float_truediv',
                     'float_lt', 'float_le', 'float_eq',
                     'float_ne', 'float_gt', 'float_ge',
@@ -1837,11 +1838,7 @@ class MetaInterpStaticData(object):
         self.cpu.propagate_exception_descr = exc_descr
         #
         self.globaldata = MetaInterpGlobalData(self)
-
-    def finish_setup_descrs(self):
-        from rpython.jit.codewriter import effectinfo
         self.all_descrs = self.cpu.setup_descrs()
-        effectinfo.compute_bitstrings(self.all_descrs)
 
     def _setup_once(self):
         """Runtime setup needed by the various components of the JIT."""
@@ -2033,7 +2030,7 @@ class MetaInterp(object):
         else:
             try:
                 self.compile_done_with_this_frame(resultbox)
-            except SwitchToBlackhole as stb:
+            except SwitchToBlackhole, stb:
                 self.aborted_tracing(stb.reason)
             sd = self.staticdata
             result_type = self.jitdriver_sd.result_type
@@ -2066,7 +2063,7 @@ class MetaInterp(object):
             self.popframe()
         try:
             self.compile_exit_frame_with_exception(self.last_exc_box)
-        except SwitchToBlackhole as stb:
+        except SwitchToBlackhole, stb:
             self.aborted_tracing(stb.reason)
         raise jitexc.ExitFrameWithExceptionRef(self.cpu, lltype.cast_opaque_ptr(llmemory.GCREF, excvalue))
 
@@ -2099,7 +2096,7 @@ class MetaInterp(object):
             guard_op = self.history.record(opnum, moreargs,
                                            lltype.nullptr(llmemory.GCREF.TO))
         else:
-            guard_op = self.history.record(opnum, moreargs, None)
+            guard_op = self.history.record(opnum, moreargs, None)            
         self.capture_resumedata(resumepc)
         # ^^^ records extra to history
         self.staticdata.profiler.count_ops(opnum, Counters.GUARDS)
@@ -2253,7 +2250,7 @@ class MetaInterp(object):
 
     def execute_raised(self, exception, constant=False):
         if isinstance(exception, jitexc.JitException):
-            raise exception      # go through
+            raise jitexc.JitException, exception      # go through
         llexception = jitexc.get_llexception(self.cpu, exception)
         self.execute_ll_raised(llexception, constant)
 
@@ -2366,7 +2363,7 @@ class MetaInterp(object):
         self.seen_loop_header_for_jdindex = -1
         try:
             self.interpret()
-        except SwitchToBlackhole as stb:
+        except SwitchToBlackhole, stb:
             self.run_blackhole_interp_to_cancel_tracing(stb)
         assert False, "should always raise"
 
@@ -2403,7 +2400,7 @@ class MetaInterp(object):
             if self.resumekey_original_loop_token is None:   # very rare case
                 raise SwitchToBlackhole(Counters.ABORT_BRIDGE)
             self.interpret()
-        except SwitchToBlackhole as stb:
+        except SwitchToBlackhole, stb:
             self.run_blackhole_interp_to_cancel_tracing(stb)
         assert False, "should always raise"
 
@@ -3275,7 +3272,7 @@ def _get_opimpl_method(name, argcodes):
                 print '\tpyjitpl: %s(%s)' % (name, ', '.join(map(repr, args))),
             try:
                 resultbox = unboundmethod(self, *args)
-            except Exception as e:
+            except Exception, e:
                 if self.debug:
                     print '-> %s!' % e.__class__.__name__
                 raise

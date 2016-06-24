@@ -450,7 +450,7 @@ class AppTestAppFloatTest:
     def test_invalid_literal_message(self):
         try:
             float('abcdef')
-        except ValueError as e:
+        except ValueError, e:
             assert 'abcdef' in e.message
         else:
             assert False, 'did not raise'

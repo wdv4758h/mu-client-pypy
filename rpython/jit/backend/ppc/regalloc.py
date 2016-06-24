@@ -1,7 +1,6 @@
 from rpython.jit.backend.llsupport.regalloc import (RegisterManager, FrameManager,
                                                     TempVar, compute_vars_longevity,
                                                     BaseRegalloc)
-from rpython.jit.backend.llsupport.descr import CallDescr
 from rpython.jit.backend.ppc.arch import (WORD, MY_COPY_OF_REGS, IS_PPC_32)
 from rpython.jit.codewriter import longlong
 from rpython.jit.backend.ppc.jump import (remap_frame_layout,
@@ -370,9 +369,9 @@ class Regalloc(BaseRegalloc):
         # This operation is used only for testing
         self.force_spill_var(op.getarg(0))
 
-    def before_call(self, save_all_regs=False):
-        self.rm.before_call(save_all_regs)
-        self.fprm.before_call(save_all_regs)
+    def before_call(self, force_store=[], save_all_regs=False):
+        self.rm.before_call(force_store, save_all_regs)
+        self.fprm.before_call(force_store, save_all_regs)
 
     def after_call(self, v):
         if v.type == FLOAT:
@@ -433,13 +432,15 @@ class Regalloc(BaseRegalloc):
     prepare_int_mul = helper.prepare_int_add_or_mul
     prepare_nursery_ptr_increment = prepare_int_add
 
+    prepare_int_floordiv = helper.prepare_binary_op
+    prepare_int_mod = helper.prepare_binary_op
     prepare_int_and = helper.prepare_binary_op
     prepare_int_or = helper.prepare_binary_op
     prepare_int_xor = helper.prepare_binary_op
     prepare_int_lshift = helper.prepare_binary_op
     prepare_int_rshift = helper.prepare_binary_op
     prepare_uint_rshift = helper.prepare_binary_op
-    prepare_uint_mul_high = helper.prepare_binary_op
+    prepare_uint_floordiv = helper.prepare_binary_op
 
     prepare_int_add_ovf = helper.prepare_binary_op
     prepare_int_sub_ovf = helper.prepare_binary_op
@@ -522,16 +523,17 @@ class Regalloc(BaseRegalloc):
         return [loc1, res]
 
     def prepare_finish(self, op):
+        descr = op.getdescr()
+        fail_descr = cast_instance_to_gcref(descr)
+        # we know it does not move, but well
+        rgc._make_sure_does_not_move(fail_descr)
+        fail_descr = rffi.cast(lltype.Signed, fail_descr)
         if op.numargs() > 0:
             loc = self.ensure_reg(op.getarg(0))
-            locs = [loc]
+            locs = [loc, imm(fail_descr)]
         else:
-            locs = []
+            locs = [imm(fail_descr)]
         return locs
-
-    def prepare_load_from_gc_table(self, op):
-        res = self.rm.force_allocate_reg(op)
-        return [res]
 
     def prepare_call_malloc_gc(self, op):
         return self._prepare_call(op)
@@ -604,8 +606,6 @@ class Regalloc(BaseRegalloc):
     def prepare_guard_value(self, op):
         l0 = self.ensure_reg(op.getarg(0))
         l1 = self.ensure_reg_or_16bit_imm(op.getarg(1))
-        op.getdescr().make_a_counter_per_value(op,
-            self.cpu.all_reg_indexes[l0.value])
         arglocs = self._prepare_guard(op, [l0, l1])
         return arglocs
 
@@ -757,7 +757,7 @@ class Regalloc(BaseRegalloc):
         src_ofs_loc = self.ensure_reg_or_any_imm(op.getarg(2))
         dst_ofs_loc = self.ensure_reg_or_any_imm(op.getarg(3))
         length_loc  = self.ensure_reg_or_any_imm(op.getarg(4))
-        self._spill_before_call(gc_level=0)
+        self._spill_before_call(save_all_regs=False)
         return [src_ptr_loc, dst_ptr_loc,
                 src_ofs_loc, dst_ofs_loc, length_loc]
 
@@ -790,15 +790,13 @@ class Regalloc(BaseRegalloc):
     prepare_call_f = _prepare_call
     prepare_call_n = _prepare_call
 
-    def _spill_before_call(self, gc_level):
-        # spill variables that need to be saved around calls:
-        # gc_level == 0: callee cannot invoke the GC
-        # gc_level == 1: can invoke GC, save all regs that contain pointers
-        # gc_level == 2: can force, save all regs
-        save_all_regs = gc_level == 2
+    def _spill_before_call(self, save_all_regs=False):
+        # spill variables that need to be saved around calls
         self.fprm.before_call(save_all_regs=save_all_regs)
-        if gc_level == 1 and self.cpu.gc_ll_descr.gcrootmap:
-            save_all_regs = 2
+        if not save_all_regs:
+            gcrootmap = self.assembler.cpu.gc_ll_descr.gcrootmap
+            if gcrootmap and gcrootmap.is_shadow_stack:
+                save_all_regs = 2
         self.rm.before_call(save_all_regs=save_all_regs)
 
     def _prepare_call(self, op, save_all_regs=False):
@@ -806,18 +804,7 @@ class Regalloc(BaseRegalloc):
         args.append(None)
         for i in range(op.numargs()):
             args.append(self.loc(op.getarg(i)))
-
-        calldescr = op.getdescr()
-        assert isinstance(calldescr, CallDescr)
-        effectinfo = calldescr.get_extra_info()
-        if save_all_regs:
-            gc_level = 2
-        elif effectinfo is None or effectinfo.check_can_collect():
-            gc_level = 1
-        else:
-            gc_level = 0
-        self._spill_before_call(gc_level=gc_level)
-
+        self._spill_before_call(save_all_regs)
         if op.type != VOID:
             resloc = self.after_call(op)
             args[0] = resloc
@@ -946,7 +933,7 @@ class Regalloc(BaseRegalloc):
 
     def _prepare_call_assembler(self, op):
         locs = self.locs_for_call_assembler(op)
-        self._spill_before_call(gc_level=2)
+        self._spill_before_call(save_all_regs=True)
         if op.type != VOID:
             resloc = self.after_call(op)
         else:

@@ -4,7 +4,7 @@ from pypy.interpreter.typedef import TypeDef
 
 
 class W_NoneObject(W_Root):
-    def unwrap(self, space):
+    def unwrap(w_self, space):
         return None
 
     def descr_nonzero(self, space):

@@ -1,4 +1,4 @@
-from pypy.interpreter.error import OperationError, oefmt
+from pypy.interpreter.error import OperationError
 from pypy.interpreter.gateway import unwrap_spec
 from rpython.rlib.rstring import StringBuilder
 from rpython.rlib.rarithmetic import ovfcheck
@@ -38,7 +38,8 @@ def _char2value(space, c):
     elif c <= 'f':
         if c >= 'a':
             return ord(c) - (ord('a')-10)
-    raise oefmt(space.w_TypeError, "Non-hexadecimal digit found")
+    raise OperationError(space.w_TypeError,
+                         space.wrap('Non-hexadecimal digit found'))
 _char2value._always_inline_ = True
 
 @unwrap_spec(hexstr='bufferstr')
@@ -47,7 +48,8 @@ def unhexlify(space, hexstr):
 hexstr must contain an even number of hex digits (upper or lower case).
 This function is also available as "unhexlify()".'''
     if len(hexstr) & 1:
-        raise oefmt(space.w_TypeError, "Odd-length string")
+        raise OperationError(space.w_TypeError,
+                             space.wrap('Odd-length string'))
     res = StringBuilder(len(hexstr) >> 1)
     for i in range(0, len(hexstr), 2):
         a = _char2value(space, hexstr[i])

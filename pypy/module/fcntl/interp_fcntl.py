@@ -1,6 +1,6 @@
 from rpython.rtyper.tool import rffi_platform as platform
 from rpython.rtyper.lltypesystem import rffi, lltype
-from pypy.interpreter.error import OperationError, oefmt, wrap_oserror
+from pypy.interpreter.error import OperationError, wrap_oserror, oefmt
 from pypy.interpreter.gateway import unwrap_spec, WrappedDefault
 from rpython.rlib import rposix
 from rpython.translator.tool.cbuild import ExternalCompilationInfo
@@ -101,7 +101,7 @@ def fcntl(space, w_fd, op, w_arg):
 
     try:
         arg = space.getarg_w('s#', w_arg)
-    except OperationError as e:
+    except OperationError, e:
         if not e.match(space, space.w_TypeError):
             raise
     else:
@@ -174,7 +174,8 @@ def lockf(space, w_fd, op, length=0, start=0, whence=0):
     elif op & LOCK_EX:
         l_type = F_WRLCK
     else:
-        raise oefmt(space.w_ValueError, "unrecognized lock operation")
+        raise OperationError(space.w_ValueError,
+            space.wrap("unrecognized lock operation"))
 
     op = [F_SETLKW, F_SETLK][int(bool(op & LOCK_NB))]
     op = rffi.cast(rffi.INT, op)        # C long => C int
@@ -210,7 +211,7 @@ def ioctl(space, w_fd, op, w_arg, mutate_flag=-1):
 
     try:
         rwbuffer = space.writebuf_w(w_arg)
-    except OperationError as e:
+    except OperationError, e:
         if not e.match(space, space.w_TypeError):
             raise
     else:
@@ -229,13 +230,13 @@ def ioctl(space, w_fd, op, w_arg, mutate_flag=-1):
             lltype.free(ll_arg, flavor='raw')
 
     if mutate_flag != -1:
-        raise oefmt(space.w_TypeError,
-                    "ioctl requires a file or file descriptor, an integer and "
-                    "optionally an integer or buffer argument")
+        raise OperationError(space.w_TypeError, space.wrap(
+            "ioctl requires a file or file descriptor, an integer "
+            "and optionally an integer or buffer argument"))
 
     try:
         arg = space.getarg_w('s#', w_arg)
-    except OperationError as e:
+    except OperationError, e:
         if not e.match(space, space.w_TypeError):
             raise
     else:

@@ -15,6 +15,7 @@ from pypy.module._cffi_backend.ctypeobj import W_CType
 
 class W_Library(W_Root):
     _immutable_ = True
+    handle = rffi.cast(DLLHANDLE, 0)
 
     def __init__(self, space, filename, flags):
         self.space = space
@@ -23,12 +24,11 @@ class W_Library(W_Root):
                 filename = "<None>"
             try:
                 self.handle = dlopen(ll_libname, flags)
-            except DLOpenError as e:
+            except DLOpenError, e:
                 raise wrap_dlopenerror(space, e, filename)
         self.name = filename
-        self.register_finalizer(space)
 
-    def _finalize_(self):
+    def __del__(self):
         h = self.handle
         if h != rffi.cast(DLLHANDLE, 0):
             self.handle = rffi.cast(DLLHANDLE, 0)

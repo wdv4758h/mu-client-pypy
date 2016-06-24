@@ -48,8 +48,8 @@ if os.name == 'nt':
 
             return W_FuncPtr(func, argtypes_w, w_restype)
         else:
-            raise oefmt(space.w_TypeError,
-                        "function name must be a string or integer")
+            raise OperationError(space.w_TypeError, space.wrap(
+                    'function name must be a string or integer'))
 else:
     @unwrap_spec(name=str)
     def _getfunc(space, CDLL, w_name, w_argtypes, w_restype):
@@ -70,7 +70,8 @@ else:
 def unwrap_ffitype(space, w_argtype, allow_void=False):
     res = w_argtype.get_ffitype()
     if res is libffi.types.void and not allow_void:
-        raise oefmt(space.w_TypeError, "void is not a valid argument type")
+        msg = 'void is not a valid argument type'
+        raise OperationError(space.w_TypeError, space.wrap(msg))
     return res
 
 
@@ -112,7 +113,7 @@ class W_FuncPtr(W_Root):
         func_caller = CallFunctionConverter(space, self.func, argchain)
         try:
             return func_caller.do_and_wrap(self.w_restype)
-        except StackCheckError as e:
+        except StackCheckError, e:
             raise OperationError(space.w_ValueError, space.wrap(e.message))
         #return self._do_call(space, argchain)
 
@@ -322,7 +323,7 @@ class W_CDLL(W_Root):
             self.name = name
         try:
             self.cdll = libffi.CDLL(name, mode)
-        except DLOpenError as e:
+        except DLOpenError, e:
             raise wrap_dlopenerror(space, e, self.name)
 
     def getfunc(self, space, w_name, w_argtypes, w_restype):
@@ -372,6 +373,6 @@ W_WinDLL.typedef = TypeDef(
 def get_libc(space):
     try:
         return space.wrap(W_CDLL(space, get_libc_name(), -1))
-    except OSError as e:
+    except OSError, e:
         raise wrap_oserror(space, e)
 

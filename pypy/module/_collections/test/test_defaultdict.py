@@ -26,7 +26,7 @@ class AppTestBasic:
             for key in ['foo', (1,)]:
                 try:
                     d1[key]
-                except KeyError as err:
+                except KeyError, err:
                     assert err.args[0] == key
                 else:
                     assert 0, "expected KeyError"

@@ -65,8 +65,6 @@
 #elif defined(HAVE_CYGWIN_SIGNAL_H)
 #include <cygwin/signal.h>
 typedef ucontext ucontext_t;
-#elif defined(__OpenBSD__)
-#include <signal.h>
 #endif
 
 

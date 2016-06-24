@@ -1,7 +1,7 @@
 import py
 try:
     from lib_pypy import greenlet
-except ImportError as e:
+except ImportError, e:
     py.test.skip(e)
 
 class SomeError(Exception):

@@ -50,9 +50,10 @@ class Local(W_Root):
         self.dicts[ec] = w_dict
         # call __init__
         try:
-            w_type = space.type(self)
+            w_self = space.wrap(self)
+            w_type = space.type(w_self)
             w_init = space.getattr(w_type, space.wrap("__init__"))
-            space.call_obj_args(w_init, self, self.initargs)
+            space.call_obj_args(w_init, w_self, self.initargs)
         except:
             # failed, forget w_dict and propagate the exception
             del self.dicts[ec]

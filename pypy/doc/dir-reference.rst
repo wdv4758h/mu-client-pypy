@@ -21,7 +21,7 @@ Directory                                 explanation/links
 
 :source:`pypy/doc/discussion/`            drafts of ideas and documentation
 
-:source:`pypy/goal/`                      our main PyPy-translation scripts
+:source:`pypy/goal/`                      our :ref:`main PyPy-translation scripts <translate-pypy>`
                                           live here
 
 :source:`pypy/interpreter/`               :doc:`bytecode interpreter <interpreter>` and related objects

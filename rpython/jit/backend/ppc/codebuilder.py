@@ -936,9 +936,9 @@ flush_icache = rffi.llexternal(
 
 class PPCGuardToken(GuardToken):
     def __init__(self, cpu, gcmap, descr, failargs, faillocs,
-                 guard_opnum, frame_depth, faildescrindex, fcond=c.cond_none):
+                 guard_opnum, frame_depth, fcond=c.cond_none):
         GuardToken.__init__(self, cpu, gcmap, descr, failargs, faillocs,
-                            guard_opnum, frame_depth, faildescrindex)
+                            guard_opnum, frame_depth)
         self.fcond = fcond
 
 
@@ -1012,15 +1012,13 @@ class PPCBuilder(BlockBuilderMixin, PPCAssembler):
         self.load_imm(dest_reg, word)
         return diff
 
-    def load_from_addr(self, rD, rT, addr):
-        # load [addr] into rD.  rT is a temporary register which can be
-        # equal to rD, but can't be r0.
-        assert rT is not r.r0
-        diff = self.load_imm_plus(rT, addr)
+    def load_from_addr(self, rD, addr):
+        assert rD is not r.r0
+        diff = self.load_imm_plus(rD, addr)
         if IS_PPC_32:
-            self.lwz(rD.value, rT.value, diff)
+            self.lwz(rD.value, rD.value, diff)
         else:
-            self.ld(rD.value, rT.value, diff)
+            self.ld(rD.value, rD.value, diff)
 
     def b_offset(self, target):
         curpos = self.currpos()
@@ -1281,7 +1279,7 @@ def make_operations():
 
     oplist = [None] * (rop._LAST + 1)
     for key, val in rop.__dict__.items():
-        if key.startswith("_") or not isinstance(val, int):
+        if key.startswith("_"):
             continue
         opname = key.lower()
         methname = "emit_%s" % opname

@@ -70,6 +70,9 @@ zlib
 bz2
     libbz2
 
+lzma (PyPy3 only)
+    liblzma
+
 pyexpat
     libexpat1
 
@@ -95,24 +98,19 @@ gdbm
 tk
     tk-dev
 
-lzma (PyPy3 only)
-    liblzma
-
-To run untranslated tests, you need the Boehm garbage collector libgc.
-
 On Debian, this is the command to install all build-time dependencies::
 
     apt-get install gcc make libffi-dev pkg-config libz-dev libbz2-dev \
     libsqlite3-dev libncurses-dev libexpat1-dev libssl-dev libgdbm-dev \
-    tk-dev libgc-dev liblzma-dev
+    tk-dev
 
 For the optional lzma module on PyPy3 you will also need ``liblzma-dev``.
 
 On Fedora::
 
-    dnf install gcc make libffi-devel pkgconfig zlib-devel bzip2-devel \
-    lib-sqlite3-devel ncurses-devel expat-devel openssl-devel tk-devel \
-    gdbm-devel
+    yum install gcc make libffi-devel pkgconfig zlib-devel bzip2-devel \
+    lib-sqlite3-devel ncurses-devel expat-devel openssl-devel
+    (XXX plus the Febora version of libgdbm-dev and tk-dev)
 
 For the optional lzma module on PyPy3 you will also need ``xz-devel``.
 

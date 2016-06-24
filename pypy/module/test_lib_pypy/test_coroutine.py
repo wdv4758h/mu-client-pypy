@@ -5,7 +5,7 @@ skip('test needs to be updated')
 
 try:
     from stackless import coroutine, CoroutineExit
-except ImportError as e:
+except ImportError, e:
     skip('cannot import stackless: %s' % (e,))
 
 

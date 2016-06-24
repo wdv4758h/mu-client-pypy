@@ -272,7 +272,7 @@ class TestRegAlloc:
             kref2 = bar(kref)
             try:
                 return g(n)
-            except FooError as e:
+            except FooError, e:
                 if foo(e):
                     return kref
                 else:

@@ -19,7 +19,8 @@ def get_graph(fn, signature, all_opts=True):
     t.buildrtyper().specialize()
     if all_opts:
         backend_optimizations(t, inline_threshold=INLINE_THRESHOLD_FOR_TEST,
-                              constfold=False)
+                              constfold=False,
+                              raisingop2direct_call=False)
     graph = graphof(t, fn)
     if option.view:
         t.view()

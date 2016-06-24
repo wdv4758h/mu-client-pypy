@@ -1,6 +1,7 @@
 from pypy.objspace.std.test import test_typeobject
 
 class TestVersionedType(test_typeobject.TestTypeObject):
+    spaceconfig = {"objspace.std.withtypeversion": True}
 
     def get_three_classes(self):
         space = self.space
@@ -259,4 +260,7 @@ class TestVersionedType(test_typeobject.TestTypeObject):
         assert space.float_w(cell.w_value) == 2.2
 
 
+
+class AppTestVersionedType(test_typeobject.AppTestTypeObject):
+    spaceconfig = {"objspace.std.withtypeversion": True}
 

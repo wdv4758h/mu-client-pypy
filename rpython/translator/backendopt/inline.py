@@ -679,7 +679,7 @@ def auto_inlining(translator, threshold=None,
                                            call_count_pred, cleanup=False)
                 to_cleanup[parentgraph] = True
                 res = bool(subcount)
-            except CannotInline as e:
+            except CannotInline, e:
                 try_again[graph] = str(e)
                 res = CannotInline
             if res is True:

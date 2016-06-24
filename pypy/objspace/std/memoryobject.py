@@ -37,7 +37,7 @@ class W_MemoryView(W_Root):
 
             try:
                 buf = space.buffer_w(w_other, space.BUF_CONTIG_RO)
-            except OperationError as e:
+            except OperationError, e:
                 if not e.match(space, space.w_TypeError):
                     raise
                 return space.w_NotImplemented

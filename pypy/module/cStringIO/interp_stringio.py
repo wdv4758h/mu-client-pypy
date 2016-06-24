@@ -1,4 +1,4 @@
-from pypy.interpreter.error import OperationError, oefmt
+from pypy.interpreter.error import OperationError
 from pypy.interpreter.baseobjspace import W_Root
 from pypy.interpreter.typedef import TypeDef, GetSetProperty
 from pypy.interpreter.gateway import interp2app, unwrap_spec
@@ -19,7 +19,8 @@ class W_InputOutputType(W_Root):
     def check_closed(self):
         if self.is_closed():
             space = self.space
-            raise oefmt(space.w_ValueError, "I/O operation on closed file")
+            raise OperationError(space.w_ValueError,
+                                 space.wrap("I/O operation on closed file"))
 
     def descr_flush(self):
         self.check_closed()
@@ -159,7 +160,7 @@ class W_OutputType(W_InputOutputType):
         else:
             size = space.int_w(w_size)
         if size < 0:
-            raise oefmt(space.w_IOError, "negative size")
+            raise OperationError(space.w_IOError, space.wrap("negative size"))
         self.truncate(size)
 
     def descr_write(self, space, w_buffer):
@@ -174,7 +175,7 @@ class W_OutputType(W_InputOutputType):
         while True:
             try:
                 w_line = space.next(w_iterator)
-            except OperationError as e:
+            except OperationError, e:
                 if not e.match(space, space.w_StopIteration):
                     raise
                 break  # done
