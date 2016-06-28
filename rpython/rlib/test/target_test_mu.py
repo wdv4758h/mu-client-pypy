@@ -5,10 +5,12 @@ OR:
     rpython target_test_mu.py
     LD_LIBRARY_PATH=$MU/cbinding:$LD_LIBRARY_PATH ./target_test_mu-c
 """
-from __future__ import print_function
-
 from rpython.rlib.mu import *
 from rpython.rlib import rposix
+from rpython.rlib import rdynload
+
+import os
+print os.getpid()
 
 prelude = """
 .typedef @i1        = int<1>
@@ -160,9 +162,6 @@ def load(ctx, bdl):
     with rffi.scoped_nonmovingbuffer(bdl) as buf:
         ctx.c_load_bundle(rffi.cast(rffi.VOIDP, ctx), buf, size)
 
-fnp_write = rffi.CConstant('write', MuCFP)
-# fnp_write = rffi.cast(MuCFP, rposix.c_write._ptr)
-
 def main(argv):
     mu = mu_new()
     ctx = rffi.cast(MuCtxPtr, mu.c_new_context(rffi.cast(rffi.VOIDP, mu)))
@@ -183,37 +182,13 @@ def main(argv):
 
     with rffi.scoped_nonmovingbuffer("@write.fp\0") as buf:
         write_fp_id = ctx.c_id_of(ctx_ptr, buf)
+    with rffi.scoped_nonmovingbuffer("/lib/x86_64-linux-gnu/libc-2.23.so\0") as buf:
+        dlc = rdynload.dlopen(buf, rdynload.RTLD_LAZY)
+    with rffi.scoped_nonmovingbuffer("write\0") as buf:
+        addr = rdynload.dlsym(dlc, buf)
 
-    print("fnp_write = %s" % fnp_write)
-    print("type(fnp_write) = %s" % type(fnp_write))
-
-    write_addr = fnp_write
-
-    # print("write_addr = %s" % write_addr)
-    # print("type(write_addr) = %s" % type(write_addr))
-    # print("write_addr._T = %s" % write_addr._T)
-    # print("type(write_addr._T) = %s" % type(write_addr._T))
-    # print("_isfunctype(write_addr) = %s" % rffi._isfunctype(write_addr))
-    # print("_isllptr(write_addr) = %s" % rffi._isllptr(write_addr))
-    # print("_isfunctype(MuCFP) = %s" % rffi._isfunctype(MuCFP))
-    # print("_isllptr(MuCFP) = %s" % rffi._isllptr(MuCFP))
-
-    print("ctx_ptr = %s" % ctx_ptr)
-    print("type(ctx_ptr) = %s" % type(ctx_ptr))
-
-    print("ctx = %s" % ctx)
-    print("type(ctx) = %s" % type(ctx))
-    print("ctx.c_handle_from_fp = %s" % ctx.c_handle_from_fp)
-    print("type(ctx.c_handle_from_fp) = %s" % type(ctx.c_handle_from_fp))
-    print("ctx.c_handle_from_fp._T = %s" % ctx.c_handle_from_fp._T)
-    print("type(ctx.c_handle_from_fp._T) = %s" % type(ctx.c_handle_from_fp._T))
-    print("ctx.c_handle_from_fp._obj = %s" % ctx.c_handle_from_fp._obj)
-    print("type(ctx.c_handle_from_fp._obj) = %s" % type(ctx.c_handle_from_fp._obj))
-    print("ctx.c_handle_from_fp._obj._callable = %s" % ctx.c_handle_from_fp._obj._callable)
-    print("type(ctx.c_handle_from_fp._obj._callable) = %s" % type(ctx.c_handle_from_fp._obj._callable))
-
+    write_addr = rffi.cast(MuCFP, addr)
     write_addr_hdle = ctx.c_handle_from_fp(ctx_ptr, write_fp_id, write_addr)
-
     ctx.c_store(ctx_ptr, rffi.cast(MuMemOrd._lltype, MuMemOrd.NOT_ATOMIC),
               write_g_hdle, write_addr_hdle)
 
