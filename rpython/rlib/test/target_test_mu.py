@@ -5,7 +5,7 @@ OR:
     rpython target_test_mu.py
     LD_LIBRARY_PATH=$MU/cbinding:$LD_LIBRARY_PATH ./target_test_mu-c
 """
-from rpython.rlib.mu import *
+from rpython.rlib.rmuapi import *
 from rpython.rlib import rposix
 from rpython.rlib import rdynload
 
