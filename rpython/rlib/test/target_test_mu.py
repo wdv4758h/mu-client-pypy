@@ -7,7 +7,7 @@ OR:
 """
 from __future__ import print_function
 
-from rpython.rlib.mu import *
+from rpython.rlib.rmuapi import *
 from rpython.rlib import rposix
 
 prelude = """
