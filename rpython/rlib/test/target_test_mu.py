@@ -160,25 +160,24 @@ hello_world_hail = """
 def load(ctx, bdl):
     size = rffi.cast(MuArraySize, len(bdl))
     with rffi.scoped_nonmovingbuffer(bdl) as buf:
-        ctx.c_load_bundle(rffi.cast(rffi.VOIDP, ctx), buf, size)
+        ctx.c_load_bundle(ctx, buf, size)
 
 def main(argv):
     mu = mu_new()
-    ctx = rffi.cast(MuCtxPtr, mu.c_new_context(rffi.cast(rffi.VOIDP, mu)))
-    ctx_ptr = rffi.cast(rffi.VOIDP, ctx)
+    ctx = mu.c_new_context(mu)
+    ctx_ptr = ctx
 
     load(ctx, prelude)
     load(ctx, hello_world_uir)
 
     size = rffi.cast(MuArraySize, len(hello_world_hail))
     with rffi.scoped_nonmovingbuffer(hello_world_hail) as buf:
-        ctx.c_load_hail(rffi.cast(rffi.VOIDP, ctx), buf, size)
+        ctx.c_load_hail(ctx, buf, size)
 
     with rffi.scoped_nonmovingbuffer("@write.g\0") as buf:
         write_g_id = ctx.c_id_of(ctx_ptr, buf)
 
-    write_g_hdle = ctx.c_handle_from_global(rffi.cast(rffi.VOIDP, ctx),
-                                            rffi.cast(MuID, write_g_id))
+    write_g_hdle = ctx.c_handle_from_global(ctx, rffi.cast(MuID, write_g_id))
 
     with rffi.scoped_nonmovingbuffer("@write.fp\0") as buf:
         write_fp_id = ctx.c_id_of(ctx_ptr, buf)
@@ -201,7 +200,7 @@ def main(argv):
                                        rffi.cast(MuValuePtr, 0),
                                        rffi.cast(MuArraySize, 0))
 
-    mu.c_execute(rffi.cast(rffi.VOIDP, mu))
+    mu.c_execute(mu)
 
     mu_close(mu)
     return 0
