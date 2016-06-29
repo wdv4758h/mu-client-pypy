@@ -192,8 +192,7 @@ def main(argv):
 
     write_addr = rffi.cast(MuCFP, addr)
     write_addr_hdle = ctx.c_handle_from_fp(ctx_ptr, write_fp_id, write_addr)
-    ctx.c_store(ctx_ptr, rffi.cast(MuMemOrd._lltype, MuMemOrd.NOT_ATOMIC),
-              write_g_hdle, write_addr_hdle)
+    ctx.c_store(ctx_ptr, MuMemOrd.NOT_ATOMIC, write_g_hdle, write_addr_hdle)
 
     with rffi.scoped_nonmovingbuffer("@_start\0") as buf:
         _start_id = ctx.c_id_of(ctx_ptr, buf)
