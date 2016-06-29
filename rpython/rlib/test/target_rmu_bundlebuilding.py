@@ -134,12 +134,11 @@ def main_build(argv):
 
     gblres = ctx.c_new_global_cell(ctx, bdl, i64)
     set_name(ctx, bdl, gblres, "@gblresult")
-
-    with scoped_rpylist2rawarray(MuTypeNodePtr, [i64]) as prms:
-        with scoped_rpylist2rawarray(MuTypeNodePtr, [i64]) as rtns:
-            sig = ctx.c_new_funcsig(ctx, bdl,
-                                    prms, rffi.cast(MuArraySize, 1),
-                                    rtns, rffi.cast(MuArraySize, 1))
+    with lltype.scoped_alloc(rffi.CArray(MuTypeNode), 1) as arr:
+        arr[0] = i64
+        sig = ctx.c_new_funcsig(ctx, bdl,
+                                arr, rffi.cast(MuArraySize, 1),
+                                arr, rffi.cast(MuArraySize, 1))
     set_name(ctx, bdl, sig, "@sig_i64_i64")
 
 
