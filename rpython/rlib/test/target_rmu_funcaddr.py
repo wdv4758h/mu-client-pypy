@@ -5,12 +5,10 @@ OR:
     rpython target_test_mu.py
     LD_LIBRARY_PATH=$MU/cbinding:$LD_LIBRARY_PATH ./target_test_mu-c
 """
-from rpython.rlib.rmuapi import *
+from rpython.rlib.rmu import *
 from rpython.rlib import rposix
 from rpython.rlib import rdynload
-
-import os
-print os.getpid()
+from rpython.rlib.objectmodel import we_are_translated
 
 prelude = """
 .typedef @i1        = int<1>
@@ -181,10 +179,16 @@ def main(argv):
 
     with rffi.scoped_nonmovingbuffer("@write.fp\0") as buf:
         write_fp_id = ctx.c_id_of(ctx_ptr, buf)
-    with rffi.scoped_nonmovingbuffer("/lib/x86_64-linux-gnu/libc-2.23.so\0") as buf:
-        dlc = rdynload.dlopen(buf, rdynload.RTLD_LAZY)
-    with rffi.scoped_nonmovingbuffer("write\0") as buf:
-        addr = rdynload.dlsym(dlc, buf)
+
+    ll_fncptr = rposix.c_write._ptr
+    if we_are_translated():
+        addr = ll_fncptr
+    else:
+        import ctypes
+        from rpython.rtyper.lltypesystem.ll2ctypes import get_ctypes_callable, ctypes2lltype
+        from rpython.rtyper.lltypesystem import llmemory
+        c_fncptr = get_ctypes_callable(ll_fncptr, ll_fncptr._obj.calling_conv)
+        addr = ctypes2lltype(llmemory.Address, ctypes.cast(c_fncptr, ctypes.c_void_p).value)
 
     write_addr = rffi.cast(MuCFP, addr)
     write_addr_hdle = ctx.c_handle_from_fp(ctx_ptr, write_fp_id, write_addr)
