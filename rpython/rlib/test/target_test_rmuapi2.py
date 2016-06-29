@@ -93,6 +93,24 @@ def rpylist2carray(lst):
 
     return rffi.cast(MuTypeNodePtr, data_start)
 
+class scoped_rpylist2rawarray:
+    def __init__(self, TYPE, lst):
+        self.TYPE = TYPE
+        self.lst = lst
+
+    def __enter__(self):
+        from rpython.rlib.rrawarray import copy_list_to_raw_array
+        self.arr = lltype.malloc(self.TYPE, len(self.lst), flavor='raw')
+        copy_list_to_raw_array(self.lst, self.arr)
+        return self.arr
+
+    def __exit__(self, *args):
+        lltype.free(self.arr, flavor='raw')
+
+    __init__._always_inline_ = 'try'
+    __enter__._always_inline_ = 'try'
+    __exit__._always_inline_ = 'try'
+
 def main_build(argv):
     def set_name(ctx, bdl, nd, s_name):
         with rffi.scoped_nonmovingbuffer(s_name) as buf:
@@ -117,9 +135,11 @@ def main_build(argv):
     gblres = ctx.c_new_global_cell(ctx, bdl, i64)
     set_name(ctx, bdl, gblres, "@gblresult")
 
-    sig = ctx.c_new_funcsig(ctx, bdl,
-                            rpylist2carray([i64]), rffi.cast(MuArraySize, 1),
-                            rpylist2carray([i64]), rffi.cast(MuArraySize, 1) )
+    with scoped_rpylist2rawarray(MuTypeNodePtr, [i64]) as prms:
+        with scoped_rpylist2rawarray(MuTypeNodePtr, [i64]) as rtns:
+            sig = ctx.c_new_funcsig(ctx, bdl,
+                                    prms, rffi.cast(MuArraySize, 1),
+                                    rtns, rffi.cast(MuArraySize, 1))
     set_name(ctx, bdl, sig, "@sig_i64_i64")
 
 
