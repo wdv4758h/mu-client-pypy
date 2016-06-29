@@ -1,7 +1,7 @@
 """
 Build a simple factorial bundle using MuAPI and run it.
 """
-from rpython.rlib.rmuapi import *
+from rpython.rlib.rmu import *
 from rpython.rtyper.lltypesystem import rffi
 
 fac_bundle = """
