@@ -72,45 +72,6 @@ def main_load(argv):
     mu_close(mu)
     return 0
 
-def rpylist2carray(lst):
-    from rpython.rtyper.lltypesystem.rlist import ListRepr, ll_newlist
-    from rpython.rtyper.rlist import ll_setitem
-    from rpython.rtyper.rptr import PtrRepr
-    from rpython.rlib import rgc
-
-    rlist = ListRepr(None, PtrRepr(MuTypeNode))
-    rlist.setup()
-    LIST = rlist.lowleveltype.TO
-    ll_lst = ll_newlist(LIST, len(lst))
-    for i in range(len(lst)):
-        ll_setitem(None, ll_lst, i, lst[i])
-
-    rgc.pin(ll_lst)
-    items = ll_lst.items
-    data_start = items._cast_to_adr() + rffi.itemoffsetof(LIST.items.TO, 0)
-    # data_start = ll_lst._cast_to_adr() + \
-    #              rffi.offsetof(LIST, 'items') + rffi.itemoffsetof(LIST.items, 0)
-
-    return rffi.cast(MuTypeNodePtr, data_start)
-
-class scoped_rpylist2rawarray:
-    def __init__(self, TYPE, lst):
-        self.TYPE = TYPE
-        self.lst = lst
-
-    def __enter__(self):
-        from rpython.rlib.rrawarray import copy_list_to_raw_array
-        self.arr = lltype.malloc(self.TYPE, len(self.lst), flavor='raw')
-        copy_list_to_raw_array(self.lst, self.arr)
-        return self.arr
-
-    def __exit__(self, *args):
-        lltype.free(self.arr, flavor='raw')
-
-    __init__._always_inline_ = 'try'
-    __enter__._always_inline_ = 'try'
-    __exit__._always_inline_ = 'try'
-
 def main_build(argv):
     def set_name(ctx, bdl, nd, s_name):
         with rffi.scoped_nonmovingbuffer(s_name) as buf:
