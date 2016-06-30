@@ -143,7 +143,7 @@ def main_build(argv):
     with lltype.scoped_alloc(rffi.CArray(MuTypeNode), 1) as arr:
         arr[0] = v10
         ctx.c_add_dest(ctx, br, MuDestKind.NORMAL, blk2, arr, rffi.cast(MuArraySize, 1))
-    # TODO: a bug on Kunshan's part, fail to add destination clause to BRANCH.
+
     # blk2
     v11 = ctx.c_new_nor_param(ctx, blk2, i64)
     with lltype.scoped_alloc(rffi.CArray(MuTypeNode), 1) as arr:
