@@ -157,7 +157,7 @@ hello_world_hail = """
 
 def load(ctx, bdl):
     size = rffi.cast(MuArraySize, len(bdl))
-    with rffi.scoped_nonmovingbuffer(bdl) as buf:
+    with rffi.scoped_str2charp(bdl) as buf:
         ctx.c_load_bundle(ctx, buf, size)
 
 def main(argv):
@@ -169,15 +169,15 @@ def main(argv):
     load(ctx, hello_world_uir)
 
     size = rffi.cast(MuArraySize, len(hello_world_hail))
-    with rffi.scoped_nonmovingbuffer(hello_world_hail) as buf:
+    with rffi.scoped_str2charp(hello_world_hail) as buf:
         ctx.c_load_hail(ctx, buf, size)
 
-    with rffi.scoped_nonmovingbuffer("@write.g\0") as buf:
+    with rffi.scoped_str2charp("@write.g\0") as buf:
         write_g_id = ctx.c_id_of(ctx_ptr, buf)
 
     write_g_hdle = ctx.c_handle_from_global(ctx, rffi.cast(MuID, write_g_id))
 
-    with rffi.scoped_nonmovingbuffer("@write.fp\0") as buf:
+    with rffi.scoped_str2charp("@write.fp\0") as buf:
         write_fp_id = ctx.c_id_of(ctx_ptr, buf)
 
     ll_fncptr = rposix.c_write._ptr
@@ -194,7 +194,7 @@ def main(argv):
     write_addr_hdle = ctx.c_handle_from_fp(ctx_ptr, write_fp_id, write_addr)
     ctx.c_store(ctx_ptr, MuMemOrd.NOT_ATOMIC, write_g_hdle, write_addr_hdle)
 
-    with rffi.scoped_nonmovingbuffer("@_start\0") as buf:
+    with rffi.scoped_str2charp("@_start\0") as buf:
         _start_id = ctx.c_id_of(ctx_ptr, buf)
     _start_hdle = ctx.c_handle_from_func(ctx_ptr, _start_id)
     stack_hdle = ctx.c_new_stack(ctx_ptr, _start_hdle)

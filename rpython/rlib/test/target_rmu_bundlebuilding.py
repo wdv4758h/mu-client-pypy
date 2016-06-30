@@ -45,12 +45,12 @@ def main_load(argv):
     # Load the bundle and run, verify its correctness
     mu = mu_new()
     ctx = mu.c_new_context(mu)
-    with rffi.scoped_nonmovingbuffer(fac_bundle) as buf:
+    with rffi.scoped_str2charp(fac_bundle) as buf:
         size = rffi.cast(MuArraySize, len(fac_bundle))
         ctx.c_load_bundle(ctx, buf, size)
 
     # Get handle to @main function, and execute it
-    with rffi.scoped_nonmovingbuffer("@main") as buf:
+    with rffi.scoped_str2charp("@main") as buf:
         main_id = ctx.c_id_of(ctx, buf)
     main_h = ctx.c_handle_from_func(ctx, main_id)
     stack_h = ctx.c_new_stack(ctx, main_h)
@@ -62,7 +62,7 @@ def main_load(argv):
     mu.c_execute(mu)
 
     # Load result from global cell
-    with rffi.scoped_nonmovingbuffer("@gblresult") as buf:
+    with rffi.scoped_str2charp("@gblresult") as buf:
         gbl_id = ctx.c_id_of(ctx, buf)
     gbl_h = ctx.c_handle_from_global(ctx, gbl_id)
     res_h = ctx.c_load(ctx, rffi.cast(MuMemOrd._lltype, MuMemOrd.NOT_ATOMIC), gbl_h)
@@ -74,7 +74,7 @@ def main_load(argv):
 
 def main_build(argv):
     def set_name(ctx, bdl, nd, s_name):
-        with rffi.scoped_nonmovingbuffer(s_name) as buf:
+        with rffi.scoped_str2charp(s_name) as buf:
             ctx.c_set_name(ctx, bdl, nd, buf)
 
     mu = mu_new()
@@ -191,7 +191,7 @@ def main_build(argv):
     mu.c_execute(mu)
 
     # Load result from global cell
-    with rffi.scoped_nonmovingbuffer("@gblresult") as buf:
+    with rffi.scoped_str2charp("@gblresult") as buf:
         gbl_id = ctx.c_id_of(ctx, buf)
     gbl_h = ctx.c_handle_from_global(ctx, gbl_id)
     res_h = ctx.c_load(ctx, rffi.cast(MuMemOrd._lltype, MuMemOrd.NOT_ATOMIC), gbl_h)
