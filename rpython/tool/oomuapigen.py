@@ -58,7 +58,8 @@ def rpy2prmtype(typ):
         "rffi.ULONG": "int",
         "rffi.UINTPTR_T": "int",
         "rffi.FLOAT": "float",
-        "rffi.DOUBLE": "float"
+        "rffi.DOUBLE": "float",
+        "lltype.Void": "None"
     }
     if typ in _map:
         return _map[typ]
@@ -68,15 +69,10 @@ def rpy2prmtype(typ):
 
 
 def proc_params(mtd):
-    def rpy2rtntype(typ):
-        if typ == "lltype.Void":
-            return "None"
-        return typ
-
     c_prms = mtd['params'][1:]
     rpy_prms = ['self']
     if len(c_prms) == 0:
-        return rpy_prms, [], rpy2rtntype(c2rpytype(mtd['ret_ty']))
+        return rpy_prms, [], rpy2prmtype(c2rpytype(mtd['ret_ty']))
 
     prms = [prm['name'] for prm in c_prms]
     types = list(map(rpy2prmtype, map(c2rpytype, [prm['type'] for prm in c_prms])))
@@ -86,15 +82,18 @@ def proc_params(mtd):
             # convert it into a list
             arr_var, sz_var = pragma.split(':array:')
             idx_arr_var = prms.index(arr_var)
-            idx_sz_var = prms.index(sz_var)
-            prms.remove(sz_var)
             arr_ty = types[idx_arr_var]
             if not (arr_ty == "str" or arr_ty[0] == '['):
                 types[idx_arr_var] = '[%s]' % arr_ty
-            types.remove(types[idx_sz_var])
+            try:
+                idx_sz_var = prms.index(sz_var)
+                prms.remove(sz_var)
+                types.remove(types[idx_sz_var])
+            except ValueError:
+                pass
 
     rpy_prms.extend(prms)
-    return rpy_prms, types, rpy2rtntype(c2rpytype(mtd['ret_ty']))
+    return rpy_prms, types, rpy2prmtype(c2rpytype(mtd['ret_ty']))
 
 def gen_def(mtd):
     print(idts, end='')
@@ -105,7 +104,9 @@ def gen_def(mtd):
     print("# type: ({arg_ts}) -> {rtn_t}".format(arg_ts=', '.join(typ_lst), rtn_t=rtn_t))
 
 def gen_body(mtd):
-    pass
+    arg_lst, typ_lst, rtn_t = proc_params(mtd)
+    print(idts*2, end='')
+    print("return self._ctx.c_{name}(self._ctx, {arg_lst})".format(name=mtd['name'], arg_lst=", ".join(arg_lst[1:])))
 
 def main(argv):
     with open(argv[1], 'r') as fp:
@@ -130,7 +131,8 @@ def main(argv):
     stt = api['structs'][1]
     for mtd in stt['methods']:
         gen_def(mtd)
-
+        gen_body(mtd)
+        print()
 if __name__ == "__main__":
     import sys
     main(sys.argv)

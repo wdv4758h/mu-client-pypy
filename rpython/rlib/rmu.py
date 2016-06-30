@@ -589,3 +589,747 @@ MuCtx.become(rffi.CStruct(
 
 mu_new = rffi.llexternal('mu_refimpl2_new', [], MuVMPtr, compilation_info=eci)
 mu_close = rffi.llexternal('mu_refimpl2_close', [MuVMPtr], lltype.Void, compilation_info=eci)
+
+
+# -------------------------------------------------------------------------------------------------------
+# OO wrappers
+class Mu:
+    def __init__(self):
+        self._mu = mu_new()
+
+    def new_context(self):
+        # type: () -> MuContext
+        return MuContext(self._mu.c_new_context(self._mu))
+
+    def id_of(self, name):
+        # type (str) -> MuID
+        with rffi.scoped_str2charp(name) as buf:
+            return self._mu.c_id_of(self._mu, buf)
+
+    def name_of(self, id):
+        # type (MuID) -> str
+        c_charp = self._mu.c_name_of(self._mu, id)
+        return rffi.charp2str(c_charp)
+
+    def set_trap_handler(self, trap_handler, userdata):
+        # type (MuTrapHandler, MuCPtr) -> void
+        return self._mu.c_set_trap_handler(self._mu, trap_handler, userdata)
+
+    def execute(self):
+        # type () -> None
+        return self._mu.c_execute(self._mu)
+
+    def get_mu_error_ptr(self):
+        # type () -> rffi.INTP
+        return self._mu.c_get_mu_error_ptr(self._mu)
+
+
+class MuContext:
+    def __init__(self, rffi_ctx_ptr):
+        self._ctx = rffi_ctx_ptr
+
+    def id_of(self, name):
+        # type: (str) -> MuID
+        with rffi.scoped_str2charp(name) as buf:
+            return self._ctx.c_id_of(self._ctx, buf)
+
+    def name_of(self, id):
+        # type: (MuID) -> str
+        c_charp = self._ctx.c_name_of(self._ctx, id)
+        return rffi.charp2str(c_charp)
+
+    def close_context(self):
+        # type: () -> None
+        return self._ctx.c_close_context(self._ctx)
+
+    def load_bundle(self, bdl):
+        # type: (str) -> None
+        with rffi.scoped_str2charp(bdl) as buf:
+            return self._ctx.c_load_bundle(self._ctx, buf)
+
+    def load_hail(self, hail):
+        # type: (str) -> None
+        with rffi.scoped_str2charp(hail) as buf:
+            return self._ctx.c_load_hail(self._ctx, buf)
+
+    # TODO: rest
+    def handle_from_sint8(self, num, len):
+        # type: (int, int) -> MuIntValue
+        return self._ctx.c_handle_from_sint8(self._ctx, num, len)
+
+    def handle_from_uint8(self, num, len):
+        # type: (int, int) -> MuIntValue
+        return self._ctx.c_handle_from_uint8(self._ctx, num, len)
+
+    def handle_from_sint16(self, num, len):
+        # type: (int, int) -> MuIntValue
+        return self._ctx.c_handle_from_sint16(self._ctx, num, len)
+
+    def handle_from_uint16(self, num, len):
+        # type: (int, int) -> MuIntValue
+        return self._ctx.c_handle_from_uint16(self._ctx, num, len)
+
+    def handle_from_sint32(self, num, len):
+        # type: (int, int) -> MuIntValue
+        return self._ctx.c_handle_from_sint32(self._ctx, num, len)
+
+    def handle_from_uint32(self, num, len):
+        # type: (int, int) -> MuIntValue
+        return self._ctx.c_handle_from_uint32(self._ctx, num, len)
+
+    def handle_from_sint64(self, num, len):
+        # type: (int, int) -> MuIntValue
+        return self._ctx.c_handle_from_sint64(self._ctx, num, len)
+
+    def handle_from_uint64(self, num, len):
+        # type: (int, int) -> MuIntValue
+        return self._ctx.c_handle_from_uint64(self._ctx, num, len)
+
+    def handle_from_uint64s(self, nums, len):
+        # type: ([int], int) -> MuIntValue
+        return self._ctx.c_handle_from_uint64s(self._ctx, nums, len)
+
+    def handle_from_float(self, num):
+        # type: (float) -> MuFloatValue
+        return self._ctx.c_handle_from_float(self._ctx, num)
+
+    def handle_from_double(self, num):
+        # type: (float) -> MuDoubleValue
+        return self._ctx.c_handle_from_double(self._ctx, num)
+
+    def handle_from_ptr(self, mu_type, ptr):
+        # type: (MuID, MuCPtr) -> MuUPtrValue
+        return self._ctx.c_handle_from_ptr(self._ctx, mu_type, ptr)
+
+    def handle_from_fp(self, mu_type, fp):
+        # type: (MuID, MuCFP) -> MuUFPValue
+        return self._ctx.c_handle_from_fp(self._ctx, mu_type, fp)
+
+    def handle_to_sint8(self, opnd):
+        # type: (MuIntValue) -> int
+        return self._ctx.c_handle_to_sint8(self._ctx, opnd)
+
+    def handle_to_uint8(self, opnd):
+        # type: (MuIntValue) -> int
+        return self._ctx.c_handle_to_uint8(self._ctx, opnd)
+
+    def handle_to_sint16(self, opnd):
+        # type: (MuIntValue) -> int
+        return self._ctx.c_handle_to_sint16(self._ctx, opnd)
+
+    def handle_to_uint16(self, opnd):
+        # type: (MuIntValue) -> int
+        return self._ctx.c_handle_to_uint16(self._ctx, opnd)
+
+    def handle_to_sint32(self, opnd):
+        # type: (MuIntValue) -> int
+        return self._ctx.c_handle_to_sint32(self._ctx, opnd)
+
+    def handle_to_uint32(self, opnd):
+        # type: (MuIntValue) -> int
+        return self._ctx.c_handle_to_uint32(self._ctx, opnd)
+
+    def handle_to_sint64(self, opnd):
+        # type: (MuIntValue) -> int
+        return self._ctx.c_handle_to_sint64(self._ctx, opnd)
+
+    def handle_to_uint64(self, opnd):
+        # type: (MuIntValue) -> int
+        return self._ctx.c_handle_to_uint64(self._ctx, opnd)
+
+    def handle_to_float(self, opnd):
+        # type: (MuFloatValue) -> float
+        return self._ctx.c_handle_to_float(self._ctx, opnd)
+
+    def handle_to_double(self, opnd):
+        # type: (MuDoubleValue) -> float
+        return self._ctx.c_handle_to_double(self._ctx, opnd)
+
+    def handle_to_ptr(self, opnd):
+        # type: (MuUPtrValue) -> MuCPtr
+        return self._ctx.c_handle_to_ptr(self._ctx, opnd)
+
+    def handle_to_fp(self, opnd):
+        # type: (MuUFPValue) -> MuCFP
+        return self._ctx.c_handle_to_fp(self._ctx, opnd)
+
+    def handle_from_const(self, id):
+        # type: (MuID) -> MuValue
+        return self._ctx.c_handle_from_const(self._ctx, id)
+
+    def handle_from_global(self, id):
+        # type: (MuID) -> MuIRefValue
+        return self._ctx.c_handle_from_global(self._ctx, id)
+
+    def handle_from_func(self, id):
+        # type: (MuID) -> MuFuncRefValue
+        return self._ctx.c_handle_from_func(self._ctx, id)
+
+    def handle_from_expose(self, id):
+        # type: (MuID) -> MuValue
+        return self._ctx.c_handle_from_expose(self._ctx, id)
+
+    def delete_value(self, opnd):
+        # type: (MuValue) -> None
+        return self._ctx.c_delete_value(self._ctx, opnd)
+
+    def ref_eq(self, lhs, rhs):
+        # type: (MuGenRefValue, MuGenRefValue) -> MuBool
+        return self._ctx.c_ref_eq(self._ctx, lhs, rhs)
+
+    def ref_ult(self, lhs, rhs):
+        # type: (MuIRefValue, MuIRefValue) -> MuBool
+        return self._ctx.c_ref_ult(self._ctx, lhs, rhs)
+
+    def extract_value(self, str, index):
+        # type: (MuStructValue, int) -> MuValue
+        return self._ctx.c_extract_value(self._ctx, str, index)
+
+    def insert_value(self, str, index, newval):
+        # type: (MuStructValue, int, MuValue) -> MuStructValue
+        return self._ctx.c_insert_value(self._ctx, str, index, newval)
+
+    def extract_element(self, str, index):
+        # type: (MuSeqValue, MuIntValue) -> MuValue
+        return self._ctx.c_extract_element(self._ctx, str, index)
+
+    def insert_element(self, str, index, newval):
+        # type: (MuSeqValue, MuIntValue, MuValue) -> MuSeqValue
+        return self._ctx.c_insert_element(self._ctx, str, index, newval)
+
+    def new_fixed(self, mu_type):
+        # type: (MuID) -> MuRefValue
+        return self._ctx.c_new_fixed(self._ctx, mu_type)
+
+    def new_hybrid(self, mu_type, length):
+        # type: (MuID, MuIntValue) -> MuRefValue
+        return self._ctx.c_new_hybrid(self._ctx, mu_type, length)
+
+    def refcast(self, opnd, new_type):
+        # type: (MuGenRefValue, MuID) -> MuGenRefValue
+        return self._ctx.c_refcast(self._ctx, opnd, new_type)
+
+    def get_iref(self, opnd):
+        # type: (MuRefValue) -> MuIRefValue
+        return self._ctx.c_get_iref(self._ctx, opnd)
+
+    def get_field_iref(self, opnd, field):
+        # type: (MuIRefValue, int) -> MuIRefValue
+        return self._ctx.c_get_field_iref(self._ctx, opnd, field)
+
+    def get_elem_iref(self, opnd, index):
+        # type: (MuIRefValue, MuIntValue) -> MuIRefValue
+        return self._ctx.c_get_elem_iref(self._ctx, opnd, index)
+
+    def shift_iref(self, opnd, offset):
+        # type: (MuIRefValue, MuIntValue) -> MuIRefValue
+        return self._ctx.c_shift_iref(self._ctx, opnd, offset)
+
+    def get_var_part_iref(self, opnd):
+        # type: (MuIRefValue) -> MuIRefValue
+        return self._ctx.c_get_var_part_iref(self._ctx, opnd)
+
+    def load(self, ord, loc):
+        # type: (MuMemOrd, MuIRefValue) -> MuValue
+        return self._ctx.c_load(self._ctx, ord, loc)
+
+    def store(self, ord, loc, newval):
+        # type: (MuMemOrd, MuIRefValue, MuValue) -> None
+        return self._ctx.c_store(self._ctx, ord, loc, newval)
+
+    def cmpxchg(self, ord_succ, ord_fail, weak, loc, expected, desired, is_succ):
+        # type: (MuMemOrd, MuMemOrd, MuBool, MuIRefValue, MuValue, MuValue, MuBool) -> MuValue
+        return self._ctx.c_cmpxchg(self._ctx, ord_succ, ord_fail, weak, loc, expected, desired, is_succ)
+
+    def atomicrmw(self, ord, op, loc, opnd):
+        # type: (MuMemOrd, MuAtomicRMWOptr, MuIRefValue, MuValue) -> MuValue
+        return self._ctx.c_atomicrmw(self._ctx, ord, op, loc, opnd)
+
+    def fence(self, ord):
+        # type: (MuMemOrd) -> None
+        return self._ctx.c_fence(self._ctx, ord)
+
+    def new_stack(self, func):
+        # type: (MuFuncRefValue) -> MuStackRefValue
+        return self._ctx.c_new_stack(self._ctx, func)
+
+    def new_thread_nor(self, stack, threadlocal, vals):
+        # type: (MuStackRefValue, MuRefValue, [MuValue]) -> MuThreadRefValue
+        return self._ctx.c_new_thread_nor(self._ctx, stack, threadlocal, vals)
+
+    def new_thread_exc(self, stack, threadlocal, exc):
+        # type: (MuStackRefValue, MuRefValue, MuRefValue) -> MuThreadRefValue
+        return self._ctx.c_new_thread_exc(self._ctx, stack, threadlocal, exc)
+
+    def kill_stack(self, stack):
+        # type: (MuStackRefValue) -> None
+        return self._ctx.c_kill_stack(self._ctx, stack)
+
+    def set_threadlocal(self, thread, threadlocal):
+        # type: (MuThreadRefValue, MuRefValue) -> None
+        return self._ctx.c_set_threadlocal(self._ctx, thread, threadlocal)
+
+    def get_threadlocal(self, thread):
+        # type: (MuThreadRefValue) -> MuRefValue
+        return self._ctx.c_get_threadlocal(self._ctx, thread)
+
+    def new_cursor(self, stack):
+        # type: (MuStackRefValue) -> MuFCRefValue
+        return self._ctx.c_new_cursor(self._ctx, stack)
+
+    def next_frame(self, cursor):
+        # type: (MuFCRefValue) -> None
+        return self._ctx.c_next_frame(self._ctx, cursor)
+
+    def copy_cursor(self, cursor):
+        # type: (MuFCRefValue) -> MuFCRefValue
+        return self._ctx.c_copy_cursor(self._ctx, cursor)
+
+    def close_cursor(self, cursor):
+        # type: (MuFCRefValue) -> None
+        return self._ctx.c_close_cursor(self._ctx, cursor)
+
+    def cur_func(self, cursor):
+        # type: (MuFCRefValue) -> MuID
+        return self._ctx.c_cur_func(self._ctx, cursor)
+
+    def cur_func_ver(self, cursor):
+        # type: (MuFCRefValue) -> MuID
+        return self._ctx.c_cur_func_ver(self._ctx, cursor)
+
+    def cur_inst(self, cursor):
+        # type: (MuFCRefValue) -> MuID
+        return self._ctx.c_cur_inst(self._ctx, cursor)
+
+    def dump_keepalives(self, cursor, results):
+        # type: (MuFCRefValue, MuValue) -> None
+        return self._ctx.c_dump_keepalives(self._ctx, cursor, results)
+
+    def pop_frames_to(self, cursor):
+        # type: (MuFCRefValue) -> None
+        return self._ctx.c_pop_frames_to(self._ctx, cursor)
+
+    def push_frame(self, stack, func):
+        # type: (MuStackRefValue, MuFuncRefValue) -> None
+        return self._ctx.c_push_frame(self._ctx, stack, func)
+
+    def tr64_is_fp(self, value):
+        # type: (MuTagRef64Value) -> MuBool
+        return self._ctx.c_tr64_is_fp(self._ctx, value)
+
+    def tr64_is_int(self, value):
+        # type: (MuTagRef64Value) -> MuBool
+        return self._ctx.c_tr64_is_int(self._ctx, value)
+
+    def tr64_is_ref(self, value):
+        # type: (MuTagRef64Value) -> MuBool
+        return self._ctx.c_tr64_is_ref(self._ctx, value)
+
+    def tr64_to_fp(self, value):
+        # type: (MuTagRef64Value) -> MuDoubleValue
+        return self._ctx.c_tr64_to_fp(self._ctx, value)
+
+    def tr64_to_int(self, value):
+        # type: (MuTagRef64Value) -> MuIntValue
+        return self._ctx.c_tr64_to_int(self._ctx, value)
+
+    def tr64_to_ref(self, value):
+        # type: (MuTagRef64Value) -> MuRefValue
+        return self._ctx.c_tr64_to_ref(self._ctx, value)
+
+    def tr64_to_tag(self, value):
+        # type: (MuTagRef64Value) -> MuIntValue
+        return self._ctx.c_tr64_to_tag(self._ctx, value)
+
+    def tr64_from_fp(self, value):
+        # type: (MuDoubleValue) -> MuTagRef64Value
+        return self._ctx.c_tr64_from_fp(self._ctx, value)
+
+    def tr64_from_int(self, value):
+        # type: (MuIntValue) -> MuTagRef64Value
+        return self._ctx.c_tr64_from_int(self._ctx, value)
+
+    def tr64_from_ref(self, ref, tag):
+        # type: (MuRefValue, MuIntValue) -> MuTagRef64Value
+        return self._ctx.c_tr64_from_ref(self._ctx, ref, tag)
+
+    def enable_watchpoint(self, wpid):
+        # type: (MuWPID) -> None
+        return self._ctx.c_enable_watchpoint(self._ctx, wpid)
+
+    def disable_watchpoint(self, wpid):
+        # type: (MuWPID) -> None
+        return self._ctx.c_disable_watchpoint(self._ctx, wpid)
+
+    def pin(self, loc):
+        # type: (MuValue) -> MuUPtrValue
+        return self._ctx.c_pin(self._ctx, loc)
+
+    def unpin(self, loc):
+        # type: (MuValue) -> None
+        return self._ctx.c_unpin(self._ctx, loc)
+
+    def expose(self, func, call_conv, cookie):
+        # type: (MuFuncRefValue, MuCallConv, MuIntValue) -> MuValue
+        return self._ctx.c_expose(self._ctx, func, call_conv, cookie)
+
+    def unexpose(self, call_conv, value):
+        # type: (MuCallConv, MuValue) -> None
+        return self._ctx.c_unexpose(self._ctx, call_conv, value)
+
+    def new_bundle(self):
+        # type: () -> MuBundleNode
+        return self._ctx.c_new_bundle(self._ctx, )
+
+    def load_bundle_from_node(self, b):
+        # type: (MuBundleNode) -> None
+        return self._ctx.c_load_bundle_from_node(self._ctx, b)
+
+    def abort_bundle_node(self, b):
+        # type: (MuBundleNode) -> None
+        return self._ctx.c_abort_bundle_node(self._ctx, b)
+
+    def get_node(self, b, id):
+        # type: (MuBundleNode, MuID) -> MuChildNode
+        return self._ctx.c_get_node(self._ctx, b, id)
+
+    def get_id(self, b, node):
+        # type: (MuBundleNode, MuChildNode) -> MuID
+        return self._ctx.c_get_id(self._ctx, b, node)
+
+    def set_name(self, b, node, name):
+        # type: (MuBundleNode, MuChildNode, str) -> None
+        return self._ctx.c_set_name(self._ctx, b, node, name)
+
+    def new_type_int(self, b, len):
+        # type: (MuBundleNode, int) -> MuTypeNode
+        return self._ctx.c_new_type_int(self._ctx, b, len)
+
+    def new_type_float(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_float(self._ctx, b)
+
+    def new_type_double(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_double(self._ctx, b)
+
+    def new_type_uptr(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_uptr(self._ctx, b)
+
+    def set_type_uptr(self, uptr, ty):
+        # type: (MuTypeNode, MuTypeNode) -> None
+        return self._ctx.c_set_type_uptr(self._ctx, uptr, ty)
+
+    def new_type_ufuncptr(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_ufuncptr(self._ctx, b)
+
+    def set_type_ufuncptr(self, ufuncptr, sig):
+        # type: (MuTypeNode, MuFuncSigNode) -> None
+        return self._ctx.c_set_type_ufuncptr(self._ctx, ufuncptr, sig)
+
+    def new_type_struct(self, b, fieldtys):
+        # type: (MuBundleNode, [MuTypeNode]) -> MuTypeNode
+        return self._ctx.c_new_type_struct(self._ctx, b, fieldtys)
+
+    def new_type_hybrid(self, b, fixedtys, varty):
+        # type: (MuBundleNode, [MuTypeNode], MuTypeNode) -> MuTypeNode
+        return self._ctx.c_new_type_hybrid(self._ctx, b, fixedtys, varty)
+
+    def new_type_array(self, b, elemty, len):
+        # type: (MuBundleNode, MuTypeNode, int) -> MuTypeNode
+        return self._ctx.c_new_type_array(self._ctx, b, elemty, len)
+
+    def new_type_vector(self, b, elemty, len):
+        # type: (MuBundleNode, MuTypeNode, int) -> MuTypeNode
+        return self._ctx.c_new_type_vector(self._ctx, b, elemty, len)
+
+    def new_type_void(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_void(self._ctx, b)
+
+    def new_type_ref(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_ref(self._ctx, b)
+
+    def set_type_ref(self, ref, ty):
+        # type: (MuTypeNode, MuTypeNode) -> None
+        return self._ctx.c_set_type_ref(self._ctx, ref, ty)
+
+    def new_type_iref(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_iref(self._ctx, b)
+
+    def set_type_iref(self, iref, ty):
+        # type: (MuTypeNode, MuTypeNode) -> None
+        return self._ctx.c_set_type_iref(self._ctx, iref, ty)
+
+    def new_type_weakref(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_weakref(self._ctx, b)
+
+    def set_type_weakref(self, weakref, ty):
+        # type: (MuTypeNode, MuTypeNode) -> None
+        return self._ctx.c_set_type_weakref(self._ctx, weakref, ty)
+
+    def new_type_funcref(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_funcref(self._ctx, b)
+
+    def set_type_funcref(self, funcref, sig):
+        # type: (MuTypeNode, MuFuncSigNode) -> None
+        return self._ctx.c_set_type_funcref(self._ctx, funcref, sig)
+
+    def new_type_tagref64(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_tagref64(self._ctx, b)
+
+    def new_type_threadref(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_threadref(self._ctx, b)
+
+    def new_type_stackref(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_stackref(self._ctx, b)
+
+    def new_type_framecursorref(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_framecursorref(self._ctx, b)
+
+    def new_type_irnoderef(self, b):
+        # type: (MuBundleNode) -> MuTypeNode
+        return self._ctx.c_new_type_irnoderef(self._ctx, b)
+
+    def new_funcsig(self, b, paramtys, rettys):
+        # type: (MuBundleNode, [MuTypeNode], [MuTypeNode]) -> MuFuncSigNode
+        return self._ctx.c_new_funcsig(self._ctx, b, paramtys, rettys)
+
+    def new_const_int(self, b, ty, value):
+        # type: (MuBundleNode, MuTypeNode, int) -> MuConstNode
+        return self._ctx.c_new_const_int(self._ctx, b, ty, value)
+
+    def new_const_int_ex(self, b, ty, values):
+        # type: (MuBundleNode, MuTypeNode, [int]) -> MuConstNode
+        return self._ctx.c_new_const_int_ex(self._ctx, b, ty, values)
+
+    def new_const_float(self, b, ty, value):
+        # type: (MuBundleNode, MuTypeNode, float) -> MuConstNode
+        return self._ctx.c_new_const_float(self._ctx, b, ty, value)
+
+    def new_const_double(self, b, ty, value):
+        # type: (MuBundleNode, MuTypeNode, float) -> MuConstNode
+        return self._ctx.c_new_const_double(self._ctx, b, ty, value)
+
+    def new_const_null(self, b, ty):
+        # type: (MuBundleNode, MuTypeNode) -> MuConstNode
+        return self._ctx.c_new_const_null(self._ctx, b, ty)
+
+    def new_const_seq(self, b, ty, elems):
+        # type: (MuBundleNode, MuTypeNode, [MuConstNode]) -> MuConstNode
+        return self._ctx.c_new_const_seq(self._ctx, b, ty, elems)
+
+    def new_global_cell(self, b, ty):
+        # type: (MuBundleNode, MuTypeNode) -> MuGlobalNode
+        return self._ctx.c_new_global_cell(self._ctx, b, ty)
+
+    def new_func(self, b, sig):
+        # type: (MuBundleNode, MuFuncSigNode) -> MuFuncNode
+        return self._ctx.c_new_func(self._ctx, b, sig)
+
+    def new_func_ver(self, b, func):
+        # type: (MuBundleNode, MuFuncNode) -> MuFuncVerNode
+        return self._ctx.c_new_func_ver(self._ctx, b, func)
+
+    def new_exp_func(self, b, func, callconv, cookie):
+        # type: (MuBundleNode, MuFuncNode, MuCallConv, MuConstNode) -> MuExpFuncNode
+        return self._ctx.c_new_exp_func(self._ctx, b, func, callconv, cookie)
+
+    def new_bb(self, fv):
+        # type: (MuFuncVerNode) -> MuBBNode
+        return self._ctx.c_new_bb(self._ctx, fv)
+
+    def new_nor_param(self, bb, ty):
+        # type: (MuBBNode, MuTypeNode) -> MuNorParamNode
+        return self._ctx.c_new_nor_param(self._ctx, bb, ty)
+
+    def new_exc_param(self, bb):
+        # type: (MuBBNode) -> MuExcParamNode
+        return self._ctx.c_new_exc_param(self._ctx, bb)
+
+    def new_inst_res(self, inst):
+        # type: (MuInstNode) -> MuInstResNode
+        return self._ctx.c_new_inst_res(self._ctx, inst)
+
+    def add_dest(self, inst, kind, dest, vars):
+        # type: (MuInstNode, MuDestKind, MuBBNode, [MuVarNode]) -> None
+        return self._ctx.c_add_dest(self._ctx, inst, kind, dest, vars)
+
+    def add_keepalives(self, inst, vars):
+        # type: (MuInstNode, [MuLocalVarNode]) -> None
+        return self._ctx.c_add_keepalives(self._ctx, inst, vars)
+
+    def new_binop(self, bb, optr, ty, opnd1, opnd2):
+        # type: (MuBBNode, MuBinOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_binop(self._ctx, bb, optr, ty, opnd1, opnd2)
+
+    def new_cmp(self, bb, optr, ty, opnd1, opnd2):
+        # type: (MuBBNode, MuCmpOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_cmp(self._ctx, bb, optr, ty, opnd1, opnd2)
+
+    def new_conv(self, bb, optr, from_ty, to_ty, opnd):
+        # type: (MuBBNode, MuConvOptr, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_conv(self._ctx, bb, optr, from_ty, to_ty, opnd)
+
+    def new_select(self, bb, cond_ty, opnd_ty, cond, if_true, if_false):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_select(self._ctx, bb, cond_ty, opnd_ty, cond, if_true, if_false)
+
+    def new_branch(self, bb):
+        # type: (MuBBNode) -> MuInstNode
+        return self._ctx.c_new_branch(self._ctx, bb)
+
+    def new_branch2(self, bb, cond):
+        # type: (MuBBNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_branch2(self._ctx, bb, cond)
+
+    def new_switch(self, bb, opnd_ty, opnd):
+        # type: (MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_switch(self._ctx, bb, opnd_ty, opnd)
+
+    def add_switch_dest(self, sw, key, dest, vars):
+        # type: (MuInstNode, MuConstNode, MuBBNode, [MuVarNode]) -> None
+        return self._ctx.c_add_switch_dest(self._ctx, sw, key, dest, vars)
+
+    def new_call(self, bb, sig, callee, args):
+        # type: (MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
+        return self._ctx.c_new_call(self._ctx, bb, sig, callee, args)
+
+    def new_tailcall(self, bb, sig, callee, args):
+        # type: (MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
+        return self._ctx.c_new_tailcall(self._ctx, bb, sig, callee, args)
+
+    def new_ret(self, bb, rvs):
+        # type: (MuBBNode, [MuVarNode]) -> MuInstNode
+        return self._ctx.c_new_ret(self._ctx, bb, rvs)
+
+    def new_throw(self, bb, exc):
+        # type: (MuBBNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_throw(self._ctx, bb, exc)
+
+    def new_extractvalue(self, bb, strty, index, opnd):
+        # type: (MuBBNode, MuTypeNode, int, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_extractvalue(self._ctx, bb, strty, index, opnd)
+
+    def new_insertvalue(self, bb, strty, index, opnd, newval):
+        # type: (MuBBNode, MuTypeNode, int, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_insertvalue(self._ctx, bb, strty, index, opnd, newval)
+
+    def new_extractelement(self, bb, seqty, indty, opnd, index):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_extractelement(self._ctx, bb, seqty, indty, opnd, index)
+
+    def new_insertelement(self, bb, seqty, indty, opnd, index, newval):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_insertelement(self._ctx, bb, seqty, indty, opnd, index, newval)
+
+    def new_shufflevector(self, bb, vecty, maskty, vec1, vec2, mask):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_shufflevector(self._ctx, bb, vecty, maskty, vec1, vec2, mask)
+
+    def new_new(self, bb, allocty):
+        # type: (MuBBNode, MuTypeNode) -> MuInstNode
+        return self._ctx.c_new_new(self._ctx, bb, allocty)
+
+    def new_newhybrid(self, bb, allocty, lenty, length):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_newhybrid(self._ctx, bb, allocty, lenty, length)
+
+    def new_alloca(self, bb, allocty):
+        # type: (MuBBNode, MuTypeNode) -> MuInstNode
+        return self._ctx.c_new_alloca(self._ctx, bb, allocty)
+
+    def new_allocahybrid(self, bb, allocty, lenty, length):
+        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_allocahybrid(self._ctx, bb, allocty, lenty, length)
+
+    def new_getiref(self, bb, refty, opnd):
+        # type: (MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_getiref(self._ctx, bb, refty, opnd)
+
+    def new_getfieldiref(self, bb, is_ptr, refty, index, opnd):
+        # type: (MuBBNode, MuBool, MuTypeNode, int, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_getfieldiref(self._ctx, bb, is_ptr, refty, index, opnd)
+
+    def new_getelemiref(self, bb, is_ptr, refty, indty, opnd, index):
+        # type: (MuBBNode, MuBool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_getelemiref(self._ctx, bb, is_ptr, refty, indty, opnd, index)
+
+    def new_shiftiref(self, bb, is_ptr, refty, offty, opnd, offset):
+        # type: (MuBBNode, MuBool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_shiftiref(self._ctx, bb, is_ptr, refty, offty, opnd, offset)
+
+    def new_getvarpartiref(self, bb, is_ptr, refty, opnd):
+        # type: (MuBBNode, MuBool, MuTypeNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_getvarpartiref(self._ctx, bb, is_ptr, refty, opnd)
+
+    def new_load(self, bb, is_ptr, ord, refty, loc):
+        # type: (MuBBNode, MuBool, MuMemOrd, MuTypeNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_load(self._ctx, bb, is_ptr, ord, refty, loc)
+
+    def new_store(self, bb, is_ptr, ord, refty, loc, newval):
+        # type: (MuBBNode, MuBool, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_store(self._ctx, bb, is_ptr, ord, refty, loc, newval)
+
+    def new_cmpxchg(self, bb, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired):
+        # type: (MuBBNode, MuBool, MuBool, MuMemOrd, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_cmpxchg(self._ctx, bb, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired)
+
+    def new_atomicrmw(self, bb, is_ptr, ord, optr, refTy, loc, opnd):
+        # type: (MuBBNode, MuBool, MuMemOrd, MuAtomicRMWOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_atomicrmw(self._ctx, bb, is_ptr, ord, optr, refTy, loc, opnd)
+
+    def new_fence(self, bb, ord):
+        # type: (MuBBNode, MuMemOrd) -> MuInstNode
+        return self._ctx.c_new_fence(self._ctx, bb, ord)
+
+    def new_trap(self, bb, rettys):
+        # type: (MuBBNode, [MuTypeNode]) -> MuInstNode
+        return self._ctx.c_new_trap(self._ctx, bb, rettys)
+
+    def new_watchpoint(self, bb, wpid, rettys):
+        # type: (MuBBNode, MuWPID, [MuTypeNode]) -> MuInstNode
+        return self._ctx.c_new_watchpoint(self._ctx, bb, wpid, rettys)
+
+    def new_wpbranch(self, bb, wpid):
+        # type: (MuBBNode, MuWPID) -> MuInstNode
+        return self._ctx.c_new_wpbranch(self._ctx, bb, wpid)
+
+    def new_ccall(self, bb, callconv, callee_ty, sig, callee, args):
+        # type: (MuBBNode, MuCallConv, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
+        return self._ctx.c_new_ccall(self._ctx, bb, callconv, callee_ty, sig, callee, args)
+
+    def new_newthread(self, bb, stack, threadlocal):
+        # type: (MuBBNode, MuVarNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_newthread(self._ctx, bb, stack, threadlocal)
+
+    def new_swapstack_ret(self, bb, swappee, ret_tys):
+        # type: (MuBBNode, MuVarNode, [MuTypeNode]) -> MuInstNode
+        return self._ctx.c_new_swapstack_ret(self._ctx, bb, swappee, ret_tys)
+
+    def new_swapstack_kill(self, bb, swappee):
+        # type: (MuBBNode, MuVarNode) -> MuInstNode
+        return self._ctx.c_new_swapstack_kill(self._ctx, bb, swappee)
+
+    def set_newstack_pass_values(self, inst, tys, vars):
+        # type: (MuInstNode, [MuTypeNode], [MuVarNode]) -> None
+        return self._ctx.c_set_newstack_pass_values(self._ctx, inst, tys, vars)
+
+    def set_newstack_throw_exc(self, inst, exc):
+        # type: (MuInstNode, MuVarNode) -> None
+        return self._ctx.c_set_newstack_throw_exc(self._ctx, inst, exc)
+
+    def new_comminst(self, bb, opcode, flags, tys, sigs, args):
+        # type: (MuBBNode, MuCommInst, [MuFlag], [MuTypeNode], [MuFuncSigNode], [MuVarNode]) -> MuInstNode
+        return self._ctx.c_new_comminst(self._ctx, bb, opcode, flags, tys, sigs, args)
+
