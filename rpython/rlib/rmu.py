@@ -62,6 +62,13 @@ class MuContext:
     def __init__(self, rffi_ctx_ptr):
         self._ctx = rffi_ctx_ptr
 
+    # scope support
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close_context()
+
     def id_of(self, name):
         # type: (str) -> MuID
         with rffi.scoped_str2charp(name) as buf:
@@ -74,17 +81,17 @@ class MuContext:
 
     def close_context(self):
         # type: () -> None
-        return self._ctx.c_close_context(self._ctx)
+        self._ctx.c_close_context(self._ctx)
 
     def load_bundle(self, bdl):
         # type: (str) -> None
         with rffi.scoped_str2charp(bdl) as buf:
-            return self._ctx.c_load_bundle(self._ctx, buf, rffi.cast(MuArraySize, len(bdl)))
+            self._ctx.c_load_bundle(self._ctx, buf, rffi.cast(MuArraySize, len(bdl)))
 
     def load_hail(self, hail):
         # type: (str) -> None
         with rffi.scoped_str2charp(hail) as buf:
-            return self._ctx.c_load_hail(self._ctx, buf, rffi.cast(MuArraySize, len(hail)))
+            self._ctx.c_load_hail(self._ctx, buf, rffi.cast(MuArraySize, len(hail)))
 
     def handle_from_sint8(self, num, length):
         # type: (int, int) -> MuIntValue
