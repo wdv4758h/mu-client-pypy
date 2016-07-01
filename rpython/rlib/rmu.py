@@ -77,12 +77,12 @@ class MuContext:
     def load_bundle(self, bdl):
         # type: (str) -> None
         with rffi.scoped_str2charp(bdl) as buf:
-            return self._ctx.c_load_bundle(self._ctx, buf)
+            return self._ctx.c_load_bundle(self._ctx, buf, rffi.cast(MuArraySize, len(bdl)))
 
     def load_hail(self, hail):
         # type: (str) -> None
         with rffi.scoped_str2charp(hail) as buf:
-            return self._ctx.c_load_hail(self._ctx, buf)
+            return self._ctx.c_load_hail(self._ctx, buf, rffi.cast(MuArraySize, len(hail)))
 
     def handle_from_sint8(self, num, length):
         # type: (int, int) -> MuIntValue
@@ -567,7 +567,7 @@ class MuContext:
 
     def new_const_int(self, b, ty, value):
         # type: (MuBundleNode, MuTypeNode, int) -> MuConstNode
-        return self._ctx.c_new_const_int(self._ctx, b, ty, value)
+        return self._ctx.c_new_const_int(self._ctx, b, ty, rffi.cast(rffi.ULONG, value))
 
     def new_const_int_ex(self, b, ty, values):
         # type: (MuBundleNode, MuTypeNode, [int]) -> MuConstNode
@@ -819,10 +819,10 @@ class MuContext:
 # --------------------------------
 # Flags
 class _MuFlagWrapper:
-    _lltype = MuFlag
+    _lltype = rffi.UINT     # MuFlag type
     def __init__(self, **value_dic):
         for key, val in value_dic.items():
-            setattr(self, key, rffi.cast(MuFlag, val))
+            setattr(self, key, rffi.cast(_MuFlagWrapper._lltype, val))
 
 
 MuTrapHandlerResult = _MuFlagWrapper(
@@ -1407,10 +1407,10 @@ class scoped_lst2arr:
     def __enter__(self):
         buf = lltype.malloc(rffi.CArray(self.ELM_T), len(self.lst), flavor='raw')
         if self.need_cast:
-            for e, i in enumerate(self.lst):
+            for i, e in enumerate(self.lst):
                 buf[i] = rffi.cast(self.ELM_T, e)
         else:
-            for e, i in enumerate(self.lst):
+            for i, e in enumerate(self.lst):
                 buf[i] = e
         sz = rffi.cast(MuArraySize, len(self.lst))
         self.buf = buf
