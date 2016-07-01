@@ -612,12 +612,12 @@ class Mu:
         return rffi.charp2str(c_charp)
 
     def set_trap_handler(self, trap_handler, userdata):
-        # type (MuTrapHandler, MuCPtr) -> void
-        return self._mu.c_set_trap_handler(self._mu, trap_handler, userdata)
+        # type (MuTrapHandler, MuCPtr) -> None
+        self._mu.c_set_trap_handler(self._mu, trap_handler, userdata)
 
     def execute(self):
         # type () -> None
-        return self._mu.c_execute(self._mu)
+        self._mu.c_execute(self._mu)
 
     def get_mu_error_ptr(self):
         # type () -> rffi.INTP
@@ -652,98 +652,122 @@ class MuContext:
         with rffi.scoped_str2charp(hail) as buf:
             return self._ctx.c_load_hail(self._ctx, buf)
 
-    # TODO: rest
-    def handle_from_sint8(self, num, len):
+    def handle_from_sint8(self, num, length):
         # type: (int, int) -> MuIntValue
-        return self._ctx.c_handle_from_sint8(self._ctx, num, len)
+        num = rffi.cast(rffi.CHAR, num)
+        length = rffi.cast(rffi.INT, length)
+        return self._ctx.c_handle_from_sint8(self._ctx, num, length)
 
-    def handle_from_uint8(self, num, len):
+    def handle_from_uint8(self, num, length):
         # type: (int, int) -> MuIntValue
-        return self._ctx.c_handle_from_uint8(self._ctx, num, len)
+        num = rffi.cast(rffi.UCHAR, num)
+        length = rffi.cast(rffi.INT, length)
+        return self._ctx.c_handle_from_uint8(self._ctx, num, length)
 
-    def handle_from_sint16(self, num, len):
+    def handle_from_sint16(self, num, length):
         # type: (int, int) -> MuIntValue
-        return self._ctx.c_handle_from_sint16(self._ctx, num, len)
+        num = rffi.cast(rffi.SHORT, num)
+        length = rffi.cast(rffi.INT, length)
+        return self._ctx.c_handle_from_sint16(self._ctx, num, length)
 
-    def handle_from_uint16(self, num, len):
+    def handle_from_uint16(self, num, length):
         # type: (int, int) -> MuIntValue
-        return self._ctx.c_handle_from_uint16(self._ctx, num, len)
+        num = rffi.cast(rffi.USHORT, num)
+        length = rffi.cast(rffi.INT, length)
+        return self._ctx.c_handle_from_uint16(self._ctx, num, length)
 
-    def handle_from_sint32(self, num, len):
+    def handle_from_sint32(self, num, length):
         # type: (int, int) -> MuIntValue
-        return self._ctx.c_handle_from_sint32(self._ctx, num, len)
+        num = rffi.cast(rffi.INT, num)
+        length = rffi.cast(rffi.INT, length)
+        return self._ctx.c_handle_from_sint32(self._ctx, num, length)
 
-    def handle_from_uint32(self, num, len):
+    def handle_from_uint32(self, num, length):
         # type: (int, int) -> MuIntValue
-        return self._ctx.c_handle_from_uint32(self._ctx, num, len)
+        num = rffi.cast(rffi.UINT, num)
+        length = rffi.cast(rffi.INT, length)
+        return self._ctx.c_handle_from_uint32(self._ctx, num, length)
 
-    def handle_from_sint64(self, num, len):
+    def handle_from_sint64(self, num, length):
         # type: (int, int) -> MuIntValue
-        return self._ctx.c_handle_from_sint64(self._ctx, num, len)
+        num = rffi.cast(rffi.LONG, num)
+        length = rffi.cast(rffi.INT, length)
+        return self._ctx.c_handle_from_sint64(self._ctx, num, length)
 
-    def handle_from_uint64(self, num, len):
+    def handle_from_uint64(self, num, length):
         # type: (int, int) -> MuIntValue
-        return self._ctx.c_handle_from_uint64(self._ctx, num, len)
+        num = rffi.cast(rffi.ULONG, num)
+        length = rffi.cast(rffi.INT, length)
+        return self._ctx.c_handle_from_uint64(self._ctx, num, length)
 
-    def handle_from_uint64s(self, nums, len):
+    def handle_from_uint64s(self, nums, length):
         # type: ([int], int) -> MuIntValue
-        return self._ctx.c_handle_from_uint64s(self._ctx, nums, len)
+        with lltype.scoped_alloc(rffi.CArray(rffi.ULONG), len(nums)) as arr:
+            for n, i in enumerate(nums):
+                arr[i] = rffi.cast(rffi.ULONG, n)
+            sz = rffi.cast(rffi.INT, len(nums))
+            length = rffi.cast(rffi.INT, length)
+            return self._ctx.c_handle_from_uint64s(self._ctx, arr, sz, length)
 
     def handle_from_float(self, num):
         # type: (float) -> MuFloatValue
+        num = rffi.cast(rffi.FLOAT, num)
         return self._ctx.c_handle_from_float(self._ctx, num)
 
     def handle_from_double(self, num):
         # type: (float) -> MuDoubleValue
+        num = rffi.cast(rffi.DOUBLE, num)
         return self._ctx.c_handle_from_double(self._ctx, num)
 
     def handle_from_ptr(self, mu_type, ptr):
         # type: (MuID, MuCPtr) -> MuUPtrValue
+        ptr = rffi.cast(MuCPtr, ptr)
         return self._ctx.c_handle_from_ptr(self._ctx, mu_type, ptr)
 
     def handle_from_fp(self, mu_type, fp):
         # type: (MuID, MuCFP) -> MuUFPValue
+        fp = rffi.cast(MuCFP, fp)
         return self._ctx.c_handle_from_fp(self._ctx, mu_type, fp)
 
     def handle_to_sint8(self, opnd):
         # type: (MuIntValue) -> int
-        return self._ctx.c_handle_to_sint8(self._ctx, opnd)
+        return int(self._ctx.c_handle_to_sint8(self._ctx, opnd))
 
     def handle_to_uint8(self, opnd):
         # type: (MuIntValue) -> int
-        return self._ctx.c_handle_to_uint8(self._ctx, opnd)
+        return int(self._ctx.c_handle_to_uint8(self._ctx, opnd))
 
     def handle_to_sint16(self, opnd):
         # type: (MuIntValue) -> int
-        return self._ctx.c_handle_to_sint16(self._ctx, opnd)
+        return int(self._ctx.c_handle_to_sint16(self._ctx, opnd))
 
     def handle_to_uint16(self, opnd):
         # type: (MuIntValue) -> int
-        return self._ctx.c_handle_to_uint16(self._ctx, opnd)
+        return int(self._ctx.c_handle_to_uint16(self._ctx, opnd))
 
     def handle_to_sint32(self, opnd):
         # type: (MuIntValue) -> int
-        return self._ctx.c_handle_to_sint32(self._ctx, opnd)
+        return int(self._ctx.c_handle_to_sint32(self._ctx, opnd))
 
     def handle_to_uint32(self, opnd):
         # type: (MuIntValue) -> int
-        return self._ctx.c_handle_to_uint32(self._ctx, opnd)
+        return int(self._ctx.c_handle_to_uint32(self._ctx, opnd))
 
     def handle_to_sint64(self, opnd):
         # type: (MuIntValue) -> int
-        return self._ctx.c_handle_to_sint64(self._ctx, opnd)
+        return int(self._ctx.c_handle_to_sint64(self._ctx, opnd))
 
     def handle_to_uint64(self, opnd):
         # type: (MuIntValue) -> int
-        return self._ctx.c_handle_to_uint64(self._ctx, opnd)
+        return int(self._ctx.c_handle_to_uint64(self._ctx, opnd))
 
     def handle_to_float(self, opnd):
         # type: (MuFloatValue) -> float
-        return self._ctx.c_handle_to_float(self._ctx, opnd)
+        return float(self._ctx.c_handle_to_float(self._ctx, opnd))
 
     def handle_to_double(self, opnd):
         # type: (MuDoubleValue) -> float
-        return self._ctx.c_handle_to_double(self._ctx, opnd)
+        return float(self._ctx.c_handle_to_double(self._ctx, opnd))
 
     def handle_to_ptr(self, opnd):
         # type: (MuUPtrValue) -> MuCPtr
@@ -753,6 +777,7 @@ class MuContext:
         # type: (MuUFPValue) -> MuCFP
         return self._ctx.c_handle_to_fp(self._ctx, opnd)
 
+    # TODO: rest
     def handle_from_const(self, id):
         # type: (MuID) -> MuValue
         return self._ctx.c_handle_from_const(self._ctx, id)
