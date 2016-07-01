@@ -155,57 +155,40 @@ hello_world_hail = """
 .init @newline.g = $nl
 """
 
-def load(ctx, bdl):
-    size = rffi.cast(MuArraySize, len(bdl))
-    with rffi.scoped_str2charp(bdl) as buf:
-        ctx.c_load_bundle(ctx, buf, size)
 
 def main(argv):
-    mu = mu_new()
-    ctx = mu.c_new_context(mu)
-    ctx_ptr = ctx
+    with Mu() as mu:
+        ctx = mu.new_context()
 
-    load(ctx, prelude)
-    load(ctx, hello_world_uir)
+        ctx.load_bundle(prelude)
+        ctx.load_bundle(hello_world_uir)
+        ctx.load_hail(hello_world_hail)
 
-    size = rffi.cast(MuArraySize, len(hello_world_hail))
-    with rffi.scoped_str2charp(hello_world_hail) as buf:
-        ctx.c_load_hail(ctx, buf, size)
+        write_g_id = ctx.id_of("@write.g")
+        write_g_hdle = ctx.handle_from_global(write_g_id)
+        write_fp_id = ctx.id_of("@write.fp")
 
-    with rffi.scoped_str2charp("@write.g\0") as buf:
-        write_g_id = ctx.c_id_of(ctx_ptr, buf)
+        ll_fncptr = rposix.c_write._ptr
+        if we_are_translated():
+            addr = ll_fncptr
+        else:
+            import ctypes
+            from rpython.rtyper.lltypesystem.ll2ctypes import get_ctypes_callable, ctypes2lltype
+            from rpython.rtyper.lltypesystem import llmemory
+            c_fncptr = get_ctypes_callable(ll_fncptr, ll_fncptr._obj.calling_conv)
+            addr = ctypes2lltype(llmemory.Address, ctypes.cast(c_fncptr, ctypes.c_void_p).value)
 
-    write_g_hdle = ctx.c_handle_from_global(ctx, rffi.cast(MuID, write_g_id))
+        write_addr = rffi.cast(MuCFP, addr)
+        write_addr_hdle = ctx.handle_from_fp(write_fp_id, write_addr)
+        ctx.store(MuMemOrd.NOT_ATOMIC, write_g_hdle, write_addr_hdle)
 
-    with rffi.scoped_str2charp("@write.fp\0") as buf:
-        write_fp_id = ctx.c_id_of(ctx_ptr, buf)
+        _start_id = ctx.id_of("@_start")
+        _start_hdle = ctx.handle_from_func(_start_id)
+        stack_hdle = ctx.new_stack(_start_hdle)
+        thread_hdle = ctx.new_thread_nor(stack_hdle, rffi.cast(MuRefValue, 0), [])
 
-    ll_fncptr = rposix.c_write._ptr
-    if we_are_translated():
-        addr = ll_fncptr
-    else:
-        import ctypes
-        from rpython.rtyper.lltypesystem.ll2ctypes import get_ctypes_callable, ctypes2lltype
-        from rpython.rtyper.lltypesystem import llmemory
-        c_fncptr = get_ctypes_callable(ll_fncptr, ll_fncptr._obj.calling_conv)
-        addr = ctypes2lltype(llmemory.Address, ctypes.cast(c_fncptr, ctypes.c_void_p).value)
+        mu.execute()
 
-    write_addr = rffi.cast(MuCFP, addr)
-    write_addr_hdle = ctx.c_handle_from_fp(ctx_ptr, write_fp_id, write_addr)
-    ctx.c_store(ctx_ptr, MuMemOrd.NOT_ATOMIC, write_g_hdle, write_addr_hdle)
-
-    with rffi.scoped_str2charp("@_start\0") as buf:
-        _start_id = ctx.c_id_of(ctx_ptr, buf)
-    _start_hdle = ctx.c_handle_from_func(ctx_ptr, _start_id)
-    stack_hdle = ctx.c_new_stack(ctx_ptr, _start_hdle)
-    thread_hdle = ctx.c_new_thread_nor(ctx_ptr, stack_hdle,
-                                       rffi.cast(MuValue, 0),
-                                       rffi.cast(MuValuePtr, 0),
-                                       rffi.cast(MuArraySize, 0))
-
-    mu.c_execute(mu)
-
-    mu_close(mu)
     return 0
 
 
