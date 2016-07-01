@@ -1,8 +1,13 @@
 """
 Build a simple factorial bundle using MuAPI and run it.
+
+Run with:
+    PYTHONPATH=$PYPY_MU:$PYTHONPATH LIBRARY_PATH=$MU/cbinding:$LIBRARY_PATH python target_rmu_bundlebuilding.py
+OR:
+    rpython target_rmu_bundlebuilding.py
+    LD_LIBRARY_PATH=$MU/cbinding:$LD_LIBRARY_PATH ./target_rmu_bundlebuilding-c
 """
 from rpython.rlib.rmu import *
-from rpython.rtyper.lltypesystem import rffi
 
 fac_bundle = """
 .typedef @i64 = int<64>

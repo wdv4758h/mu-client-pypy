@@ -1,5 +1,7 @@
 """
 Mu API RPython binding.
+
+Note: environment variable $MU needs to be defined to point to the reference implementation!
 """
 from rpython.rtyper.lltypesystem import rffi
 from rpython.rtyper.lltypesystem import lltype
@@ -1154,8 +1156,7 @@ MuFuncVerNodePtr = rffi.CArrayPtr(MuFuncVerNode)
 MuBBNodePtr = rffi.CArrayPtr(MuBBNode)
 MuInstNodePtr = rffi.CArrayPtr(MuInstNode)
 
-MuTrapHandlerResult = MuFlag
-MuTrapHandlerResultPtr = rffi.CArrayPtr(MuTrapHandlerResult)
+MuTrapHandlerResultPtr = rffi.CArrayPtr(MuFlag)
 MuStackRefValuePtr = rffi.CArrayPtr(MuStackRefValue)
 MuValuesFreerPtr = rffi.CArrayPtr(MuValuesFreer)
 MuRefValuePtr = rffi.CArrayPtr(MuRefValue)

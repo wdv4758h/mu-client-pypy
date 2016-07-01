@@ -1,13 +1,15 @@
 """
+Hello world program
+Touches on how to load a C function address.
+
 Run with:
-    PYTHONPATH=$PYPY_MU LIBRARY_PATH=$MU/cbinding:$LIBRARY_PATH python target_test_mu.py
+    PYTHONPATH=$PYPY_MU:$PYTHONPATH LIBRARY_PATH=$MU/cbinding:$LIBRARY_PATH python target_rmu_funcaddr.py
 OR:
-    rpython target_test_mu.py
-    LD_LIBRARY_PATH=$MU/cbinding:$LD_LIBRARY_PATH ./target_test_mu-c
+    rpython target_rmu_funcaddr.py
+    LD_LIBRARY_PATH=$MU/cbinding:$LD_LIBRARY_PATH ./target_rmu_funcaddr-c
 """
 from rpython.rlib.rmu import *
 from rpython.rlib import rposix
-from rpython.rlib import rdynload
 from rpython.rlib.objectmodel import we_are_translated
 
 prelude = """
