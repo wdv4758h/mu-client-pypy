@@ -19,6 +19,13 @@ class Mu:
     def __init__(self):
         self._mu = mu_new()
 
+    # scope support
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
     def new_context(self):
         # type: () -> MuContext
         return MuContext(self._mu.c_new_context(self._mu))
@@ -44,6 +51,9 @@ class Mu:
     def get_mu_error_ptr(self):
         # type () -> rffi.INTP
         return self._mu.c_get_mu_error_ptr(self._mu)
+
+    def close(self):
+        return mu_close(self._mu)
 
 
 class MuContext:
