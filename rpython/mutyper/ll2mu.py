@@ -727,9 +727,9 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
     elif SRC_MUTYPE.__class__ == RES_MUTYPE.__class__:
         return [], x
     elif SRC_MUTYPE is mutype.double_t and isinstance(RES_MUTYPE, mutype.MuInt):
-        return [muops.FPTOSI(x, RES_MUTYPE)]
+        return [muops.FPTOSI(x, RES_MUTYPE, result=res)]
     elif isinstance(SRC_MUTYPE, mutype.MuInt) and RES_MUTYPE is mutype.double_t:
-        return [muops.SITOFP(x, RES_MUTYPE)]
+        return [muops.SITOFP(x, RES_MUTYPE, result=res)]
 
     raise NotImplementedError("force_cast(%s) -> %s" % (SRC_LLTYPE, RES_LLTYPE))
 
