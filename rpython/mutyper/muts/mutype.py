@@ -3,7 +3,7 @@ Define Mu Type System in similar fashion of Low Level Type System.
 """
 import weakref
 from types import NoneType
-
+import math
 from rpython.rlib.objectmodel import Symbolic
 from rpython.rtyper.lltypesystem.lltype import LowLevelType, saferecursive, WeakValueDictionary, frozendict
 from .muentity import MuEntity, MuName
@@ -128,7 +128,12 @@ class _muprimitive(_muobject):
         self.val = val
 
     def __eq__(self, other):
-        return self._TYPE == other._TYPE and self.val == other.val
+        if self._TYPE != other._TYPE:
+            return False
+        if isinstance(self.val, float):
+            if math.isnan(self.val) or math.isinf(self.val):
+                return str(self.val) == str(other.val)
+        return self.val == other.val
 
     def __repr__(self):
         def _scistr(f):
@@ -156,7 +161,11 @@ class _muprimitive(_muobject):
         return repr_str
 
     def __hash__(self):
-        return hash((self._TYPE, self.val))
+        val = self.val
+        if isinstance(self.val, float):
+            if math.isnan(self.val) or math.isinf(self.val):
+                val = str(self.val)
+        return hash((self._TYPE, val))
 
 
 # ----------------------------------------------------------
