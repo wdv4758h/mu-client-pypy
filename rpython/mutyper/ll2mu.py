@@ -556,7 +556,8 @@ def _llop2mu_bool_not(x, res=None, llopname='bool_not'):
         v = ops.append(muops.ZEXT(x, mutype.bool_t))
     else:
         v = x
-    return [muops.XOR(v, _newprimconst(mutype.bool_t, 1), result=res)]
+    ops.append(muops.XOR(v, _newprimconst(mutype.bool_t, 1), result=res))
+    return ops
 
 
 def _llop2mu_int_is_true(x, res=None, llopname='int_is_true'):
@@ -1239,4 +1240,8 @@ def _llop2mu_gc_thread_before_fork(res=None, llopname='gc_thread_before_fork'):
     return [], _newprimconst(res.mu_type, 0)
 
 
+# ----------------
+# Other dummy operations
+def _llop2mu_debug_offset(res, llopname='debug_offset'):
+    return [], _newprimconst(res.mu_type, -1)
 # TODO: rest of the operations
