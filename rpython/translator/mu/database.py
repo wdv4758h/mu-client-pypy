@@ -94,7 +94,7 @@ class MuDatabase:
                     for attr in "exc nor".split(' '):
                         dst = getattr(op.exc, attr)
                         if dst:
-                            _trav_symbol(dst.args)
+                            map(_trav_symbol, dst.args)
             mdb.dot()
 
         self._recursive_addtype(self.mutyper.tlstt_t)
