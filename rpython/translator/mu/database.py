@@ -68,6 +68,8 @@ class MuDatabase:
                 else:
                     v.__init__(v.value)     # rehash
                     self.gblcnsts.add(v)
+            elif isinstance(v, mutype.MuType):
+                self._recursive_addtype(v)
 
         log.collect_gbldefs("traversing graphs...")
         for g in self.graphs:
