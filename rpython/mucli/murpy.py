@@ -140,8 +140,12 @@ def build_arglist(ctx, argv):
 
     return refstt
 
+loaded_extfncs = []     # Keep them in a global variable so that PyPy's GC will not finalize these libraries.
 
-def load_extfncs(ctx, exfns):
+def ensure_open_libs():
+    if len(loaded_extfncs) != 0:
+        return loaded_extfncs
+    
     libc = ctypes.CDLL(ctypes.util.find_library("c"))
     libm = ctypes.CDLL(ctypes.util.find_library("m"))
     libutil = ctypes.CDLL(ctypes.util.find_library("util"))
@@ -160,7 +164,15 @@ def load_extfncs(ctx, exfns):
                     "Please execute 'make' in the directory {}\n".format(path_librpyc, dir_librpyc))
         raise e
 
-    libs = (libc, libm, libutil, librt, librpyc)
+    loaded_extfncs[:] = [libc, libm, libutil, librt, librpyc]
+    
+    return loaded_extfncs
+    
+
+def load_extfncs(ctx, exfns):
+    
+    libs = ensure_open_libs()
+
     for c_name, fncptr_name, gcl_name, hdrs in exfns:
         with DelayedDisposer() as dd:
             adr = None
@@ -179,6 +191,8 @@ def load_extfncs(ctx, exfns):
             if adr is None:
                 os.write(2, "Failed to load function '%(c_name)s'.\n" % locals())
                 raise NotImplementedError
+            
+            # print("func: {}, addr: {} 0x{:x}".format(c_name, adr, adr))
 
             hadr = dd << ctx.handle_from_fp(ctx.id_of(fncptr_name), adr)
             hgcl = dd << ctx.handle_from_global(ctx.id_of(gcl_name))
