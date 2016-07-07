@@ -299,6 +299,7 @@ def _llval2mu_stt(llv, building=False):
     if llv._TYPE._arrayfld:
         return _llval2mu_varstt(llv)
 
+    topstt = llv._normalizedcontainer()
     if building:
         llt = lltype.typeOf(llv)
         mut = ll2mu_ty(llt)
@@ -309,14 +310,16 @@ def _llval2mu_stt(llv, building=False):
             for fld in filter(lambda n: n != GC_IDHASH_FLD, mut._names):
                 setattr(stt, fld, ll2mu_val(getattr(llv, fld), building=True))
 
+        if hasattr(stt, GC_IDHASH_FLD) and hasattr(topstt, '_hash_cache_'):
+            _idhash = topstt._hash_cache_
+            setattr(stt, GC_IDHASH_FLD, mutype.int64_t(_idhash))
+
         llprnt = llv._parentstructure()
         if llprnt:
             key = (lltype.typeOf(llprnt), llprnt)
             assert key in __ll2muval_cache
             stt._setparent(__ll2muval_cache[key], llv._parent_index)
     else:
-        topstt = llv._normalizedcontainer()
-
         if topstt not in __topstt_map:
             # build from top
             topstt_mu = _llval2mu_stt(topstt, building=True)
@@ -336,10 +339,6 @@ def _llval2mu_stt(llv, building=False):
         while depth > 0:
             depth -= 1
             stt = stt.super
-
-        if hasattr(stt, GC_IDHASH_FLD) and hasattr(topstt, '_hash_cache_'):
-            _idhash = topstt._hash_cache_
-            setattr(stt, GC_IDHASH_FLD, mutype.int64_t(_idhash))
 
     return stt
 

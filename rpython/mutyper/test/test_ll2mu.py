@@ -374,7 +374,22 @@ def test_parent_struct():
     assert ref_a._obj0._top_container() is ref_c._obj0
 
     mu_obj = ref_a._obj0.super
-    assert getattr(mu_obj, GC_IDHASH_FLD) != mu.int64_t(0)
+    assert getattr(mu_obj, GC_IDHASH_FLD) == mu.int64_t(ll.identityhash(ptr_a))
 
 def test_parent_circular():
-    pass
+    S_A = ll.GcStruct("AEmb", ("m", ll.Signed))
+    S_B = ll.GcStruct("BEmb", ("k", ll.Signed))
+    A = ll.GcStruct("A", ("super", S_A), ("p", ll.Ptr(S_B)))
+    B = ll.GcStruct("B", ("super", S_B), ("q", ll.Ptr(S_A)))
+
+    a = ll.malloc(A)
+    b = ll.malloc(B)
+    a.super.m = 10
+    b.super.k = 20
+    a.p = b.super._as_ptr()
+    b.q = a.super._as_ptr()
+
+    ref_emba = ll2mu_val(a.super)
+    ref_embb = ll2mu_val(b.super)
+
+    assert ref_emba._obj0._parent.p is ref_embb
