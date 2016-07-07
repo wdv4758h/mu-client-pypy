@@ -154,9 +154,6 @@ def ensure_open_libs():
     dir_librpyc = os.path.join(dir_rpython, 'translator', 'mu', 'rpyc')
     path_librpyc = os.path.join(dir_librpyc, 'librpyc.so')
 
-    _pypy_linux_prefix = "__pypy_mu_linux_"
-    _pypy_macro_prefix = "__pypy_macro_"
-
     try:
         librpyc = ctypes.CDLL(path_librpyc)
     except OSError as e:
@@ -170,9 +167,11 @@ def ensure_open_libs():
     
 
 def load_extfncs(ctx, exfns):
-    
-    libs = ensure_open_libs()
+    _pypy_linux_prefix = "__pypy_mu_linux_"
+    _pypy_macro_prefix = "__pypy_macro_"
 
+    libs = ensure_open_libs()
+    librpyc = libs[-1]
     for c_name, fncptr_name, gcl_name, hdrs in exfns:
         with DelayedDisposer() as dd:
             adr = None
