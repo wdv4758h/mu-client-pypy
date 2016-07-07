@@ -207,7 +207,7 @@ __ll2muval_cache = {}
 __ll2muval_cache_ptr = {}
 
 
-def ll2mu_val(llv):
+def ll2mu_val(llv, **kwargs):
     if isinstance(llv, mutype._muobject):
         return llv
     # if isinstance(llv, CDefinedIntSymbolic):
@@ -222,7 +222,7 @@ def ll2mu_val(llv):
     try:
         return cache[key]
     except KeyError:
-        muv = _ll2mu_val(llv)
+        muv = _ll2mu_val(llv, **kwargs)
         if key not in cache:    # may have already been added to cache (in stt to prevent recursion).
             cache[key] = muv
         return muv
@@ -235,7 +235,7 @@ def ll2mu_val(llv):
             raise e
 
 
-def _ll2mu_val(llv):
+def _ll2mu_val(llv, **kwargs):
     """
     Map LLTS value types to MuTS value types
     :param llv: LLTS value
@@ -253,7 +253,7 @@ def _ll2mu_val(llv):
         return _llval2mu_arrfix(llv)
 
     elif isinstance(llv, lltype._struct):
-        return _llval2mu_stt(llv)
+        return _llval2mu_stt(llv, **kwargs)
 
     elif isinstance(llv, lltype._array):
         return _llval2mu_arr(llv)
@@ -294,44 +294,53 @@ def _llval2mu_arrfix(llv):
 
     return arr
 
-
-def _llval2mu_stt(llv):
+__topstt_map = {}
+def _llval2mu_stt(llv, building=False):
     if llv._TYPE._arrayfld:
         return _llval2mu_varstt(llv)
 
-    mut = ll2mu_ty(llv._TYPE)
-    stt = mutype._mustruct(mut)
+    if building:
+        llt = lltype.typeOf(llv)
+        mut = ll2mu_ty(llt)
+        stt = mutype._mustruct(mut)
+        __ll2muval_cache[(llt, llv)] = stt
 
-    __ll2muval_cache[(llv._TYPE, llv)] = stt    # add to cache to prevent recursion.
+        if len(llv._TYPE._names) != 0:  # origional value struct is non-empty
+            for fld in filter(lambda n: n != GC_IDHASH_FLD, mut._names):
+                setattr(stt, fld, ll2mu_val(getattr(llv, fld), building=True))
 
-    if len(llv._TYPE._names) != 0:  # origional value struct is non-empty
-        for fld in filter(lambda n: n != GC_IDHASH_FLD, mut._names):
-            setattr(stt, fld, ll2mu_val(getattr(llv, fld)))
+        llprnt = llv._parentstructure()
+        if llprnt:
+            key = (lltype.typeOf(llprnt), llprnt)
+            assert key in __ll2muval_cache
+            stt._setparent(__ll2muval_cache[key], llv._parent_index)
+    else:
+        topstt = llv._normalizedcontainer()
 
-    # deal with the parent structs
-    llstt = llv
-    mustt = stt
-    mustt_idhash = mustt if hasattr(mustt, GC_IDHASH_FLD) else None
-    _idhash = 0
-    while not (llstt._normalizedcontainer() is llstt):
-        llprnt = llstt._parentstructure()
-        prnt_idx = llstt._parent_index
-        prnt_llt = llprnt._TYPE
-        prnt_mut = ll2mu_ty(prnt_llt)
-        muprnt = mutype._mustruct(prnt_mut)
-        for fld in tuple(n for n in prnt_mut._names if n != prnt_idx and n != GC_IDHASH_FLD):
-            setattr(muprnt, fld, ll2mu_val(getattr(llprnt, fld)))
-        setattr(muprnt, prnt_idx, mustt)
-        mustt._setparent(muprnt, prnt_idx)
+        if topstt not in __topstt_map:
+            # build from top
+            topstt_mu = _llval2mu_stt(topstt, building=True)
+            __topstt_map[topstt] = topstt_mu
+        else:
+            topstt_mu = __topstt_map[topstt]
 
-        if hasattr(llprnt, '_hash_cache_'):
-            _idhash = llprnt._hash_cache_
+        # work out the depth of parent structure
+        depth = 0
+        prnt = llv
+        while not prnt is topstt:
+            depth += 1
+            prnt = prnt._parentstructure()
 
-        llstt = llprnt
-        mustt = muprnt
+        # traverse down according to the depth
+        stt = topstt_mu
+        while depth > 0:
+            depth -= 1
+            stt = stt.super
 
-    if mustt_idhash and _idhash != 0:
-        setattr(mustt_idhash, GC_IDHASH_FLD, mutype.int64_t(_idhash))
+        if hasattr(stt, GC_IDHASH_FLD) and hasattr(topstt, '_hash_cache_'):
+            _idhash = topstt._hash_cache_
+            setattr(stt, GC_IDHASH_FLD, mutype.int64_t(_idhash))
+
     return stt
 
 
