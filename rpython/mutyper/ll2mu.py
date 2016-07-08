@@ -31,35 +31,28 @@ def ll2mu_ty(llt):
     try:
         return _type_cache[llt]
     except KeyError:
-        mut = _ll2mu_ty(llt)
+        if isinstance(llt, mutype.MuType):
+            mut = llt
+        elif llt is llmemory.Address:
+            mut = _lltype2mu_addr(llt)
+        elif isinstance(llt, lltype.Primitive):
+            mut = _lltype2mu_prim(llt)
+        elif isinstance(llt, lltype.FixedSizeArray):
+            mut = _lltype2mu_arrfix(llt)
+        elif isinstance(llt, lltype.Struct):
+            mut = _lltype2mu_stt(llt)
+        elif isinstance(llt, lltype.Array):
+            mut = _lltype2mu_arr(llt)
+        elif isinstance(llt, lltype.Ptr):
+            mut = _lltype2mu_ptr(llt)
+        elif isinstance(llt, lltype.OpaqueType):
+            mut = _lltype2mu_opq(llt)
+        elif llt is llmemory.WeakRef:
+            mut = _lltype2mu_wref(llt)
+        else:
+            raise NotImplementedError("Don't know how to specialise %s using MuTS." % llt)
         _type_cache[llt] = mut
         return mut
-
-
-def _ll2mu_ty(llt):
-    if isinstance(llt, mutype.MuType):
-        return llt
-    if llt is llmemory.Address:
-        return _lltype2mu_addr(llt)
-    elif isinstance(llt, lltype.Primitive):
-        return _lltype2mu_prim(llt)
-    elif isinstance(llt, lltype.FixedSizeArray):
-        return _lltype2mu_arrfix(llt)
-    elif isinstance(llt, lltype.Struct):
-        return _lltype2mu_stt(llt)
-    elif isinstance(llt, lltype.Array):
-        return _lltype2mu_arr(llt)
-    elif isinstance(llt, lltype.Ptr):
-        return _lltype2mu_ptr(llt)
-    elif isinstance(llt, lltype.OpaqueType):
-        return _lltype2mu_opq(llt)
-    elif llt is llmemory.WeakRef:
-        return _lltype2mu_wref(llt)
-
-    else:
-        raise NotImplementedError("Don't know how to specialise %s using MuTS." % llt)
-# ll2mu_ty = ll.saferecursive(_ll2mu_ty, None)
-
 
 def _lltype2mu_prim(llt):
     type_map = {
@@ -191,7 +184,7 @@ def _lltype2mu_addr(llt):
 
 def _lltype2mu_opq(llt):
     if llt is lltype.RuntimeTypeInfo:
-        return _ll2mu_ty(lltype.Char)  # rtti is defined to be a char in C backend.
+        return ll2mu_ty(lltype.Char)  # rtti is defined to be a char in C backend.
 
     mut = mutype.int64_t  # values of opaque type are translated to be 64-bit integers
     log.warning("mapping type %r -> %r" % (llt, mut))
@@ -225,51 +218,44 @@ def ll2mu_val(llv, **kwargs):
     try:
         return cache[key]
     except KeyError:
-        muv = _ll2mu_val(llv, **kwargs)
+        llt = lltype.typeOf(llv)
+        if isinstance(llv, llmemory.AddressOffset):
+            muv = _llval2mu_adrofs(llv)
+
+        elif isinstance(llt, lltype.Primitive):
+            muv = _llval2mu_prim(llv)
+
+        elif isinstance(llv, lltype._fixedsizearray):
+            muv = _llval2mu_arrfix(llv)
+
+        elif isinstance(llv, lltype._struct):
+            muv = _llval2mu_stt(llv, **kwargs)
+
+        elif isinstance(llv, lltype._array):
+            muv = _llval2mu_arr(llv)
+
+        elif isinstance(llv, lltype._ptr):
+            muv = _llval2mu_ptr(llv)
+
+        elif isinstance(llv, lltype._opaque):
+            muv = _llval2mu_opq(llv)
+
+        elif isinstance(llv, llmemory._wref):
+            muv = _llval2mu_wref(llv)
+
+        else:
+            raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
+        
         if key not in cache:    # may have already been added to cache (in stt to prevent recursion).
             cache[key] = muv
         return muv
     except TypeError, e:
-        if isinstance(llv, lltype.Symbolic):
-            return _ll2mu_val(llv)
-        else:
-            raise e
-
-
-def _ll2mu_val(llv, **kwargs):
-    """
-    Map LLTS value types to MuTS value types
-    :param llv: LLTS value
-    :param llt: optional LLType, if the type information cannot be obtained from llv (Primitives)
-    :return: _muobject
-    """
-    llt = lltype.typeOf(llv)
-    if isinstance(llv, llmemory.AddressOffset):
-        return _llval2mu_adrofs(llv)
-
-    elif isinstance(llt, lltype.Primitive):
-        return _llval2mu_prim(llv)
-
-    elif isinstance(llv, lltype._fixedsizearray):
-        return _llval2mu_arrfix(llv)
-
-    elif isinstance(llv, lltype._struct):
-        return _llval2mu_stt(llv, **kwargs)
-
-    elif isinstance(llv, lltype._array):
-        return _llval2mu_arr(llv)
-
-    elif isinstance(llv, lltype._ptr):
-        return _llval2mu_ptr(llv)
-
-    elif isinstance(llv, lltype._opaque):
-        return _llval2mu_opq(llv)
-
-    elif isinstance(llv, llmemory._wref):
-        return _llval2mu_wref(llv)
-
-    else:
-        raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
+        if isinstance(llv, llmemory.AddressOffset):
+            return _llval2mu_adrofs(llv)
+        llt = lltype.typeOf(llv)
+        if isinstance(llt, lltype.Primitive):
+            return _llval2mu_prim(llv)
+        raise e
 
 
 def _llval2mu_prim(llv):
@@ -433,7 +419,7 @@ def _llval2mu_opq(llv):
 
     if hasattr(llv, 'container'):
         container = llv._normalizedcontainer()
-        muv = _ll2mu_val(container)
+        muv = ll2mu_val(container)
         # log.ll2mu_val("%(llv)r really is %(muv)r" % locals())
         return muv
 
