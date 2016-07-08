@@ -315,9 +315,8 @@ class _mustruct(_muparentable, _mucontainer):
             setattr(self, fld, value)
 
         from ..ll2mu import GC_IDHASH_FLD
-        from random import randint
         if GC_IDHASH_FLD in TYPE._flds:
-            setattr(self, GC_IDHASH_FLD, int64_t(randint(0, 0x7FFFFFFFFFFFFFFF)))
+            setattr(self, GC_IDHASH_FLD, int64_t(0))
 
     def __setattr__(self, key, value):
         if hasattr(self, key) and key in self._TYPE._flds:
