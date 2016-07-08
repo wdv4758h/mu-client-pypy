@@ -203,6 +203,9 @@ def _lltype2mu_wref(llt):
 
 
 # ----------------------------------------------------------
+class IgnoredLLVal(NotImplementedError):
+    pass
+
 __ll2muval_cache = {}
 __ll2muval_cache_ptr = {}
 
@@ -227,9 +230,7 @@ def ll2mu_val(llv, **kwargs):
             cache[key] = muv
         return muv
     except TypeError, e:
-        if isinstance(llv, llmemory.AddressOffset):
-            return _ll2mu_val(llv)
-        elif isinstance(llv, lltype.Symbolic):
+        if isinstance(llv, lltype.Symbolic):
             return _ll2mu_val(llv)
         else:
             raise e
@@ -277,7 +278,7 @@ def _llval2mu_prim(llv):
         llv = llv.compute_fn()
     elif isinstance(llv, CDefinedIntSymbolic):
         if llv.default == '?':
-            raise NotImplementedError("Unknown default value for CDefinedIntSymbolic '%s'." % llv.expr)
+            raise IgnoredLLVal
         llv = llv.default
     elif isinstance(llv, (str, unicode)):
         assert len(llv) == 1    # char
@@ -315,8 +316,9 @@ def _llval2mu_stt(llv, building=False):
             setattr(stt, GC_IDHASH_FLD, mutype.int64_t(_idhash))
 
         llprnt = llv._parentstructure()
-        if llprnt:
-            key = (lltype.typeOf(llprnt), llprnt)
+        llprnt_t = lltype.typeOf(llprnt)
+        if llprnt and isinstance(llprnt_t, lltype.Struct):
+            key = (llprnt_t, llprnt)
             assert key in __ll2muval_cache
             stt._setparent(__ll2muval_cache[key], llv._parent_index)
     else:

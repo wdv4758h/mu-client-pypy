@@ -61,6 +61,7 @@ class MuDatabase:
                 self._recursive_addtype(v.mu_type)
             if isinstance(v, Constant):
                 assert isinstance(v.value, mutype._muobject)
+                assert not isinstance(v.value, mutype._muref)
                 if isinstance(v.value, mutype._mufuncref):
                     if not hasattr(v, 'mu_name'):
                         assert getattr(v.value, 'graph', False)
