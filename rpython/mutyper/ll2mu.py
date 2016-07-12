@@ -1,6 +1,7 @@
 from rpython.mutyper.muts.muentity import MuName
 from rpython.rtyper.lltypesystem import lltype
 from rpython.rtyper.lltypesystem import llmemory
+from rpython.tool.ansi_mandelbrot import Driver
 from .muts import mutype
 from .muts import muops
 from .muts import muni
@@ -16,7 +17,7 @@ from rpython.tool.ansi_print import AnsiLogger
 
 
 log = AnsiLogger("ll2mu")
-
+mdb = Driver()
 
 # ----------------------------------------------------------
 _type_cache = {}
@@ -361,7 +362,7 @@ def _llval2mu_arr(llv):
 
         return hyb
 
-
+__todorefs = []
 def _llval2mu_ptr(llv):
     if llv._obj0 is None:
         return mutype._munullref(ll2mu_ty(llv._TYPE))
@@ -374,8 +375,17 @@ def _llval2mu_ptr(llv):
         log.warning("Translating LL value '%(llv)r' to '%(muv)r'" % locals())
         return muv
 
-    return mutype._muref(mut, ll2mu_val(llv._obj))
+    muref = mutype._muref(mut)
+    __todorefs.append((llv._obj, muref))
+    return muref
+    # return mutype._muref(mut, ll2mu_val(llv._obj))
 
+
+def resolve_refobjs():
+    log.resolve_refobjs("Resolving all reference objects...")
+    for llv, muref in __todorefs:
+        muref.setobj(ll2mu_val(llv))
+        mdb.dot()
 
 def _llval2mu_funcptr(llv):
     mut = ll2mu_ty(llv._TYPE)

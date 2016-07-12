@@ -810,9 +810,12 @@ class MuRef(MuRefType):
 class _muref(_mugenref, _mucontainer):
     __slots__ = ("_T", "_obj0")
 
-    def __init__(self, TYPE, obj):
+    def __init__(self, TYPE, obj=None):
         _mucontainer.__init__(self, TYPE)
         self._T = TYPE.TO
+        self._obj0 = obj
+
+    def setobj(self, obj):
         self._obj0 = obj
 
     @property       # read only!
