@@ -1,5 +1,5 @@
 from rpython.jit.metainterp.history import INT, FLOAT
-# from rpython.jit.backend.arm.arch import WORD, DOUBLE_WORD, JITFRAME_FIXED_SIZE
+from rpython.jit.backend.muvm.arch import WORD, DOUBLE_WORD, JITFRAME_FIXED_SIZE
 
 class AssemblerLocation(object):
     _immutable_ = True

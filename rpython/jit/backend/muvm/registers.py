@@ -13,7 +13,7 @@ svfpregisters = []
 
 
 all_regs = []
-all_vfp_regs = vfpregisters[]
+all_vfp_regs = vfpregisters
 
 argument_regs = caller_resp = []
 callee_resp = []

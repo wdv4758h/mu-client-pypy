@@ -1,11 +1,11 @@
 #Commented code is from rpython.jit.backend.ppc.opassembler.py
+from rpython.jit.backend.muvm.helper.assembler import gen_emit_cmp_op
+# from rpython.jit.backend.muvm.helper.regalloc import _check_imm_arg
+import rpython.jit.backend.muvm.conditions as c
+import rpython.jit.backend.muvm.registers as r
+from rpython.jit.backend.muvm.locations import imm
+from rpython.jit.backend.muvm.locations import imm as make_imm_loc
 """
-from rpython.jit.backend.ppc.helper.assembler import gen_emit_cmp_op
-from rpython.jit.backend.ppc.helper.regalloc import _check_imm_arg
-import rpython.jit.backend.ppc.condition as c
-import rpython.jit.backend.ppc.register as r
-from rpython.jit.backend.ppc.locations import imm
-from rpython.jit.backend.ppc.locations import imm as make_imm_loc
 from rpython.jit.backend.ppc.arch import (IS_PPC_32, IS_PPC_64, WORD,
                                           MAX_REG_PARAMS, MAX_FREG_PARAMS,
                                           PARAM_SAVE_AREA_OFFSET,
@@ -870,7 +870,7 @@ class CallOpAssembler(object):
         return regalloc.operations[regalloc.rm.position + delta]
         """
 
-    _COND_CALL_SAVE_REGS = [r.r3, r.r4, r.r5, r.r6, r.r12]
+    #_COND_CALL_SAVE_REGS = [r.r3, r.r4, r.r5, r.r6, r.r12]
 
     def emit_cond_call(self, op, arglocs, regalloc):
         pass
@@ -1655,3 +1655,4 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
     _mixin_ = True
 
     def nop(self):
+        pass
