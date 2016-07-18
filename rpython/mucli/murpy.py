@@ -167,6 +167,10 @@ def ensure_open_libs():
     
 
 def load_extfncs(ctx, exfns):
+    _pypy_linux_prefix = "__pypy_mu_linux_"
+    _pypy_apple_prefix = "__pypy_mu_apple_"
+    _pypy_macro_prefix = "__pypy_macro_"
+
     def correct_name(c_name):
         """
         Correct some function naming
@@ -175,10 +179,9 @@ def load_extfncs(ctx, exfns):
         if sys.platform.startswith('darwin'):  # Apple
             if c_name in ('stat', 'fstat', 'lstat'):
                 return c_name + '64'    # stat64, fstat64, lstat64
+            if c_name == "readdir":     # fixing the macro defined return type (struct dirent*)
+                return _pypy_apple_prefix + c_name
         return c_name
-
-    _pypy_linux_prefix = "__pypy_mu_linux_"
-    _pypy_macro_prefix = "__pypy_macro_"
 
     libs = ensure_open_libs()
     librpyc = libs[0]
@@ -189,7 +192,6 @@ def load_extfncs(ctx, exfns):
             for lib in libs:
                 try:
                     adr = ctypes.cast(getattr(lib, c_name), ctypes.c_void_p).value
-                    print("Found {} in {._name}.".format(c_name, lib))
                     break
                 except AttributeError:
                     pass
