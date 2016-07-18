@@ -161,23 +161,35 @@ def ensure_open_libs():
                     "Please execute 'make' in the directory {}\n".format(path_librpyc, dir_librpyc))
         raise e
 
-    loaded_extfncs[:] = [libc, libm, libutil, librt, librpyc]
+    loaded_extfncs[:] = [librpyc, libc, libm, libutil, librt]
     
     return loaded_extfncs
     
 
 def load_extfncs(ctx, exfns):
+    def correct_name(c_name):
+        """
+        Correct some function naming
+        especially needed for stat system calls.
+        """
+        if sys.platform.startswith('darwin'):  # Apple
+            if c_name in ('stat', 'fstat', 'lstat'):
+                return c_name + '64'    # stat64, fstat64, lstat64
+        return c_name
+
     _pypy_linux_prefix = "__pypy_mu_linux_"
     _pypy_macro_prefix = "__pypy_macro_"
 
     libs = ensure_open_libs()
-    librpyc = libs[-1]
+    librpyc = libs[0]
     for c_name, fncptr_name, gcl_name, hdrs in exfns:
+        c_name = correct_name(c_name)
         with DelayedDisposer() as dd:
             adr = None
             for lib in libs:
                 try:
                     adr = ctypes.cast(getattr(lib, c_name), ctypes.c_void_p).value
+                    print("Found {} in {._name}.".format(c_name, lib))
                     break
                 except AttributeError:
                     pass
