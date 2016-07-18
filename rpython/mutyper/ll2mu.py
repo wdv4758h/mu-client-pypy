@@ -567,7 +567,13 @@ def _llop2mu_bool_not(x, res=None, llopname='bool_not'):
 
 
 def _llop2mu_int_is_true(x, res=None, llopname='int_is_true'):
-    return [muops.NE(x, _newprimconst(x.mu_type, 0), result=res)]
+    ops = _MuOpList()
+    cmp_res = ops.append(muops.NE(x, _newprimconst(x.mu_type, 0)))
+    ops.append(muops.SELECT(cmp_res,
+                            _newprimconst(mutype.bool_t, 1),
+                            _newprimconst(mutype.bool_t, 0),
+                            result=res))
+    return ops
 
 
 def _llop2mu_int_neg(x, res=None, llopname='int_neg'):
@@ -579,7 +585,7 @@ def _llop2mu_int_abs(x, res=None, llopname='int_abs'):
     # -x = 0 - x
     neg_x = ops.extend(_ll2mu_op('int_neg', [x]))
     # x > 0?
-    cmp_res = ops.extend(_ll2mu_op('int_gt', [x, _newprimconst(x.mu_type, 0)]))
+    cmp_res = ops.append(muops.SGT(x, _newprimconst(x.mu_type, 0)))
     # True -> x, False -> -x
     ops.append(muops.SELECT(cmp_res, x, neg_x, result=res))
     return ops
@@ -616,16 +622,22 @@ def _llop2mu_float_abs(x, res=None, llopname='float_abs'):
     # -x = 0 - x
     neg_x = ops.extend(_ll2mu_op('float_neg', [x]))
     # x > 0 ?
-    cmp_res = ops.extend(_ll2mu_op('float_gt', [x, _newprimconst(x.mu_type, 0.0)]))
+    cmp_res = ops.append(muops.FOGT(x, _newprimconst(x.mu_type, 0.0)))
     # True -> x, False -> (-x)
     ops.append(muops.SELECT(cmp_res, x, neg_x, result=res))
     return ops
 
 
 def _llop2mu_float_is_true(x, res=None, llopname='float_is_true'):
-    return [muops.FUNE(x, _newprimconst(x.mu_type, 0.0), result=res)]
+    ops = _MuOpList()
+    cmp_res = ops.append(muops.FUNE(x, _newprimconst(x.mu_type, 0.0)))
+    ops.append(muops.SELECT(cmp_res,
+                            _newprimconst(mutype.bool_t, 1),
+                            _newprimconst(mutype.bool_t, 0),
+                            result=res))
+    return ops
 
-__primop_map = {
+__binop_map = {
     'int_floordiv':     'SDIV',
     'int_mod':          'SREM',
     'int_lshift':       'SHL',
@@ -638,27 +650,41 @@ __primop_map = {
     'float_sub':        'FSUB',
     'float_mul':        'FMUL',
     'float_truediv':    'FDIV',
+}
+
+__cmpop_map = {
     'int_eq':           'EQ',
     'int_ne':           'NE',
+    'unichar_eq':        'EQ',
+    'unichar_ne':       'NE',
     'float_eq':         'FOEQ',
     'float_ne':         'FUNE'
 }
 
 for op in "add sub mul and or xor".split(' '):
-    __primop_map['int_' + op] = op.upper()
+    __binop_map['int_' + op] = op.upper()
 for cmp in 'lt le gt ge'.split(' '):
-    __primop_map['int_' + cmp] = 'S' + cmp.upper()
-    __primop_map['uint_' + cmp] = 'U' + cmp.upper()
-    __primop_map['float_' + cmp] = 'FO' + cmp.upper()
-    __primop_map['char_' + cmp] = 'U' + cmp.upper()
-__primop_map['unichar_eq'] = 'EQ'
-__primop_map['unichar_ne'] = 'NE'
+    __cmpop_map['int_' + cmp] = 'S' + cmp.upper()
+    __cmpop_map['uint_' + cmp] = 'U' + cmp.upper()
+    __cmpop_map['float_' + cmp] = 'FO' + cmp.upper()
+    __cmpop_map['char_' + cmp] = 'U' + cmp.upper()
 
-for key in __primop_map:
+for key in __binop_map:
     globals()['_llop2mu_' + key] = \
-        lambda a, b, res, llopname: [getattr(muops, __primop_map[llopname])(a, b, result=res)]
+        lambda a, b, res, llopname: [getattr(muops, __binop_map[llopname])(a, b, result=res)]
 
-_llop2mu_int_add_nonneg_ovf = lambda a, b, res, llopname: [getattr(muops, __primop_map['int_add'])(a, b, result=res)]
+for key in __cmpop_map:
+    def __llop2mu_cmpop(a, b, res, llopname):
+        ops = _MuOpList()
+        cmpres = ops.append(getattr(muops, __cmpop_map[llopname])(a, b))
+        ops.append(muops.SELECT(cmpres,
+                                _newprimconst(mutype.bool_t, 1),
+                                _newprimconst(mutype.bool_t, 0),
+                                result=res))
+        return ops
+    globals()['_llop2mu_' + key] = __llop2mu_cmpop
+
+_llop2mu_int_add_nonneg_ovf = lambda a, b, res, llopname: [getattr(muops, __binop_map['int_add'])(a, b, result=res)]
 
 
 # ----------------
@@ -948,11 +974,23 @@ def _llop2mu_cast_opaque_ptr(var_ptr, res, llopname='cast_opaque_ptr'):
 
 
 def _llop2mu_ptr_eq(ptr1, ptr2, res=None, llopname='ptr_eq'):
-    return [muops.EQ(ptr1, ptr2, result=res)]
+    ops = _MuOpList()
+    cmp_res = ops.append(muops.EQ(ptr1, ptr2))
+    ops.append(muops.SELECT(cmp_res,
+                            _newprimconst(mutype.bool_t, 1),
+                            _newprimconst(mutype.bool_t, 0),
+                            result=res))
+    return ops
 
 
 def _llop2mu_ptr_ne(ptr1, ptr2, res=None, llopname='ptr_eq'):
-    return [muops.NE(ptr1, ptr2, result=res)]
+    ops = _MuOpList()
+    cmp_res = ops.append(muops.NE(ptr1, ptr2))
+    ops.append(muops.SELECT(cmp_res,
+                            _newprimconst(mutype.bool_t, 1),
+                            _newprimconst(mutype.bool_t, 0),
+                            result=res))
+    return ops
 
 
 def _llop2mu_ptr_nonzero(ptr, res=None, llopname='ptr_nonzero'):
