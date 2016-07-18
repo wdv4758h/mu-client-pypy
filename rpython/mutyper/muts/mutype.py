@@ -784,7 +784,7 @@ class _mufuncref(_mugenref):
             setattr(self, attr, attrs[attr])
 
     def __str__(self):
-        return "# %s" % self.fncname
+        return "# %s" % self.graph.name if self.graph else self.fncname
 
 
 class MuRef(MuRefType):
