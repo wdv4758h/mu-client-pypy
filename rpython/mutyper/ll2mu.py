@@ -1,6 +1,5 @@
 from rpython.mutyper.muts.muentity import MuName
-from rpython.rtyper.lltypesystem import lltype
-from rpython.rtyper.lltypesystem import llmemory
+from rpython.rtyper.lltypesystem import lltype, llmemory, rffi
 from rpython.tool.ansi_mandelbrot import Driver
 from .muts import mutype
 from .muts import muops
@@ -270,6 +269,10 @@ def _llval2mu_prim(llv):
     elif isinstance(llv, (str, unicode)):
         assert len(llv) == 1    # char
         llv = ord(llv)
+    elif isinstance(llv, rffi.CConstant):
+        from pypy.module._minimal_curses.fficurses import ERR, OK
+        assert llv in (ERR, OK)
+        llv = -1 if llv is ERR else 0
 
     return mutype._muprimitive(mut, llv)
 
@@ -736,8 +739,8 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
     RES_MUTYPE = ll2mu_ty(RES_LLTYPE)
 
     def is_unsigned(LLT):
-        return LLT in (lltype.Unsigned, lltype.UnsignedLongLong) or \
-               (LLT._type in _inttypes.values() and not LLT._type.SIGNED)
+        return LLT in (lltype.Bool, lltype.Unsigned, lltype.UnsignedLongLong) or \
+               (hasattr(LLT, '_type') and LLT._type in _inttypes.values() and not LLT._type.SIGNED)
 
     if isinstance(SRC_LLTYPE, lltype.Ptr) and \
             (RES_LLTYPE == llmemory.Address or isinstance(RES_LLTYPE, lltype.Primitive)):
@@ -871,7 +874,13 @@ def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
 
 
 def __getarrayitemiref(var, idx):
-    iref_var, ops = __getfieldiref(var, var.mu_type.TO._varfld)
+    if isinstance(var.mu_type.TO, mutype.MuHybrid):
+        iref_var, ops = __getfieldiref(var, var.mu_type.TO._varfld)
+    else:
+        assert isinstance(var.mu_type.TO, mutype.MuArray)
+        ops = _MuOpList()
+        iref_var = var if isinstance(var.mu_type, (mutype.MuIRef, mutype.MuUPtr)) else ops.append(muops.GETIREF(var))
+
     iref_itm = ops.append(muops.SHIFTIREF(iref_var, idx))
     return iref_itm, ops
 
@@ -1018,6 +1027,14 @@ def _llop2mu_shrink_array(ptr, sz, res=None, llopname='shrink_array'):
     return [], _newprimconst(mutype.bool_t, 0)  # always return False
 
 
+def _llop2mu_direct_arrayitems(ptr, res=None, llopname='direct_arrayitems'):
+    ARRAY = ptr.concretetype.TO
+    from rpython.translator.c.support import barebonearray
+    if not (isinstance(ARRAY, lltype.FixedSizeArray) or barebonearray(ARRAY)):
+        return _ll2mu_op('getfield', [ptr, Constant('items')], result=res)
+    return [], ptr
+
+
 # ----------------
 # address operations
 def _llop2mu_keepalive(ptr, res=None, llopname='keepalive'):
@@ -1128,6 +1145,16 @@ def _llop2mu_gc_pin(ptr, res=None, llopname='gc_can_move'):
 def _llop2mu_gc_writebarrier_before_copy(src, dst, src_start, dst_start, length,
                                          res=None, llopname='gc_writebarrier_before_copy'):
     return [], _newprimconst(mutype.bool_t, 1)
+
+
+def _llop2mu_gc_load_indexed(buf, index, scale, base_ofs, res, llopname='gc_load_indexed'):
+    ops = _MuOpList()
+    adr = ops.append(muops.NATIVE_PIN(buf))
+    base_adr = ops.extend(_ll2mu_op('adr_add', [adr, base_ofs]))
+    ofs = ops.extend(_ll2mu_op('int_mul', [index, scale]))
+    ops.extend(_ll2mu_op('raw_load', [base_adr, ofs], result=res))
+    ops.append(muops.NATIVE_UNPIN(buf))
+    return ops
 
 
 def _llop2mu_gc_identityhash(obj, res=None, llopname='gc_identityhash'):
@@ -1288,4 +1315,9 @@ def _llop2mu_gc_thread_before_fork(res=None, llopname='gc_thread_before_fork'):
 # Other dummy operations
 def _llop2mu_debug_offset(res, llopname='debug_offset'):
     return [], _newprimconst(res.mu_type, -1)
+
+def _llop2mu_debug_fatalerror(msg, res, llopname='debug_fatalerror'):
+    return [], res
+
+
 # TODO: rest of the operations

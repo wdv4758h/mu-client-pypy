@@ -18,7 +18,6 @@ def _has_pattern(blk):
         assert len(ops) >= 4
 
         last4 = ops[-4:]
-        print [op.opname for op in last4]
         assert last4[0].opname in __mu_cmp_ops
 
         assert [op.opname for op in last4[1:]] == "SELECT EQ BRANCH2".split(' ')

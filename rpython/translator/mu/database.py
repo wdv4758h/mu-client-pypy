@@ -66,6 +66,7 @@ class MuDatabase:
                     if not hasattr(v, 'mu_name'):
                         assert getattr(v.value, 'graph', False)
                         v.mu_name = v.value.graph.mu_name
+                        assert v.mu_name
                 else:
                     v.__init__(v.value)     # rehash
                     self.gblcnsts.add(v)
