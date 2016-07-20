@@ -1311,6 +1311,10 @@ def _llop2mu_gc_thread_before_fork(res=None, llopname='gc_thread_before_fork'):
     return [], _newprimconst(res.mu_type, 0)
 
 
+def _llop2mu_gc_stack_bottom(res, llopname='gc_stack_bottom'):
+    return [], res
+
+
 # ----------------
 # Other dummy operations
 def _llop2mu_debug_offset(res, llopname='debug_offset'):

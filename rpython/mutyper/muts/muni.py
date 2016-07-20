@@ -10,12 +10,32 @@ __ptr_int_t = MuInt(mu_sizeOf(__voidptr_t) * 8)     # the corresponding int type
 
 
 class MuExternalFunc(MuGlobalCell):
-    def __new__(cls, *args, **kwargs):
-        return object.__new__(cls)
+    __namecntr = {}
+    __cache = {}
+    def __new__(cls, c_name, arg_ts, rtn_t, c_libs=()):
+        cache = MuExternalFunc.__cache
+        key = (c_name, arg_ts, rtn_t)
+        if key not in cache:
+            obj = object.__new__(cls)
+            cache[key] = obj
+            return obj
+
+        return cache[key]
 
     def __init__(self, c_name, arg_ts, rtn_t, c_libs=()):
+        def _getname(c_name):
+            # use a counter to distinguish external functions that
+            # have variable length arguments and hence
+            # have different static signature
+            # e.g. see pypy.module.fcntl.interp_fcntl.ioctl_int
+            nd = MuExternalFunc.__namecntr
+            if c_name in nd:
+                nd[c_name] += 1
+                return "%s_%d" % (c_name, nd[c_name] - 1)
+            nd[c_name] = 2
+            return c_name
         MuGlobalCell.__init__(self, MuUFuncPtr(MuFuncSig(arg_ts, (rtn_t, ) if rtn_t is not void_t else ())))
-        self.mu_name = MuName(MuUFuncPtr.type_prefix + c_name)
+        self.mu_name = MuName(MuUFuncPtr.type_prefix + _getname(c_name))
         self.c_name = c_name
         self.c_libs = c_libs
 
