@@ -554,7 +554,11 @@ def _llop2mu_direct_call(cst_fnc, *args, **kwargs):
 
 def _llop2mu_indirect_call(var_callee, *args, **kwargs):
     res = kwargs['res'] if 'res' in kwargs else None
-    return [muops.CALL(var_callee, args[:-1], result=res)]
+    last = args[-1]
+    if isinstance(last, Constant) and isinstance(last.value, list):
+        return [muops.CALL(var_callee, args[:-1], result=res)]
+    else:
+        return [muops.CALL(var_callee, args, result=res)]
 
 
 # ----------------
@@ -744,13 +748,18 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
 
     if isinstance(SRC_LLTYPE, lltype.Ptr) and \
             (RES_LLTYPE == llmemory.Address or isinstance(RES_LLTYPE, lltype.Primitive)):
+        # Ptr -> Address/Signed
         assert SRC_LLTYPE.TO._gckind == 'raw'
         return _llop2mu_cast_ptr_to_adr(x, res)
+
     elif (SRC_LLTYPE == llmemory.Address or isinstance(SRC_LLTYPE, lltype.Primitive)) and \
             isinstance(RES_LLTYPE, lltype.Ptr):
+        # Address/Signed -> Ptr
         assert RES_LLTYPE.TO._gckind == 'raw'
         return _llop2mu_cast_adr_to_ptr(x, res)
+
     elif isinstance(SRC_MUTYPE, mutype.MuInt) and isinstance(RES_MUTYPE, mutype.MuInt):
+        # int -> int
         if SRC_MUTYPE.bits < RES_MUTYPE.bits:
             op = muops.ZEXT if is_unsigned(SRC_LLTYPE) else muops.SEXT
         elif SRC_MUTYPE.bits > RES_MUTYPE.bits:
@@ -759,14 +768,31 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
             return [], x
         return [op(x, RES_MUTYPE, result=res)]
 
-    elif SRC_MUTYPE.__class__ == RES_MUTYPE.__class__:
-        return [], x
-    elif SRC_MUTYPE is mutype.double_t and isinstance(RES_MUTYPE, mutype.MuInt):
+    elif SRC_MUTYPE in (mutype.double_t, mutype.float_t) and isinstance(RES_MUTYPE, mutype.MuInt):
+        # float/double -> int
         return [muops.FPTOSI(x, RES_MUTYPE, result=res)]
-    elif isinstance(SRC_MUTYPE, mutype.MuInt) and RES_MUTYPE is mutype.double_t:
+
+    elif isinstance(SRC_MUTYPE, mutype.MuInt) and RES_MUTYPE in (mutype.double_t, mutype.float_t):
+        # int -> float/double
         return [muops.SITOFP(x, RES_MUTYPE, result=res)]
 
-    raise NotImplementedError("force_cast(%s) -> %s" % (SRC_LLTYPE, RES_LLTYPE))
+    elif SRC_MUTYPE is mutype.float_t and RES_MUTYPE is mutype.double_t:
+        # float -> double
+        return [muops.FPEXT(x, RES_MUTYPE, result=res)]
+
+    elif SRC_MUTYPE is mutype.double_t and RES_MUTYPE is mutype.float_t:
+        # double -> float
+        return [muops.FPTRUNC(x, RES_MUTYPE, result=res)]
+
+    elif isinstance(SRC_LLTYPE, lltype.Ptr) and isinstance(RES_LLTYPE, lltype.Ptr):
+        # Ptr -> Ptr
+        return _ll2mu_op('cast_pointer', [Constant(RES_LLTYPE), x], result=res)
+
+    elif SRC_MUTYPE == RES_MUTYPE:
+        return [], x
+
+    else:
+        raise NotImplementedError("force_cast(%s) -> %s" % (SRC_LLTYPE, RES_LLTYPE))
 
 _llop2mu_cast_primitive = _llop2mu_force_cast
 
@@ -790,6 +816,7 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
         if isinstance(mut, mutype.MuStruct):
             # Empty array
             obj = ops.append(muops.NEW(mut, result=res))
+            return ops
         else:
             obj = ops.append(muops.NEWHYBRID(mut, n, result=res))
     else:
