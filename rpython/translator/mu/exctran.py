@@ -119,7 +119,7 @@ class MuExceptionTransformer:
             blk_catch = Block(args)
             ops = []
             excobjptr = Variable("excobjptr")
-            excobjptr.concretetype = lltype.Ptr(lltype.OpaqueType('_Void', hints={'mu_ptr_as_ref': True}))
+            excobjptr.concretetype = lltype.Ptr(lltype.GcOpaqueType('_Void'))
             blk_catch.mu_excparam = excobjptr
 
             excdataptr = Variable("excdataptr")

@@ -140,8 +140,12 @@ def build_arglist(ctx, argv):
 
     return refstt
 
+loaded_extfncs = []     # Keep them in a global variable so that PyPy's GC will not finalize these libraries.
 
-def load_extfncs(ctx, exfns):
+def ensure_open_libs():
+    if len(loaded_extfncs) != 0:
+        return loaded_extfncs
+    
     libc = ctypes.CDLL(ctypes.util.find_library("c"))
     libm = ctypes.CDLL(ctypes.util.find_library("m"))
     libutil = ctypes.CDLL(ctypes.util.find_library("util"))
@@ -150,9 +154,6 @@ def load_extfncs(ctx, exfns):
     dir_librpyc = os.path.join(dir_rpython, 'translator', 'mu', 'rpyc')
     path_librpyc = os.path.join(dir_librpyc, 'librpyc.so')
 
-    _pypy_linux_prefix = "__pypy_mu_linux_"
-    _pypy_macro_prefix = "__pypy_macro_"
-
     try:
         librpyc = ctypes.CDLL(path_librpyc)
     except OSError as e:
@@ -160,8 +161,32 @@ def load_extfncs(ctx, exfns):
                     "Please execute 'make' in the directory {}\n".format(path_librpyc, dir_librpyc))
         raise e
 
-    libs = (libc, libm, libutil, librt, librpyc)
+    loaded_extfncs[:] = [librpyc, libc, libm, libutil, librt]
+    
+    return loaded_extfncs
+    
+
+def load_extfncs(ctx, exfns):
+    _pypy_linux_prefix = "__pypy_mu_linux_"
+    _pypy_apple_prefix = "__pypy_mu_apple_"
+    _pypy_macro_prefix = "__pypy_macro_"
+
+    def correct_name(c_name):
+        """
+        Correct some function naming
+        especially needed for stat system calls.
+        """
+        if sys.platform.startswith('darwin'):  # Apple
+            if c_name in ('stat', 'fstat', 'lstat'):
+                return c_name + '64'    # stat64, fstat64, lstat64
+            if c_name == "readdir":     # fixing the macro defined return type (struct dirent*)
+                return _pypy_apple_prefix + c_name
+        return c_name
+
+    libs = ensure_open_libs()
+    librpyc = libs[0]
     for c_name, fncptr_name, gcl_name, hdrs in exfns:
+        c_name = correct_name(c_name)
         with DelayedDisposer() as dd:
             adr = None
             for lib in libs:
@@ -179,6 +204,8 @@ def load_extfncs(ctx, exfns):
             if adr is None:
                 os.write(2, "Failed to load function '%(c_name)s'.\n" % locals())
                 raise NotImplementedError
+            
+            # print("func: {}, addr: {} 0x{:x}".format(c_name, adr, adr))
 
             hadr = dd << ctx.handle_from_fp(ctx.id_of(fncptr_name), adr)
             hgcl = dd << ctx.handle_from_global(ctx.id_of(gcl_name))

@@ -62,6 +62,8 @@ class MuTyper:
         self.tlr.graphs = self.graphs = self.graphs + self.helper_graphs.values()
 
         mdb.restart()
+        ll2mu.resolve_refobjs()
+        mdb.restart()
 
     def specialise(self, g):
         # log.info("specialising graph '%s'" % g.name)
@@ -190,8 +192,8 @@ class MuTyper:
                 elif isinstance(llv, lltype.LowLevelType):
                     Constant.__init__(arg, ll2mu.ll2mu_ty(llv), lltype.Void)
             else:
-                try:
-                    if not hasattr(arg, 'mu_type'):     # has not been processed.
+                if not hasattr(arg, 'mu_type'):  # has not been processed.
+                    try:
                         muv = ll2mu.ll2mu_val(llv)
                         mut = ll2mu.ll2mu_ty(arg.concretetype)
                         if isinstance(muv, mutype._muprimitive) and muv._TYPE != mut:
@@ -206,17 +208,17 @@ class MuTyper:
                         arg.mu_type = mut
                         if isinstance(muv, (mutype._muprimitive, mutype._munullref)):
                             arg.mu_name = MuName("%s_%s" % (str(arg.value), arg.mu_type.mu_name._name))
+                    except ll2mu.IgnoredLLVal:
+                        # log.warning("can not process '%(arg)s' in mutyper, ignored." % locals())
+                        pass
 
-                    if isinstance(arg.value, mutype._muref):
-                        if arg not in self._cnst_gcell_dict:
-                            gcl = MuGlobalCell(arg.mu_type, arg.value)
-                            self._cnst_gcell_dict[arg] = gcl
-                        else:
-                            gcl = self._cnst_gcell_dict[arg]
-                        return self._get_ldgcell_var(gcl, blk)
-                except (NotImplementedError, AssertionError, TypeError):
-                    # log.warning("can not process '%(arg)s' in mutyper, ignored." % locals())
-                    pass
+                if isinstance(arg.value, mutype._muref):
+                    if arg not in self._cnst_gcell_dict:
+                        gcl = MuGlobalCell(arg.mu_type, arg.value)
+                        self._cnst_gcell_dict[arg] = gcl
+                    else:
+                        gcl = self._cnst_gcell_dict[arg]
+                    return self._get_ldgcell_var(gcl, blk)
 
         return arg
 
