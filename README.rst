@@ -1,4 +1,3 @@
-
 ==============================
 PyPy-Mu: A Mu Backend for PyPy
 ==============================
@@ -9,8 +8,7 @@ PyPy-Mu is a fork of `PyPy <http://pypy.org>`__ that aims to
 add a `Mu Micro Virtual Machine <http://microvm.org>`__ backend for it.
 
 This project is currently under active development,
-progressing towards a Mu backend that allows RPython to
-successfully compile `SOM interpreter <https://github.com/SOM-st/RPySOM>`__.
+right now we can compile PyPy interpreter with `--no-allworkingmodules` option.
 
 Building
 ========
@@ -59,7 +57,7 @@ Specify :bash:`-b mu` option to compile using the Mu backend:
 
 ::
 
-    $ rpython/bin/rpython -O0 -b mu <target>
+    $ rpython/bin/rpython -b mu <target>
 
 This outputs a ``<target>-mu.mu`` file in the current directory.
 This is a zipped bundle of the IR, HAIL and external function list files.
@@ -68,7 +66,14 @@ Use ``murpy`` to load and run the compiled bundle program:
 
 ::
 
-    $ murpy <target>-mu.mu
+    $ murpy --noSourceInfo --vmLog=ERROR <target>-mu.mu
 
-Currently due to the limitation of the Mu implementation in Scala,
-the performance of the Mu backend is about 100,000 times slower than that of the C backend...
+
+--------------------------
+
+Why not try compiling the PyPy interpreter (currently with some limitations)?
+
+::
+
+    $ rpython -O2 -b mu pypy/goal/targetpypystandalone.py --no-allworkingmodules
+    $ murpy --noSourceInfo --vmLog=ERROR --sosSize=780M --losSize=780M pypy-mu.mu
