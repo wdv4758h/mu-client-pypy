@@ -20,8 +20,6 @@ class Type(object):
     def __repr__(self):
         return '@' + self.prefix()
 
-### Removing AssemblerLocation from the hierarchy of our SSA variable classes.
-### I do not believe that it will be necessary for our model.
 class AssemblerLocation(object):
     _immutable_ = True
     value  = None
@@ -55,7 +53,7 @@ class AssemblerLocation(object):
     def get_position(self):
         raise NotImplementedError # only for stack
         
-class SSA(object):
+class SSALocation(AssemblerLocation):
     """This is replacing the RegisterLocation class. Rather than `value` being
     in [0..15] we let `value` member hold the value of the ssa variable. Thus,
     we are no longer treating it as a location but as a stand alone variable.
@@ -66,15 +64,16 @@ class SSA(object):
     """
     _immutable_ = True
 
-    def __init__(self, value, t=INT, width=WORD*8):
-        '''Constructor for SSA class. Parameters as follow
-        value: Box:       (some sort of wrapper)
-        t:     type str:  (INT = 'i', FLOAT = 'f', etc)
-        width: int:       for int types only
+    def __init__(self, value, t=INT, width=DOUBLE_WORD*8):
+        '''Constructor for SSALocation class. Parameters as follow
+            value: int:       index in registers
+            t:     type str:  (INT = 'i', FLOAT = 'f', etc)
+            width: int:       for int types only
+                Defaults to 64 bits - we are doing 64 bit python for now
         '''
-        self.value = value
-        self.t = Type(t = t, width=width)
-        self.type = t
+        self.value  = value
+        self.t      = Type(t = t, width=width)
+        self.type   = t
 
     def __repr__(self):
         """Temp implementation. Will update"""
@@ -83,10 +82,36 @@ class SSA(object):
     def is_core_reg(self):
         return True
 
+    def is_local(self):
+        return False
+
+    def is_global(self):
+        return False
+
+    def is_constant(self):
+        return False
+
     def as_key(self):       # 0 <= as_key <= 15
         return self.value
+
+class LocalLocation(SSALocation):
+    def is_local(self):
+        return True
     
-class VFPSSA(SSA):
+    def __repr__(self):
+        return '%{}_{}'.format(self.t.prefix(), self.value)
+
+class GlobalLocation(SSALocation):
+    def is_global(self):
+        return True
+
+    def __repr__(self):
+        return '@{}_{}'.format(self.t.prefix(), self.value)
+    
+    
+# Probably to be discarded
+"""
+class VFPSSALocation(SSALocation):
     _immutable_ = True
     type = FLOAT
     width = 2 * WORD
@@ -109,8 +134,8 @@ class VFPSSA(SSA):
     def is_float(self):
         return True
 
-class SVFPSSA(VFPSSA):
-    """Single Precission VFP SSA"""
+class SVFPSSALocation(VFPSSALocation):
+    # Single Precission VFP SSALocation
     _immutable_ = True
     width = WORD
     type = 'S'
@@ -120,6 +145,7 @@ class SVFPSSA(VFPSSA):
 
     def __repr__(self):
         return 'vfp(s%d)' % self.value
+"""
 
 class ImmLocation(AssemblerLocation):
     _immutable_ = True

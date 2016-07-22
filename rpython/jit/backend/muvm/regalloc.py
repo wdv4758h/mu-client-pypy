@@ -77,6 +77,7 @@ class TempFloat(TempVar):
 def void(self, op, fcond):
     return []
 
+### I think we can get away with a single RegisterManager, namely this one.
 class MuVMRegisterManager(RegisterManager):
     registers = r.registers  # Registers 
     
@@ -96,6 +97,7 @@ class MuVMRegisterManager(RegisterManager):
         self.assembler = assembler
 
     def return_constant(self, v, forbidden_vars=[], selected_reg=None):
+        """DEV: Need to determine what this will do in our new model."""
         # (TempVar, [TempVar], SSA) -> (SSA)
         ### OVERRIDE
         self._check_type(v)
@@ -118,7 +120,7 @@ class MuVMRegisterManager(RegisterManager):
 
     def possibly_free_var(self, v):
         ### OVERRIDE
-        return
+        return None
     
     def _pick_variable_to_spill(self, v, forbidden_vars, selected_reg=None,
                                 need_lower_byte=False):
@@ -136,7 +138,10 @@ class MuVMRegisterManager(RegisterManager):
         """
         ### OVERRIDE
         ### Scratch Method
-        assert is_instance(v, SSA)
+        try:
+            assert is_instance(v, SSA)      # This is for debug purposes.
+        except:
+            print "ERROR: {} is not an SSA variable".format(v)
         self.registers.append(v)
         return len(self.registers) - 1  # Location of v
 
@@ -150,8 +155,11 @@ class MuVMRegisterManager(RegisterManager):
 
     def force_spill_var(self, var):
         ### OVERRIDE
-        assert False        # This shouldn't be called
-        pass
+        try:
+            assert False        # This shouldn't be called
+        except:
+            print "ERROR: force_spill_var should not be called.",
+            print "there is no variable spillage in MuVM."
 
 
 ### This may not be necessary. MuVMRegisterManager should take care of
