@@ -1,9 +1,19 @@
+'''Current Dev: 
+    Map out work flow in regalloc.py
+    Remove free_regs from file
+    Remove TempVars from file
+
+    NOTE: ScratchMethod refers to an implementation that is for testing. We are
+    trying to see what works/what breaks with certain things in place.
+'''
+
 from rpython.rtyper.annlowlevel import cast_instance_to_gcref
 from rpython.rlib.debug import debug_print, debug_start, debug_stop
 from rpython.jit.backend.llsupport.regalloc import FrameManager, \
         RegisterManager, TempVar, compute_vars_longevity, BaseRegalloc, \
         get_scale
 from rpython.jit.backend.muvm import registers as r
+from rpython.rlib.objectmodel import we_are_translated
 
 #from rpython.jit.backend.arm import conditions as c
 from rpython.jit.backend.muvm import locations
@@ -38,6 +48,11 @@ from rpython.jit.codewriter.effectinfo import EffectInfo
 from rpython.rlib.rarithmetic import r_uint
 from rpython.jit.backend.llsupport.descr import CallDescr
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    OrderedDict = dict # too bad
+
 # Temp Variables -- find out what these are
 class TempInt(TempVar):
     type = INT
@@ -59,26 +74,40 @@ class TempFloat(TempVar):
     def __repr__(self):
         return "<TempFloat at %s>" % (id(self),)
 
-
 def void(self, op, fcond):
     return []
 
 class MuVMRegisterManager(RegisterManager):
-    GLOBAL_PRE = '@'
-    LOCAL_PRE  = '%'
-    all_regs = r.registers  # Registers 
-    ssacounter = 0          # This will be incremented to generate unique names
-                            # for each new SSA Variable
-    pre_f = "f_{}"          # Float variable
-    pre_i = "i{}_{}"        #
-    pre_r = "r_{}"        
+    registers = r.registers  # Registers 
+    
+    ssanum = 0          # This will be incremented to generate unique names
+                        # for each new SSA
+
+    def __init__(self, longevity, frame_manager=None, assembler=None):
+        self.longevity = longevity
+        self.temp_boxes = []
+        if not we_are_translated():
+            self.reg_bindings = OrderedDict()
+        else:
+            self.reg_bindings = {}
+        self.bindings_to_frame_reg = {}
+        self.position = -1
+        self.frame_manager = frame_manager
+        self.assembler = assembler
 
     def return_constant(self, v, forbidden_vars=[], selected_reg=None):
+        # (TempVar, [TempVar], SSA) -> (SSA)
         ### OVERRIDE
-        return None
+        self._check_type(v)
+        assert isinstance(v,Const)
+        immloc = self.convert_to_imm(v)
+        return immloc
 
-    # To phase out `longevity` override all functions referencing it
-    # Currently, just stubs.
+    def convert_to_imm(self, c):
+        # (Const) -> (TempVar)
+        #TODO
+        return
+
     def is_still_alive(self, v):
         ### OVERRIDE
         return False
@@ -98,9 +127,18 @@ class MuVMRegisterManager(RegisterManager):
     
     def try_allocate_reg(self, v, selected_reg=None, need_lower_byte=False):
         """ Override from RegisterManager. This will always succeed.
+        INPUTS:
+            v: originally a temp var. Now an SSA variable. 
+        OUTPUS:
+            self.register's location of `v`
+        NOTE: Have not determined if TempVar is necessary for outside interface
+        May need to incorporate tempvars again.
         """
         ### OVERRIDE
-        return
+        ### Scratch Method
+        assert is_instance(v, SSA)
+        self.registers.append(v)
+        return len(self.registers) - 1  # Location of v
 
     def force_allocate_reg(self, v, forbidden_vars=[], selected_reg=None,
                            need_lower_byte=False):
@@ -112,17 +150,12 @@ class MuVMRegisterManager(RegisterManager):
 
     def force_spill_var(self, var):
         ### OVERRIDE
+        assert False        # This shouldn't be called
         pass
 
-    # Possible Override:
-    #       loc(self,box,must_exist) from RegisterManager
 
-    def return_constant(self, v, forbidden_vars=[], selected_reg=None):
-        """ Return the location of the constant v.  If 'selected_reg' is
-        not None, it will first load its value into this register.
-        """
-        return None
-
+### This may not be necessary. MuVMRegisterManager should take care of
+### everything.
 class VFPRegisterManager(MuVMRegisterManager):
     all_regs = r.vfpregisters
     box_types = [FLOAT]
