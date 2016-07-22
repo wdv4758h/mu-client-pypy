@@ -1,3 +1,4 @@
+"""Some architecture-related values""" 
 WORD = 4
 DOUBLE_WORD = 8
 

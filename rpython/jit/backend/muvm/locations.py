@@ -1,8 +1,31 @@
-from rpython.jit.metainterp.history import INT, FLOAT
-# from rpython.jit.backend.arm.arch import WORD, DOUBLE_WORD, JITFRAME_FIXED_SIZE
+from rpython.jit.metainterp.history import  (INT, FLOAT, VOID, 
+                                            STRUCT, REF, VECTOR)
+from rpython.jit.backend.muvm.arch import WORD, DOUBLE_WORD, JITFRAME_FIXED_SIZE
 
+typemap = { INT : 'INT', FLOAT : 'FLOAT', VOID : 'VOID', STRUCT : 'STRCT', 
+            REF : 'REF', VECTOR : 'VEC'}
+class Type(object):
+    ''' Type value for SSALocations. Includes type and width info.'''
+    def __init__(self, t = INT, width = WORD):
+        self.t  = t
+        self.width = width
+    
+    def prefix(self):
+        """Return type signature"""
+        res = typemap[self.t]
+        if self.t == INT:
+            res += str(self.width)
+        return res
+
+    def __repr__(self):
+        return '@' + self.prefix()
+
+### Removing AssemblerLocation from the hierarchy of our SSA variable classes.
+### I do not believe that it will be necessary for our model.
 class AssemblerLocation(object):
     _immutable_ = True
+    value  = None
+    t = Type(INT, 8*WORD)
     type = INT
 
     def is_imm(self):
@@ -31,26 +54,39 @@ class AssemblerLocation(object):
 
     def get_position(self):
         raise NotImplementedError # only for stack
+        
+class SSA(object):
+    """This is replacing the RegisterLocation class. Rather than `value` being
+    in [0..15] we let `value` member hold the value of the ssa variable. Thus,
+    we are no longer treating it as a location but as a stand alone variable.
 
-class SSALocation(AssemblerLocation):
+    __init__ is also updated so that it takes `value`, type `t` (INT default),
+    and `width` (WORD*8 = 32 by default). The `width` parameter is necessary for
+    ints and does not need to be specified for other types (as of now).
+    """
     _immutable_ = True
-    width = WORD        ### 4 bytes
 
-    def __init__(self, value, width=WORD):
+    def __init__(self, value, t=INT, width=WORD*8):
+        '''Constructor for SSA class. Parameters as follow
+        value: Box:       (some sort of wrapper)
+        t:     type str:  (INT = 'i', FLOAT = 'f', etc)
+        width: int:       for int types only
+        '''
         self.value = value
-        self.width = width
+        self.t = Type(t = t, width=width)
+        self.type = t
 
     def __repr__(self):
-        return 'r%d' % self.value
+        """Temp implementation. Will update"""
+        return '{}_{}'.format( self.t.prefix(), self.value)
 
     def is_core_reg(self):
         return True
 
     def as_key(self):       # 0 <= as_key <= 15
         return self.value
-
-
-class VFPSSALocation(SSALocation):
+    
+class VFPSSA(SSA):
     _immutable_ = True
     type = FLOAT
     width = 2 * WORD
@@ -73,7 +109,7 @@ class VFPSSALocation(SSALocation):
     def is_float(self):
         return True
 
-class SVFPSSALocation(VFPSSALocation):
+class SVFPSSA(VFPSSA):
     """Single Precission VFP SSA"""
     _immutable_ = True
     width = WORD
