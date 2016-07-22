@@ -5,6 +5,7 @@ import rpython.jit.backend.muvm.conditions as c
 import rpython.jit.backend.muvm.registers as r
 from rpython.jit.backend.muvm.locations import imm
 from rpython.jit.backend.muvm.locations import imm as make_imm_loc
+from rpython.rlib import rmu
 """
 from rpython.jit.backend.ppc.arch import (IS_PPC_32, IS_PPC_64, WORD,
                                           MAX_REG_PARAMS, MAX_FREG_PARAMS,
@@ -36,170 +37,63 @@ from rpython.rlib.rarithmetic import r_uint
 class IntOpAssembler(object):
         
     _mixin_ = True
-
-    def emit_int_add(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        assert not l0.is_imm()
-        if l1.is_imm():
-            self.mc.addi(res.value, l0.value, l1.value)
-        else:
-            self.mc.add(res.value, l0.value, l1.value)
-        """
-
-    emit_nursery_ptr_increment = emit_int_add
-
-    def emit_int_sub(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        assert not l0.is_imm()
-        if l1.is_imm():
-            self.mc.subi(res.value, l0.value, l1.value)
-        else:
-            self.mc.sub(res.value, l0.value, l1.value)
-        """
-        
-    def emit_int_mul(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        assert not l0.is_imm()
-        if l1.is_imm():
-            self.mc.mulli(res.value, l0.value, l1.value)
-        elif IS_PPC_32:
-            self.mc.mullw(res.value, l0.value, l1.value)
-        else:
-            self.mc.mulld(res.value, l0.value, l1.value)
-        """
-
-    def do_emit_int_binary_ovf(self, op, arglocs):
-        pass
-        """
-        l0, l1, res = arglocs[0], arglocs[1], arglocs[2]
-        self.mc.load_imm(r.SCRATCH, 0)
-        self.mc.mtxer(r.SCRATCH.value)
-        return (res.value, l0.value, l1.value)
-        """
-
-    def emit_int_add_ovf(self, op, arglocs, regalloc):
-        pass
-        """
-        self.mc.addox(*self.do_emit_int_binary_ovf(op, arglocs))
-        """
-
-    def emit_int_sub_ovf(self, op, arglocs, regalloc):
-        pass
-        """
-        self.mc.subox(*self.do_emit_int_binary_ovf(op, arglocs))
-        """
-
-    def emit_int_mul_ovf(self, op, arglocs, regalloc):
-        pass
-        """
-        if IS_PPC_32:
-            self.mc.mullwox(*self.do_emit_int_binary_ovf(op, arglocs))
-        else:
-            self.mc.mulldox(*self.do_emit_int_binary_ovf(op, arglocs))
-        """
-
-    def emit_int_floordiv(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        if IS_PPC_32:
-            self.mc.divw(res.value, l0.value, l1.value)
-        else:
-            self.mc.divd(res.value, l0.value, l1.value)
-        """
-
-    def emit_int_mod(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        if IS_PPC_32:
-            self.mc.divw(r.r0.value, l0.value, l1.value)
-            self.mc.mullw(r.r0.value, r.r0.value, l1.value)
-        else:
-            self.mc.divd(r.r0.value, l0.value, l1.value)
-            self.mc.mulld(r.r0.value, r.r0.value, l1.value)
-        self.mc.subf(r.r0.value, r.r0.value, l0.value)
-        self.mc.mr(res.value, r.r0.value)
-        """
-
-    def emit_int_and(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        self.mc.and_(res.value, l0.value, l1.value)
-        """
-
-    def emit_int_or(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        self.mc.or_(res.value, l0.value, l1.value)
-        """
-
-    def emit_int_xor(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        self.mc.xor(res.value, l0.value, l1.value)
-        """
-        
-    def emit_int_lshift(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        if IS_PPC_32:
-            self.mc.slw(res.value, l0.value, l1.value)
-        else:
-            self.mc.sld(res.value, l0.value, l1.value)
-        """
-
-    def emit_int_rshift(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        if IS_PPC_32:
-            self.mc.sraw(res.value, l0.value, l1.value)
-        else:
-            self.mc.srad(res.value, l0.value, l1.value)
-        """
-
-    def emit_uint_rshift(self, op, arglocs, regalloc):
-        pass
-        """
-        l0, l1, res = arglocs
-        if IS_PPC_32:
-            self.mc.srw(res.value, l0.value, l1.value)
-        else:
-            self.mc.srd(res.value, l0.value, l1.value)
-        """
     
-    def emit_uint_floordiv(self, op, arglocs, regalloc):
-        pass
-        """
+    def do_emit_int_op(self, arglocs, optr):
         l0, l1, res = arglocs
-        if IS_PPC_32:
-            self.mc.divwu(res.value, l0.value, l1.value)
-        else:
-            self.mc.divdu(res.value, l0.value, l1.value)
-        """
+        v0 = get_int(l0)
+        v1 = get_int(l1)
+        inst = self.mc.new_binop(self.bb, optr, self.type_int, v0, v1)
+        inst_res = self.mc.get_inst_res(inst, 0)
+        self.vars[res] = inst_res
+    
+    def gen_emit_int_op(optr):
+        def f(self, op, arglocs, regalloc):
+            do_emit_int_op(self, arglocs, optr)
+        return f
+        
+    emit_int_add = gen_emit_int_op(self.mc.MuBinOptr.ADD)
+    emit_int_add_ovf = emit_int_add #Mu handles overflows internally
+    emit_int_sub = gen_emit_int_op(self.mc.MuBinOptr.SUB)
+    emit_int_sub_ovf = emit_int_sub
+    emit_int_mul = gen_emit_int_op(self.mc.MuBinOptr.MUL)
+    emit_int_mul_ovf = emit_int_mul
+    emit_int_floordiv = gen_emit_int_op(self.mc.MuBinOptr.SDIV)
+    emit_uint_floordiv = gen_emit_int_op(self.mc.MuBinOptr.UDIV)
+    emit_int_mod = gen_emit_int_op(self.mc.MuBinOptr.SREM)
+    
+    emit_int_and = gen_emit_int_op(self.mc.MuBinOptr.AND)
+    emit_int_or = gen_emit_int_op(self.mc.MuBinOptr.OR)
+    emit_int_xor = gen_emit_int_op(self.mc.MuBinOptr.XOR)
+    emit_int_lshift = gen_emit_int_op(self.mc.MuBinOptr.SHL)
+    emit_int_rshift = gen_emit_int_op(self.mc.MuBinOptr.ASHR)
+    emit_uint_rshift = gen_emit_int_op(self.mc.MuBinOptr.LSHR)
+    
+    emit_nursery_ptr_increment = emit_int_add   #unsure what this does
+    
+    def do_emit_cmp_op(self, arglocs, condition):
+        l0, l1, res = arglocs
+        v0 = get_int(l0)
+        v1 = get_int(l1)
+        inst = self.mc.new_cmp(self.bb, condition, self.type_int, v0, v1)
+        inst_res = self.mc.get_inst_res(inst, 0)
+        self.vars[res] = inst_res
+    
+    def gen_emit_cmp_op(condition):
+        def f(self, op, arglocs, regalloc):
+            do_emit_cmp_op(self, arglocs, condition)
+        return f
+    
+    emit_int_le = gen_emit_cmp_op(self.mc.MuCmpOptr.SLE)
+    emit_int_lt = gen_emit_cmp_op(self.mc.MuCmpOptr.SLT)
+    emit_int_gt = gen_emit_cmp_op(self.mc.MuCmpOptr.SGT)
+    emit_int_ge = gen_emit_cmp_op(self.mc.MuCmpOptr.SGE)
+    emit_int_eq = gen_emit_cmp_op(self.mc.MuCmpOptr.EQ)
+    emit_int_ne = gen_emit_cmp_op(self.mc.MuCmpOptr.NE)
 
-    emit_int_le = gen_emit_cmp_op(c.LE)
-    emit_int_lt = gen_emit_cmp_op(c.LT)
-    emit_int_gt = gen_emit_cmp_op(c.GT)
-    emit_int_ge = gen_emit_cmp_op(c.GE)
-    emit_int_eq = gen_emit_cmp_op(c.EQ)
-    emit_int_ne = gen_emit_cmp_op(c.NE)
-
-    emit_uint_lt = gen_emit_cmp_op(c.LT, signed=False)
-    emit_uint_le = gen_emit_cmp_op(c.LE, signed=False)
-    emit_uint_gt = gen_emit_cmp_op(c.GT, signed=False)
-    emit_uint_ge = gen_emit_cmp_op(c.GE, signed=False)
+    emit_uint_lt = gen_emit_cmp_op(self.mc.MuCmpOptr.ULT)
+    emit_uint_le = gen_emit_cmp_op(self.mc.MuCmpOptr.ULE)
+    emit_uint_gt = gen_emit_cmp_op(self.mc.MuCmpOptr.UGT)
+    emit_uint_ge = gen_emit_cmp_op(self.mc.MuCmpOptr.UGE)
 
     emit_int_is_zero = emit_int_eq   # EQ to 0
     emit_int_is_true = emit_int_ne   # NE to 0
@@ -209,6 +103,7 @@ class IntOpAssembler(object):
 
     emit_instance_ptr_eq = emit_ptr_eq
     emit_instance_ptr_ne = emit_ptr_ne
+    
 
     def emit_int_neg(self, op, arglocs, regalloc):
         pass
@@ -258,6 +153,13 @@ class FloatOpAssembler(object):
 
     def emit_float_add(self, op, arglocs, regalloc):
         pass
+        l0, l1, res = arglocs
+        optr = MuBinOptr.FADD
+        v0 = get_float(l0)
+        v1 = get_float(l1)
+        inst = self.mc.new_binop(self.bb, optr, self.type_float, v0, v1)
+        inst_res = self.mc.get_inst_res(inst, 0)
+        self.vars[res] = inst_res
         """
         l0, l1, res = arglocs
         self.mc.fadd(res.value, l0.value, l1.value)
@@ -326,15 +228,22 @@ class FloatOpAssembler(object):
         self.mc.ld(resloc.value, r.SP.value, THREADLOCAL_ADDR_OFFSET)
         self._load_from_mem(resloc, resloc, imm(offset), imm(size), imm(sign))
         """
-
+        
+    """
     emit_float_le = gen_emit_cmp_op(c.LE, fp=True)
     emit_float_lt = gen_emit_cmp_op(c.LT, fp=True)
     emit_float_gt = gen_emit_cmp_op(c.GT, fp=True)
     emit_float_ge = gen_emit_cmp_op(c.GE, fp=True)
     emit_float_eq = gen_emit_cmp_op(c.EQ, fp=True)
     emit_float_ne = gen_emit_cmp_op(c.NE, fp=True)
+    """
 
     def emit_cast_float_to_int(self, op, arglocs, regalloc):
+        l0, res = arglocs
+        v0 = get_float(l0)
+        inst = self.mc.new_conv(self, self.bndl, self.mc.MuConvOptr.FPTOSI, self.type_float, self.type_int, v0)
+        inst_res = self.mc.get_inst_res(inst, 0)
+        self.vars[res] = inst_res
         pass
         """
         l0, temp_loc, res = arglocs
@@ -870,7 +779,7 @@ class CallOpAssembler(object):
         return regalloc.operations[regalloc.rm.position + delta]
         """
 
-    #_COND_CALL_SAVE_REGS = [r.r3, r.r4, r.r5, r.r6, r.r12]
+    _COND_CALL_SAVE_REGS = [r.r3, r.r4, r.r5, r.r6, r.r12]
 
     def emit_cond_call(self, op, arglocs, regalloc):
         pass
@@ -1654,5 +1563,28 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
                   AllocOpAssembler, FloatOpAssembler):
     _mixin_ = True
 
+    def __init__(self):
+        muvm = Mu
+        mc = muvm.new_context()
+        bndl = mc.new_bundle()
+        vars = dict()
+        type_int = mc.new_type_int(bndl, 32)
+        type_float = mc.new_type_float(bndl)
+    
+    def get_int(arg):
+        if arg in self.vars:
+            var = self.vars[arg]
+        else
+            var = self.mc.new_const_int(bndl, self.type_int, arg.value)
+            self.vars[arg] = var
+        return var
+    
+    def get_float(arg):
+        if arg in self.vars:
+            var = self.vars[arg]
+        else
+            var = self.mc.new_const_int(bndl, self.type_float, arg.value)
+            self.vars[arg] = var
+        return var
+    
     def nop(self):
-        pass
