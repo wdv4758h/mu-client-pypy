@@ -64,11 +64,12 @@ class SSALocation(AssemblerLocation):
     """
     _immutable_ = True
 
-    def __init__(self, value, t=INT, width=WORD*8):
+    def __init__(self, value, t=INT, width=DOUBLE_WORD*8):
         '''Constructor for SSALocation class. Parameters as follow
-        value: Box:       (some sort of wrapper)
-        t:     type str:  (INT = 'i', FLOAT = 'f', etc)
-        width: int:       for int types only
+            value: int:       index in registers
+            t:     type str:  (INT = 'i', FLOAT = 'f', etc)
+            width: int:       for int types only
+                Defaults to 64 bits - we are doing 64 bit python for now
         '''
         self.value  = value
         self.t      = Type(t = t, width=width)
@@ -92,6 +93,21 @@ class SSALocation(AssemblerLocation):
 
     def as_key(self):       # 0 <= as_key <= 15
         return self.value
+
+class LocalLocation(SSALocation):
+    def is_local(self):
+        return True
+    
+    def __repr__(self):
+        return '%{}_{}'.format(self.t.prefix(), self.value)
+
+class GlobalLocation(SSALocation):
+    def is_global(self):
+        return True
+
+    def __repr__(self):
+        return '@{}_{}'.format(self.t.prefix(), self.value)
+    
     
 # Probably to be discarded
 """
