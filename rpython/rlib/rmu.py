@@ -46,6 +46,12 @@ class Mu:
         # type (MuTrapHandler, MuCPtr) -> None
         self._mu.c_set_trap_handler(self._mu, trap_handler, userdata)
 
+    def make_boot_image(self, whitelist, output_file):
+        # type ([MuID], str) -> None
+        with scoped_lst2arr(MuID, whitelist) as (arr, sz):
+            with rffi.scoped_str2charp(output_file) as buf:
+                self._mu.c_make_boot_image(self._mu, arr, sz, buf)
+
     def execute(self):
         # type () -> None
         self._mu.c_execute(self._mu)
@@ -599,6 +605,11 @@ class MuContext:
         # type: (MuBundleNode, MuTypeNode, [MuConstNode]) -> MuConstNode
         with scoped_lst2arr(MuConstNode, elems) as (arr, sz):
             return self._ctx.c_new_const_seq(self._ctx, b, ty, arr, sz)
+
+    def new_const_extern(self, b, ty, symbol):
+        # type: (MuBundleNode, MuTypeNode, str) -> MuConstNode
+        with rffi.scoped_str2charp(symbol) as buf:
+            return self._ctx.c_new_const_extern(self._ctx, b, ty, buf)
 
     def new_global_cell(self, b, ty):
         # type: (MuBundleNode, MuTypeNode) -> MuGlobalNode
@@ -1192,6 +1203,7 @@ MuVM.become(rffi.CStruct(
     ('id_of', _fnp([MuVMPtr, MuName], MuID)),
     ('name_of', _fnp([MuVMPtr, MuID], MuName)),
     ('set_trap_handler', _fnp([MuVMPtr, MuTrapHandler, MuCPtr], lltype.Void)),
+    ('make_boot_image', _fnp([MuVMPtr, MuIDPtr, MuArraySize, rffi.CCHARP], lltype.Void)),
     ('execute', _fnp([MuVMPtr], lltype.Void)),
     ('get_mu_error_ptr', _fnp([MuVMPtr], rffi.INTP))
 ))
@@ -1328,6 +1340,7 @@ MuCtx.become(rffi.CStruct(
     ('new_const_double', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, rffi.DOUBLE], MuConstNode)),
     ('new_const_null', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode], MuConstNode)),
     ('new_const_seq', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, MuConstNodePtr, MuArraySize], MuConstNode)),
+    ('new_const_extern', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, rffi.CCHARP], MuConstNode)),
     ('new_global_cell', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode], MuGlobalNode)),
     ('new_func', rffi.CCallback([MuCtxPtr, MuBundleNode, MuFuncSigNode], MuFuncNode)),
     ('new_func_ver', rffi.CCallback([MuCtxPtr, MuBundleNode, MuFuncNode], MuFuncVerNode)),
