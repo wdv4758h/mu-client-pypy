@@ -628,9 +628,13 @@ class MuContext:
         # type: (MuBBNode) -> MuExcParamNode
         return self._ctx.c_new_exc_param(self._ctx, bb)
 
-    def new_inst_res(self, inst):
-        # type: (MuInstNode) -> MuInstResNode
-        return self._ctx.c_new_inst_res(self._ctx, inst)
+    def get_inst_res(self, inst, idx):
+        # type: (MuInstNode, int) -> MuInstResNode
+        return self._ctx.c_get_inst_res(self._ctx, inst, rffi.cast(rffi.INT, idx))
+
+    def get_num_inst_res(self, inst):
+        # type: (MuInstNode) -> int
+        return int(self._ctx.c_get_num_inst_res(self._ctx, inst))
 
     def add_dest(self, inst, kind, dest, vars):
         # type: (MuInstNode, MuDestKind, MuBBNode, [MuVarNode]) -> None
@@ -1332,7 +1336,8 @@ MuCtx.become(rffi.CStruct(
     ('new_bb', rffi.CCallback([MuCtxPtr, MuFuncVerNode], MuBBNode)),
     ('new_nor_param', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode], MuNorParamNode)),
     ('new_exc_param', rffi.CCallback([MuCtxPtr, MuBBNode], MuExcParamNode)),
-    ('new_inst_res', rffi.CCallback([MuCtxPtr, MuInstNode], MuInstResNode)),
+    ('get_inst_res', rffi.CCallback([MuCtxPtr, MuInstNode, rffi.INT], MuInstResNode)),
+    ('get_num_inst_res', rffi.CCallback([MuCtxPtr, MuInstNode], rffi.INT)),
     ('add_dest',
      rffi.CCallback([MuCtxPtr, MuInstNode, MuDestKind._lltype, MuBBNode, MuVarNodePtr, MuArraySize], lltype.Void)),
     ('add_keepalives', rffi.CCallback([MuCtxPtr, MuInstNode, MuLocalVarNodePtr, MuArraySize], lltype.Void)),
