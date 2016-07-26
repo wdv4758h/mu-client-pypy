@@ -11,8 +11,6 @@ import zipfile
 import json
 from rpython.tool.ansi_mandelbrot import Driver
 
-log = AnsiLogger("MuTextIRGenerator")
-
 try:
     import zlib
     zip_compression = zipfile.ZIP_DEFLATED
@@ -20,14 +18,27 @@ except ImportError:
     zip_compression = zipfile.ZIP_STORED
 
 
-mdb = Driver()
+__mdb = Driver()
 
+def get_codegen_class():
+    from rpython.config.translationoption import get_translation_config
+    config = get_translation_config()
+    if config.translation.mucodegen == "text":
+        return MuTextBundleGenerator
+    else:
+        return MuAPIBundleGenerator
 
-class MuTextIRBuilder(object):
+class MuBundleGenerator:
     def __init__(self, db):
         self.db = db
         self.graphs = db.graphs
+        self.log = AnsiLogger(self.__class__.__name__)
+        
+    def bundlegen(self, bdlpath):
+        raise NotImplementedError
 
+
+class MuTextBundleGenerator(MuBundleGenerator):
     def bundlegen(self, bdlpath):
         strio_ir = StringIO()
         strio_hail = StringIO()
@@ -35,7 +46,7 @@ class MuTextIRBuilder(object):
         strio_graphs = StringIO()
         self.codegen(strio_ir, strio_hail, strio_exfn, strio_graphs)
 
-        log.zipbundle("generate zip bundle...")
+        self.log.zipbundle("generate zip bundle...")
         zf = zipfile.ZipFile(bdlpath.strpath, mode="w", compression=zip_compression)
 
         def _writefrom(entry_name, strio):
@@ -48,7 +59,7 @@ class MuTextIRBuilder(object):
         _writefrom(bdlpath.basename.replace('.mu', '.exfn'), strio_exfn)
         _writefrom(bdlpath.basename.replace('.mu', '.txt'), strio_graphs)
         zf.close()
-        log.zipbundle("done.")
+        self.log.zipbundle("done.")
 
     def codegen(self, fp_ir, fp_hail, fp_exfn, fp_rpy_graphs=None):
         """
@@ -56,14 +67,16 @@ class MuTextIRBuilder(object):
         """
 
 
-        log.codegen("generating bundle code...")
+        self.log.codegen("generating bundle code...")
         for cls in self.db.gbltypes:
             for t in self.db.gbltypes[cls]:
-                fp_ir.write("%s %s = %s\n" % (".funcsig" if isinstance(t, mutype.MuFuncSig) else ".typedef",
-                                              t.mu_name, t.mu_constructor))
+                fp_ir.write("%s %s = %s\n" % (
+                    ".funcsig" if isinstance(t, mutype.MuFuncSig) else ".typedef",
+                    t.mu_name, t.mu_constructor))
 
         for cst in self.db.gblcnsts:
-            fp_ir.write(".const %s <%s> = %r\n" % (cst.mu_name, cst.mu_type.mu_name, cst.value))
+            fp_ir.write(".const %s <%s> = %r\n" % (
+                cst.mu_name, cst.mu_type.mu_name, cst.value))
 
         for gcell in self.db.mutyper.ldgcells:
             fp_ir.write(".global %s <%s>\n" % (gcell.mu_name, gcell._T.mu_name))
@@ -77,8 +90,8 @@ class MuTextIRBuilder(object):
         fp_exfn.write(json.dumps(fncs))
 
         for g in self.graphs:
-            fp_ir.write(".funcdef %s VERSION %s <%s> {\n" % (g.mu_name, g.mu_version.mu_name,
-                                                             g.mu_type.Sig.mu_name))
+            fp_ir.write(".funcdef %s VERSION %s <%s> {\n" % (
+                g.mu_name, g.mu_version.mu_name, g.mu_type.Sig.mu_name))
             self._genblocks(g, fp_ir)
             fp_ir.write("}\n")
 
@@ -86,15 +99,22 @@ class MuTextIRBuilder(object):
             for g in self.graphs:
                 print_graph(g, fp_rpy_graphs)
 
-        log.codegen("finished.")
+        self.log.codegen("finished.")
 
     def _genblocks(self, g, fp):
         idt = 4  # indentation
         for blk in g.iterblocks():
             fp.write('%s%s(%s)%s:\n' % (
                 ' ' * idt, blk.mu_name,
-                ' '.join(["<%s> %s" % (arg.mu_type.mu_name, arg.mu_name) for arg in blk.mu_inputargs]),
+                ' '.join(["<%s> %s" % (arg.mu_type.mu_name, arg.mu_name)
+                          for arg in blk.mu_inputargs]),
                 '[%s]' % blk.mu_excparam.mu_name if hasattr(blk, 'mu_excparam') else ''
             ))
             for op in blk.mu_operations:
                 fp.write("%s%s\n" % (' ' * idt * 2, op))
+
+
+class MuAPIBundleGenerator(MuBundleGenerator):
+    def bundlegen(self, bdlpath):
+        self.log.bundlegen("API Bundle generator")
+        pass

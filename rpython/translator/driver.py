@@ -14,7 +14,7 @@ from rpython.tool.ansi_print import AnsiLogger
 from rpython.tool.udir import udir
 from rpython.translator.goal import query
 from rpython.translator.goal.timing import Timer
-from rpython.translator.mu.genmu import MuTextIRBuilder
+from rpython.translator.mu.genmu import get_codegen_class
 from rpython.translator.tool.taskengine import SimpleTaskEngine
 from rpython.translator.translator import TranslationContext
 from .mu.database import MuDatabase
@@ -573,8 +573,9 @@ class TranslationDriver(SimpleTaskEngine):
             bundle_name = target_name + MuDatabase.bundle_suffix
         else:
             bundle_name = target_name
-        builder = MuTextIRBuilder(self.mudb)
-        builder.bundlegen(bundle_name)
+        cls = get_codegen_class()
+        bdlgen = cls(self.mudb)
+        bdlgen.bundlegen(bundle_name)
 
     def proceed(self, goals):
         if not goals:

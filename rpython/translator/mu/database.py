@@ -9,7 +9,6 @@ from rpython.mutyper.muts import mutype
 from rpython.translator.mu.hail import HAILGenerator
 from rpython.tool.ansi_mandelbrot import Driver
 from rpython.tool.ansi_print import AnsiLogger
-log = AnsiLogger("MuTextIRGenerator")
 mdb = Driver()
 
 
@@ -25,6 +24,8 @@ class MuDatabase:
         self.hailgen = HAILGenerator()
         graphs.append(self._create_bundle_entry(self.prog_entry))
         self.graphs = graphs
+        
+        self.log = AnsiLogger(self.__class__.__name__)
 
     def _create_bundle_entry(self, pe):
         blk = Block([])
@@ -54,7 +55,7 @@ class MuDatabase:
         return be
 
     def collect_gbldefs(self):
-        log.collect_gbldefs("start collecting...")
+        self.log.collect_gbldefs("start collecting...")
 
         def _trav_symbol(v):
             if hasattr(v, 'mu_type'):
@@ -73,7 +74,7 @@ class MuDatabase:
             elif isinstance(v, mutype.MuType):
                 self._recursive_addtype(v)
 
-        log.collect_gbldefs("traversing graphs...")
+        self.log.collect_gbldefs("traversing graphs...")
         for g in self.graphs:
             _trav_symbol(g)
             for blk in g.iterblocks():
@@ -105,16 +106,16 @@ class MuDatabase:
 
         mdb.restart()
 
-        log.hailgen("start adding global cells...")
+        self.log.hailgen("start adding global cells...")
         for gcl in self.mutyper.ldgcells:
             self.hailgen.add_gcell(gcl)
 
         for t in self.hailgen.get_types():
             self._recursive_addtype(t)
 
-        log.hailgen("finished.")
+        self.log.hailgen("finished.")
 
-        log.collect_gbldefs("finished.")
+        self.log.collect_gbldefs("finished.")
 
     def _recursive_addtype(self, mut):
         key = mut.__class__
