@@ -6,6 +6,7 @@ This defines an abstract builder that needs to be implemented concretely.
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.mutyper.muts import mutype
 from rpython.mutyper.tools.textgraph import print_graph
+from rpython.rlib.rmu import Mu
 from StringIO import StringIO
 import zipfile
 import json
@@ -115,6 +116,32 @@ class MuTextBundleGenerator(MuBundleGenerator):
 
 
 class MuAPIBundleGenerator(MuBundleGenerator):
+    def __init__(self, db):
+        MuBundleGenerator.__init__(self, db)
+        self.node_map = {}
+        self.mu = Mu()
+        self.ctx = self.mu.new_context()
+        self.bdl = None
+
     def bundlegen(self, bdlpath):
         self.log.bundlegen("API Bundle generator")
+
+        self.bdl = self.ctx.new_bundle()
+
+        self.gen_types()
+        self.gen_consts()
+        self.gen_graphs()
+        self.gen_gcells()
+        self.mu.make_boot_image([], bdlpath)
+
+    def gen_types(self):
+        pass
+
+    def gen_consts(self):
+        pass
+
+    def gen_graphs(self):
+        pass
+
+    def gen_gcells(self):
         pass
