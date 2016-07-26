@@ -115,6 +115,7 @@ class MuTextBundleGenerator(MuBundleGenerator):
                 fp.write("%s%s\n" % (' ' * idt * 2, op))
 
 
+# NOTE: when rewriting, use visitor pattern for type generation
 class MuAPIBundleGenerator(MuBundleGenerator):
     def __init__(self, db):
         MuBundleGenerator.__init__(self, db)
@@ -135,7 +136,59 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         self.mu.make_boot_image([], bdlpath)
 
     def gen_types(self):
-        pass
+        bdl = self.bdl
+        ctx = self.ctx
+        ref_nodes = []  # 2 pass declaration, need to call set_
+        ndmap = self.node_map
+        ndmap.update(
+            {
+                mutype.int1_t: ctx.new_type_int(bdl, 1),
+                mutype.int8_t: ctx.new_type_int(bdl, 8),
+                mutype.int16_t: ctx.new_type_int(bdl, 16),
+                mutype.int32_t: ctx.new_type_int(bdl, 32),
+                mutype.int64_t: ctx.new_type_int(bdl, 64),
+                mutype.int128_t: ctx.new_type_int(bdl, 128),
+                mutype.float_t: ctx.new_type_float(bdl),
+                mutype.double_t: ctx.new_type_double(bdl),
+                mutype.void_t: ctx.new_type_void(bdl),
+            }
+        )
+
+        def _gen_type(t):
+            try:
+                return ndmap[t]
+            except KeyError:
+                if isinstance(t, mutype.MuStruct):
+                    nd = ctx.new_type_struct(bdl, 
+                                             map(_gen_type, [t._flds[n] for n in t._names]))
+                    ndmap[t] = nd
+                    return nd
+                elif isinstance(t, mutype.MuHybrid):
+                    nd = ctx.new_type_hybrid(bdl,
+                                             map(_gen_type, [t._flds[n] for n in t._names[:-1]]),
+                                             _gen_type(t._flds[t._varfld]))
+                    ndmap[t] = nd
+                    return nd
+                elif isinstance(t, mutype.MuArray):
+                    nd = ctx.new_type_array(bdl, _gen_type(t.OF), t.length)
+                    ndmap[t] = nd
+                    return nd
+                elif isinstance(t, mutype.MuRefType):
+                    fn = getattr(ctx, "new_type_" + t.__class__.type_constr_name)
+                    nd = fn(bdl)
+                    ref_nodes.append((t, nd))
+                    ndmap[t] = nd
+                    return nd
+                elif isinstance(t, mutype.MuFuncSig):
+                    nd = ctx.new_funcsig(bdl, map(_gen_type, t.ARGS), map(_gen_type, t.RTNS))
+                    ndmap[t] = nd
+                    return nd
+                else:
+                    raise TypeError("Unknown type: %s" % t)
+
+        for cls in self.db.gbltypes:
+            for ty in self.db.gbltypes[cls]:
+                _gen_type(ty)
 
     def gen_consts(self):
         pass

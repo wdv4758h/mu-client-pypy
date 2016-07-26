@@ -665,6 +665,7 @@ class _muarray(_mumemarray, _mucontainer):
 
 # ----------------------------------------------------------
 class MuRefType(MuType):
+    type_constr_name = None
     def _defl(self, parent=None, parentindex=None):
         return _munullref(self)
 
