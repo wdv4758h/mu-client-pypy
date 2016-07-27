@@ -71,9 +71,9 @@ class MuTextIRBuilder(object):
         self.db.hailgen.codegen(fp_hail)
 
         fncs = []
-        for gcl in self.db.mutyper.externfncs:
-            fp_ir.write(".global %s <%s>\n" % (gcl.mu_name, gcl._T.mu_name))
-            fncs.append((gcl.c_name, str(gcl._T.mu_name), str(gcl.mu_name), gcl.c_libs))
+        for extfn in self.db.externfncs:
+            fp_ir.write(".const %s <%s> = EXTERN \"%s\"\n" % (extfn.mu_name, extfn._TYPE.mu_name, extfn.c_name))
+            fncs.append((extfn.c_name, str(extfn._TYPE.mu_name), str(extfn.mu_name), extfn.eci.libraries))
         fp_exfn.write(json.dumps(fncs))
 
         for g in self.graphs:

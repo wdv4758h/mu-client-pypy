@@ -1,6 +1,5 @@
 import pytest
 from rpython.mutyper.muts.muentity import MuName
-from rpython.mutyper.muts.muni import c_memcpy
 from rpython.mutyper.mutyper import MuTyper
 from rpython.translator.mu.preps import prepare
 from ..ll2mu import ll2mu_ty, ll2mu_val, ll2mu_op, GC_IDHASH_FLD
