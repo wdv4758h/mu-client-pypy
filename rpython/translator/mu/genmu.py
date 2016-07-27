@@ -175,7 +175,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                     return nd
                 elif isinstance(t, mutype.MuRefType):
                     fn = getattr(ctx, "new_type_" + t.__class__.type_constr_name)
-                    nd = fn(bdl)
+                    nd = fn(ctx, bdl)
                     ref_nodes.append((t, nd))
                     ndmap[t] = nd
                     return nd
@@ -190,9 +190,33 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             for ty in self.db.gbltypes[cls]:
                 _gen_type(ty)
 
-    def gen_consts(self):
-        pass
+        for ref_t, nd in ref_nodes:
+            fn = getattr(ctx, "set_type_" + ref_t.__class__.type_constr_name)
+            fn(ctx, nd, _gen_type(ref_t.TO))
 
+    def gen_consts(self):
+        bdl = self.bdl
+        ctx = self.ctx
+        ndmap = self.node_map
+        for cst in self.db.gblcnsts:
+            if isinstance(cst.mu_type, mutype.MuInt):
+                ty = cst.mu_type
+                if ty.bits > 64:
+                    ndmap[cst] = ctx.new_const_int(bdl, ndmap[ty], cst.value.val)
+                else:
+                    val = cst.value.val
+                    words = []
+                    while val != 0:
+                        words.append(val & 0xFFFFFFFFFFFFFFFF)
+                        val >>= 64
+                    ndmap[cst] = ctx.new_const_int_ex(bdl, ndmap[ty], words)
+            elif cst.mu_type == mutype.float_t:
+                ndmap[cst] = ctx.new_const_float(bdl, ndmap[cst.mu_type], cst.value.val)
+            elif cst.mu_type == mutype.double_t:
+                ndmap[cst] = ctx.new_const_double(bdl, ndmap[cst.mu_type], cst.value.val)
+            elif isinstance(cst.value, mutype._munullref):
+                ndmap[cst] = ctx.new_const_null(bdl, cst.mu_type)
+        
     def gen_graphs(self):
         pass
 
