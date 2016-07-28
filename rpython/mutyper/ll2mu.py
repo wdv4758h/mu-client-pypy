@@ -1,6 +1,6 @@
 from rpython.mutyper.muts.muentity import MuName
-from rpython.rtyper.lltypesystem import lltype
-from rpython.rtyper.lltypesystem import llmemory
+from rpython.rtyper.lltypesystem import lltype, llmemory, rffi
+from rpython.tool.ansi_mandelbrot import Driver
 from .muts import mutype
 from .muts import muops
 from .muts import muni
@@ -16,7 +16,7 @@ from rpython.tool.ansi_print import AnsiLogger
 
 
 log = AnsiLogger("ll2mu")
-
+mdb = Driver()
 
 # ----------------------------------------------------------
 _type_cache = {}
@@ -31,35 +31,28 @@ def ll2mu_ty(llt):
     try:
         return _type_cache[llt]
     except KeyError:
-        mut = _ll2mu_ty(llt)
+        if isinstance(llt, mutype.MuType):
+            mut = llt
+        elif llt is llmemory.Address:
+            mut = _lltype2mu_addr(llt)
+        elif isinstance(llt, lltype.Primitive):
+            mut = _lltype2mu_prim(llt)
+        elif isinstance(llt, lltype.FixedSizeArray):
+            mut = _lltype2mu_arrfix(llt)
+        elif isinstance(llt, lltype.Struct):
+            mut = _lltype2mu_stt(llt)
+        elif isinstance(llt, lltype.Array):
+            mut = _lltype2mu_arr(llt)
+        elif isinstance(llt, lltype.Ptr):
+            mut = _lltype2mu_ptr(llt)
+        elif isinstance(llt, lltype.OpaqueType):
+            mut = _lltype2mu_opq(llt)
+        elif llt is llmemory.WeakRef:
+            mut = _lltype2mu_wref(llt)
+        else:
+            raise NotImplementedError("Don't know how to specialise %s using MuTS." % llt)
         _type_cache[llt] = mut
         return mut
-
-
-def _ll2mu_ty(llt):
-    if isinstance(llt, mutype.MuType):
-        return llt
-    if llt is llmemory.Address:
-        return _lltype2mu_addr(llt)
-    elif isinstance(llt, lltype.Primitive):
-        return _lltype2mu_prim(llt)
-    elif isinstance(llt, lltype.FixedSizeArray):
-        return _lltype2mu_arrfix(llt)
-    elif isinstance(llt, lltype.Struct):
-        return _lltype2mu_stt(llt)
-    elif isinstance(llt, lltype.Array):
-        return _lltype2mu_arr(llt)
-    elif isinstance(llt, lltype.Ptr):
-        return _lltype2mu_ptr(llt)
-    elif isinstance(llt, lltype.OpaqueType):
-        return _lltype2mu_opq(llt)
-    elif llt is llmemory.WeakRef:
-        return _lltype2mu_wref(llt)
-
-    else:
-        raise NotImplementedError("Don't know how to specialise %s using MuTS." % llt)
-# ll2mu_ty = ll.saferecursive(_ll2mu_ty, None)
-
 
 def _lltype2mu_prim(llt):
     type_map = {
@@ -167,7 +160,7 @@ def _lltype2mu_arr(llt):
 def _lltype2mu_ptr(llt):
     if isinstance(llt.TO, lltype.FuncType):
         return _lltype2mu_funcptr(llt)
-    if llt.TO._gckind == 'gc' or (hasattr(llt.TO, '_hints') and llt.TO._hints.get("mu_ptr_as_ref", False)):
+    if llt.TO._gckind == 'gc' or (hasattr(llt.TO, '_hints') and llt.TO._hints.get("immutable", False)):
         cls = mutype.MuRef
     elif isinstance(llt.TO, lltype.OpaqueType) and llt.TO.hints.get("mu_ptr_as_ref", False):
         cls = mutype.MuRef
@@ -191,7 +184,7 @@ def _lltype2mu_addr(llt):
 
 def _lltype2mu_opq(llt):
     if llt is lltype.RuntimeTypeInfo:
-        return _ll2mu_ty(lltype.Char)  # rtti is defined to be a char in C backend.
+        return ll2mu_ty(lltype.Char)  # rtti is defined to be a char in C backend.
 
     mut = mutype.int64_t  # values of opaque type are translated to be 64-bit integers
     log.warning("mapping type %r -> %r" % (llt, mut))
@@ -203,11 +196,14 @@ def _lltype2mu_wref(llt):
 
 
 # ----------------------------------------------------------
+class IgnoredLLVal(NotImplementedError):
+    pass
+
 __ll2muval_cache = {}
 __ll2muval_cache_ptr = {}
 
 
-def ll2mu_val(llv):
+def ll2mu_val(llv, **kwargs):
     if isinstance(llv, mutype._muobject):
         return llv
     # if isinstance(llv, CDefinedIntSymbolic):
@@ -222,53 +218,44 @@ def ll2mu_val(llv):
     try:
         return cache[key]
     except KeyError:
-        muv = _ll2mu_val(llv)
+        llt = lltype.typeOf(llv)
+        if isinstance(llv, llmemory.AddressOffset):
+            muv = _llval2mu_adrofs(llv)
+
+        elif isinstance(llt, lltype.Primitive):
+            muv = _llval2mu_prim(llv)
+
+        elif isinstance(llv, lltype._fixedsizearray):
+            muv = _llval2mu_arrfix(llv)
+
+        elif isinstance(llv, lltype._struct):
+            muv = _llval2mu_stt(llv, **kwargs)
+
+        elif isinstance(llv, lltype._array):
+            muv = _llval2mu_arr(llv)
+
+        elif isinstance(llv, lltype._ptr):
+            muv = _llval2mu_ptr(llv)
+
+        elif isinstance(llv, lltype._opaque):
+            muv = _llval2mu_opq(llv)
+
+        elif isinstance(llv, llmemory._wref):
+            muv = _llval2mu_wref(llv)
+
+        else:
+            raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
+        
         if key not in cache:    # may have already been added to cache (in stt to prevent recursion).
             cache[key] = muv
         return muv
     except TypeError, e:
         if isinstance(llv, llmemory.AddressOffset):
-            return _ll2mu_val(llv)
-        elif isinstance(llv, lltype.Symbolic):
-            return _ll2mu_val(llv)
-        else:
-            raise e
-
-
-def _ll2mu_val(llv):
-    """
-    Map LLTS value types to MuTS value types
-    :param llv: LLTS value
-    :param llt: optional LLType, if the type information cannot be obtained from llv (Primitives)
-    :return: _muobject
-    """
-    llt = lltype.typeOf(llv)
-    if isinstance(llv, llmemory.AddressOffset):
-        return _llval2mu_adrofs(llv)
-
-    elif isinstance(llt, lltype.Primitive):
-        return _llval2mu_prim(llv)
-
-    elif isinstance(llv, lltype._fixedsizearray):
-        return _llval2mu_arrfix(llv)
-
-    elif isinstance(llv, lltype._struct):
-        return _llval2mu_stt(llv)
-
-    elif isinstance(llv, lltype._array):
-        return _llval2mu_arr(llv)
-
-    elif isinstance(llv, lltype._ptr):
-        return _llval2mu_ptr(llv)
-
-    elif isinstance(llv, lltype._opaque):
-        return _llval2mu_opq(llv)
-
-    elif isinstance(llv, llmemory._wref):
-        return _llval2mu_wref(llv)
-
-    else:
-        raise NotImplementedError("Don't know how to specialise value %r of type %r." % (llv, lltype.typeOf(llv)))
+            return _llval2mu_adrofs(llv)
+        llt = lltype.typeOf(llv)
+        if isinstance(llt, lltype.Primitive):
+            return _llval2mu_prim(llv)
+        raise e
 
 
 def _llval2mu_prim(llv):
@@ -277,11 +264,15 @@ def _llval2mu_prim(llv):
         llv = llv.compute_fn()
     elif isinstance(llv, CDefinedIntSymbolic):
         if llv.default == '?':
-            raise NotImplementedError("Unknown default value for CDefinedIntSymbolic '%s'." % llv.expr)
+            raise IgnoredLLVal
         llv = llv.default
     elif isinstance(llv, (str, unicode)):
         assert len(llv) == 1    # char
         llv = ord(llv)
+    elif isinstance(llv, rffi.CConstant):
+        from pypy.module._minimal_curses.fficurses import ERR, OK
+        assert llv in (ERR, OK)
+        llv = -1 if llv is ERR else 0
 
     return mutype._muprimitive(mut, llv)
 
@@ -294,44 +285,53 @@ def _llval2mu_arrfix(llv):
 
     return arr
 
-
-def _llval2mu_stt(llv):
+__topstt_map = {}
+def _llval2mu_stt(llv, building=False):
     if llv._TYPE._arrayfld:
         return _llval2mu_varstt(llv)
 
-    mut = ll2mu_ty(llv._TYPE)
-    stt = mutype._mustruct(mut)
+    topstt = llv._normalizedcontainer()
+    if building:
+        llt = lltype.typeOf(llv)
+        mut = ll2mu_ty(llt)
+        stt = mutype._mustruct(mut)
+        __ll2muval_cache[(llt, llv)] = stt
 
-    __ll2muval_cache[(llv._TYPE, llv)] = stt    # add to cache to prevent recursion.
+        if len(llv._TYPE._names) != 0:  # origional value struct is non-empty
+            for fld in filter(lambda n: n != GC_IDHASH_FLD, mut._names):
+                setattr(stt, fld, ll2mu_val(getattr(llv, fld), building=True))
 
-    if len(llv._TYPE._names) != 0:  # origional value struct is non-empty
-        for fld in filter(lambda n: n != GC_IDHASH_FLD, mut._names):
-            setattr(stt, fld, ll2mu_val(getattr(llv, fld)))
+        if hasattr(stt, GC_IDHASH_FLD) and hasattr(topstt, '_hash_cache_'):
+            _idhash = topstt._hash_cache_
+            setattr(stt, GC_IDHASH_FLD, mutype.int64_t(_idhash))
 
-    # deal with the parent structs
-    llstt = llv
-    mustt = stt
-    mustt_idhash = mustt if hasattr(mustt, GC_IDHASH_FLD) else None
-    _idhash = 0
-    while not (llstt._normalizedcontainer() is llstt):
-        llprnt = llstt._parentstructure()
-        prnt_idx = llstt._parent_index
-        prnt_llt = llprnt._TYPE
-        prnt_mut = ll2mu_ty(prnt_llt)
-        muprnt = mutype._mustruct(prnt_mut)
-        for fld in tuple(n for n in prnt_mut._names if n != prnt_idx and n != GC_IDHASH_FLD):
-            setattr(muprnt, fld, ll2mu_val(getattr(llprnt, fld)))
-        setattr(muprnt, prnt_idx, mustt)
-        mustt._setparent(muprnt, prnt_idx)
+        llprnt = llv._parentstructure()
+        llprnt_t = lltype.typeOf(llprnt)
+        if llprnt and isinstance(llprnt_t, lltype.Struct):
+            key = (llprnt_t, llprnt)
+            assert key in __ll2muval_cache
+            stt._setparent(__ll2muval_cache[key], llv._parent_index)
+    else:
+        if topstt not in __topstt_map:
+            # build from top
+            topstt_mu = _llval2mu_stt(topstt, building=True)
+            __topstt_map[topstt] = topstt_mu
+        else:
+            topstt_mu = __topstt_map[topstt]
 
-        if hasattr(llprnt, '_hash_cache_'):
-            _idhash = llprnt._hash_cache_
+        # work out the depth of parent structure
+        depth = 0
+        prnt = llv
+        while not prnt is topstt:
+            depth += 1
+            prnt = prnt._parentstructure()
 
-        llstt = llprnt
-        mustt = muprnt
+        # traverse down according to the depth
+        stt = topstt_mu
+        while depth > 0:
+            depth -= 1
+            stt = stt.super
 
-    if mustt_idhash and _idhash != 0:
-        setattr(mustt_idhash, GC_IDHASH_FLD, mutype.int64_t(_idhash))
     return stt
 
 
@@ -365,7 +365,7 @@ def _llval2mu_arr(llv):
 
         return hyb
 
-
+__todorefs = []
 def _llval2mu_ptr(llv):
     if llv._obj0 is None:
         return mutype._munullref(ll2mu_ty(llv._TYPE))
@@ -378,8 +378,17 @@ def _llval2mu_ptr(llv):
         log.warning("Translating LL value '%(llv)r' to '%(muv)r'" % locals())
         return muv
 
-    return mutype._muref(mut, ll2mu_val(llv._obj))
+    muref = mutype._muref(mut)
+    __todorefs.append((llv._obj, muref))
+    return muref
+    # return mutype._muref(mut, ll2mu_val(llv._obj))
 
+
+def resolve_refobjs():
+    log.resolve_refobjs("Resolving all reference objects...")
+    for llv, muref in __todorefs:
+        muref.setobj(ll2mu_val(llv))
+        mdb.dot()
 
 def _llval2mu_funcptr(llv):
     mut = ll2mu_ty(llv._TYPE)
@@ -423,7 +432,7 @@ def _llval2mu_opq(llv):
 
     if hasattr(llv, 'container'):
         container = llv._normalizedcontainer()
-        muv = _ll2mu_val(container)
+        muv = ll2mu_val(container)
         # log.ll2mu_val("%(llv)r really is %(muv)r" % locals())
         return muv
 
@@ -545,7 +554,11 @@ def _llop2mu_direct_call(cst_fnc, *args, **kwargs):
 
 def _llop2mu_indirect_call(var_callee, *args, **kwargs):
     res = kwargs['res'] if 'res' in kwargs else None
-    return [muops.CALL(var_callee, args[:-1], result=res)]
+    last = args[-1]
+    if isinstance(last, Constant) and isinstance(last.value, list):
+        return [muops.CALL(var_callee, args[:-1], result=res)]
+    else:
+        return [muops.CALL(var_callee, args, result=res)]
 
 
 # ----------------
@@ -556,11 +569,18 @@ def _llop2mu_bool_not(x, res=None, llopname='bool_not'):
         v = ops.append(muops.ZEXT(x, mutype.bool_t))
     else:
         v = x
-    return [muops.XOR(v, _newprimconst(mutype.bool_t, 1), result=res)]
+    ops.append(muops.XOR(v, _newprimconst(mutype.bool_t, 1), result=res))
+    return ops
 
 
 def _llop2mu_int_is_true(x, res=None, llopname='int_is_true'):
-    return [muops.NE(x, _newprimconst(x.mu_type, 0), result=res)]
+    ops = _MuOpList()
+    cmp_res = ops.append(muops.NE(x, _newprimconst(x.mu_type, 0)))
+    ops.append(muops.SELECT(cmp_res,
+                            _newprimconst(mutype.bool_t, 1),
+                            _newprimconst(mutype.bool_t, 0),
+                            result=res))
+    return ops
 
 
 def _llop2mu_int_neg(x, res=None, llopname='int_neg'):
@@ -572,7 +592,7 @@ def _llop2mu_int_abs(x, res=None, llopname='int_abs'):
     # -x = 0 - x
     neg_x = ops.extend(_ll2mu_op('int_neg', [x]))
     # x > 0?
-    cmp_res = ops.extend(_ll2mu_op('int_gt', [x, _newprimconst(x.mu_type, 0)]))
+    cmp_res = ops.append(muops.SGT(x, _newprimconst(x.mu_type, 0)))
     # True -> x, False -> -x
     ops.append(muops.SELECT(cmp_res, x, neg_x, result=res))
     return ops
@@ -609,16 +629,22 @@ def _llop2mu_float_abs(x, res=None, llopname='float_abs'):
     # -x = 0 - x
     neg_x = ops.extend(_ll2mu_op('float_neg', [x]))
     # x > 0 ?
-    cmp_res = ops.extend(_ll2mu_op('float_gt', [x, _newprimconst(x.mu_type, 0.0)]))
+    cmp_res = ops.append(muops.FOGT(x, _newprimconst(x.mu_type, 0.0)))
     # True -> x, False -> (-x)
     ops.append(muops.SELECT(cmp_res, x, neg_x, result=res))
     return ops
 
 
 def _llop2mu_float_is_true(x, res=None, llopname='float_is_true'):
-    return [muops.FUNE(x, _newprimconst(x.mu_type, 0.0), result=res)]
+    ops = _MuOpList()
+    cmp_res = ops.append(muops.FUNE(x, _newprimconst(x.mu_type, 0.0)))
+    ops.append(muops.SELECT(cmp_res,
+                            _newprimconst(mutype.bool_t, 1),
+                            _newprimconst(mutype.bool_t, 0),
+                            result=res))
+    return ops
 
-__primop_map = {
+__binop_map = {
     'int_floordiv':     'SDIV',
     'int_mod':          'SREM',
     'int_lshift':       'SHL',
@@ -631,27 +657,41 @@ __primop_map = {
     'float_sub':        'FSUB',
     'float_mul':        'FMUL',
     'float_truediv':    'FDIV',
+}
+
+__cmpop_map = {
     'int_eq':           'EQ',
     'int_ne':           'NE',
+    'unichar_eq':        'EQ',
+    'unichar_ne':       'NE',
     'float_eq':         'FOEQ',
     'float_ne':         'FUNE'
 }
 
 for op in "add sub mul and or xor".split(' '):
-    __primop_map['int_' + op] = op.upper()
+    __binop_map['int_' + op] = op.upper()
 for cmp in 'lt le gt ge'.split(' '):
-    __primop_map['int_' + cmp] = 'S' + cmp.upper()
-    __primop_map['uint_' + cmp] = 'U' + cmp.upper()
-    __primop_map['float_' + cmp] = 'FO' + cmp.upper()
-    __primop_map['char_' + cmp] = 'U' + cmp.upper()
-__primop_map['unichar_eq'] = 'EQ'
-__primop_map['unichar_ne'] = 'NE'
+    __cmpop_map['int_' + cmp] = 'S' + cmp.upper()
+    __cmpop_map['uint_' + cmp] = 'U' + cmp.upper()
+    __cmpop_map['float_' + cmp] = 'FO' + cmp.upper()
+    __cmpop_map['char_' + cmp] = 'U' + cmp.upper()
 
-for key in __primop_map:
+for key in __binop_map:
     globals()['_llop2mu_' + key] = \
-        lambda a, b, res, llopname: [getattr(muops, __primop_map[llopname])(a, b, result=res)]
+        lambda a, b, res, llopname: [getattr(muops, __binop_map[llopname])(a, b, result=res)]
 
-_llop2mu_int_add_nonneg_ovf = lambda a, b, res, llopname: [getattr(muops, __primop_map['int_add'])(a, b, result=res)]
+for key in __cmpop_map:
+    def __llop2mu_cmpop(a, b, res, llopname):
+        ops = _MuOpList()
+        cmpres = ops.append(getattr(muops, __cmpop_map[llopname])(a, b))
+        ops.append(muops.SELECT(cmpres,
+                                _newprimconst(mutype.bool_t, 1),
+                                _newprimconst(mutype.bool_t, 0),
+                                result=res))
+        return ops
+    globals()['_llop2mu_' + key] = __llop2mu_cmpop
+
+_llop2mu_int_add_nonneg_ovf = lambda a, b, res, llopname: [getattr(muops, __binop_map['int_add'])(a, b, result=res)]
 
 
 # ----------------
@@ -703,18 +743,23 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
     RES_MUTYPE = ll2mu_ty(RES_LLTYPE)
 
     def is_unsigned(LLT):
-        return LLT in (lltype.Unsigned, lltype.UnsignedLongLong) or \
-               (LLT._type in _inttypes.values() and not LLT._type.SIGNED)
+        return LLT in (lltype.Bool, lltype.Unsigned, lltype.UnsignedLongLong) or \
+               (hasattr(LLT, '_type') and LLT._type in _inttypes.values() and not LLT._type.SIGNED)
 
     if isinstance(SRC_LLTYPE, lltype.Ptr) and \
             (RES_LLTYPE == llmemory.Address or isinstance(RES_LLTYPE, lltype.Primitive)):
+        # Ptr -> Address/Signed
         assert SRC_LLTYPE.TO._gckind == 'raw'
         return _llop2mu_cast_ptr_to_adr(x, res)
+
     elif (SRC_LLTYPE == llmemory.Address or isinstance(SRC_LLTYPE, lltype.Primitive)) and \
             isinstance(RES_LLTYPE, lltype.Ptr):
+        # Address/Signed -> Ptr
         assert RES_LLTYPE.TO._gckind == 'raw'
         return _llop2mu_cast_adr_to_ptr(x, res)
+
     elif isinstance(SRC_MUTYPE, mutype.MuInt) and isinstance(RES_MUTYPE, mutype.MuInt):
+        # int -> int
         if SRC_MUTYPE.bits < RES_MUTYPE.bits:
             op = muops.ZEXT if is_unsigned(SRC_LLTYPE) else muops.SEXT
         elif SRC_MUTYPE.bits > RES_MUTYPE.bits:
@@ -723,14 +768,31 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
             return [], x
         return [op(x, RES_MUTYPE, result=res)]
 
-    elif SRC_MUTYPE.__class__ == RES_MUTYPE.__class__:
-        return [], x
-    elif SRC_MUTYPE is mutype.double_t and isinstance(RES_MUTYPE, mutype.MuInt):
-        return [muops.FPTOSI(x, RES_MUTYPE)]
-    elif isinstance(SRC_MUTYPE, mutype.MuInt) and RES_MUTYPE is mutype.double_t:
-        return [muops.SITOFP(x, RES_MUTYPE)]
+    elif SRC_MUTYPE in (mutype.double_t, mutype.float_t) and isinstance(RES_MUTYPE, mutype.MuInt):
+        # float/double -> int
+        return [muops.FPTOSI(x, RES_MUTYPE, result=res)]
 
-    raise NotImplementedError("force_cast(%s) -> %s" % (SRC_LLTYPE, RES_LLTYPE))
+    elif isinstance(SRC_MUTYPE, mutype.MuInt) and RES_MUTYPE in (mutype.double_t, mutype.float_t):
+        # int -> float/double
+        return [muops.SITOFP(x, RES_MUTYPE, result=res)]
+
+    elif SRC_MUTYPE is mutype.float_t and RES_MUTYPE is mutype.double_t:
+        # float -> double
+        return [muops.FPEXT(x, RES_MUTYPE, result=res)]
+
+    elif SRC_MUTYPE is mutype.double_t and RES_MUTYPE is mutype.float_t:
+        # double -> float
+        return [muops.FPTRUNC(x, RES_MUTYPE, result=res)]
+
+    elif isinstance(SRC_LLTYPE, lltype.Ptr) and isinstance(RES_LLTYPE, lltype.Ptr):
+        # Ptr -> Ptr
+        return _ll2mu_op('cast_pointer', [Constant(RES_LLTYPE), x], result=res)
+
+    elif SRC_MUTYPE == RES_MUTYPE:
+        return [], x
+
+    else:
+        raise NotImplementedError("force_cast(%s) -> %s" % (SRC_LLTYPE, RES_LLTYPE))
 
 _llop2mu_cast_primitive = _llop2mu_force_cast
 
@@ -754,6 +816,7 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
         if isinstance(mut, mutype.MuStruct):
             # Empty array
             obj = ops.append(muops.NEW(mut, result=res))
+            return ops
         else:
             obj = ops.append(muops.NEWHYBRID(mut, n, result=res))
     else:
@@ -838,7 +901,13 @@ def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
 
 
 def __getarrayitemiref(var, idx):
-    iref_var, ops = __getfieldiref(var, var.mu_type.TO._varfld)
+    if isinstance(var.mu_type.TO, mutype.MuHybrid):
+        iref_var, ops = __getfieldiref(var, var.mu_type.TO._varfld)
+    else:
+        assert isinstance(var.mu_type.TO, mutype.MuArray)
+        ops = _MuOpList()
+        iref_var = var if isinstance(var.mu_type, (mutype.MuIRef, mutype.MuUPtr)) else ops.append(muops.GETIREF(var))
+
     iref_itm = ops.append(muops.SHIFTIREF(iref_var, idx))
     return iref_itm, ops
 
@@ -941,11 +1010,23 @@ def _llop2mu_cast_opaque_ptr(var_ptr, res, llopname='cast_opaque_ptr'):
 
 
 def _llop2mu_ptr_eq(ptr1, ptr2, res=None, llopname='ptr_eq'):
-    return [muops.EQ(ptr1, ptr2, result=res)]
+    ops = _MuOpList()
+    cmp_res = ops.append(muops.EQ(ptr1, ptr2))
+    ops.append(muops.SELECT(cmp_res,
+                            _newprimconst(mutype.bool_t, 1),
+                            _newprimconst(mutype.bool_t, 0),
+                            result=res))
+    return ops
 
 
 def _llop2mu_ptr_ne(ptr1, ptr2, res=None, llopname='ptr_eq'):
-    return [muops.NE(ptr1, ptr2, result=res)]
+    ops = _MuOpList()
+    cmp_res = ops.append(muops.NE(ptr1, ptr2))
+    ops.append(muops.SELECT(cmp_res,
+                            _newprimconst(mutype.bool_t, 1),
+                            _newprimconst(mutype.bool_t, 0),
+                            result=res))
+    return ops
 
 
 def _llop2mu_ptr_nonzero(ptr, res=None, llopname='ptr_nonzero'):
@@ -971,6 +1052,14 @@ def _llop2mu_direct_ptradd(ptr, n, res=None, llopname='direct_ptradd'):
 
 def _llop2mu_shrink_array(ptr, sz, res=None, llopname='shrink_array'):
     return [], _newprimconst(mutype.bool_t, 0)  # always return False
+
+
+def _llop2mu_direct_arrayitems(ptr, res=None, llopname='direct_arrayitems'):
+    ARRAY = ptr.concretetype.TO
+    from rpython.translator.c.support import barebonearray
+    if not (isinstance(ARRAY, lltype.FixedSizeArray) or barebonearray(ARRAY)):
+        return _ll2mu_op('getfield', [ptr, Constant('items')], result=res)
+    return [], ptr
 
 
 # ----------------
@@ -1083,6 +1172,16 @@ def _llop2mu_gc_pin(ptr, res=None, llopname='gc_can_move'):
 def _llop2mu_gc_writebarrier_before_copy(src, dst, src_start, dst_start, length,
                                          res=None, llopname='gc_writebarrier_before_copy'):
     return [], _newprimconst(mutype.bool_t, 1)
+
+
+def _llop2mu_gc_load_indexed(buf, index, scale, base_ofs, res, llopname='gc_load_indexed'):
+    ops = _MuOpList()
+    adr = ops.append(muops.NATIVE_PIN(buf))
+    base_adr = ops.extend(_ll2mu_op('adr_add', [adr, base_ofs]))
+    ofs = ops.extend(_ll2mu_op('int_mul', [index, scale]))
+    ops.extend(_ll2mu_op('raw_load', [base_adr, ofs], result=res))
+    ops.append(muops.NATIVE_UNPIN(buf))
+    return ops
 
 
 def _llop2mu_gc_identityhash(obj, res=None, llopname='gc_identityhash'):
@@ -1237,6 +1336,19 @@ for _llopname in ("gc_get_rpy_roots",
 
 def _llop2mu_gc_thread_before_fork(res=None, llopname='gc_thread_before_fork'):
     return [], _newprimconst(res.mu_type, 0)
+
+
+def _llop2mu_gc_stack_bottom(res, llopname='gc_stack_bottom'):
+    return [], res
+
+
+# ----------------
+# Other dummy operations
+def _llop2mu_debug_offset(res, llopname='debug_offset'):
+    return [], _newprimconst(res.mu_type, -1)
+
+def _llop2mu_debug_fatalerror(msg, res, llopname='debug_fatalerror'):
+    return [], res
 
 
 # TODO: rest of the operations

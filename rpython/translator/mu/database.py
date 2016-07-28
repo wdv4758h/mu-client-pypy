@@ -61,13 +61,17 @@ class MuDatabase:
                 self._recursive_addtype(v.mu_type)
             if isinstance(v, Constant):
                 assert isinstance(v.value, mutype._muobject)
+                assert not isinstance(v.value, mutype._muref)
                 if isinstance(v.value, mutype._mufuncref):
                     if not hasattr(v, 'mu_name'):
                         assert getattr(v.value, 'graph', False)
                         v.mu_name = v.value.graph.mu_name
+                        assert v.mu_name
                 else:
                     v.__init__(v.value)     # rehash
                     self.gblcnsts.add(v)
+            elif isinstance(v, mutype.MuType):
+                self._recursive_addtype(v)
 
         log.collect_gbldefs("traversing graphs...")
         for g in self.graphs:
@@ -94,7 +98,7 @@ class MuDatabase:
                     for attr in "exc nor".split(' '):
                         dst = getattr(op.exc, attr)
                         if dst:
-                            _trav_symbol(dst.args)
+                            map(_trav_symbol, dst.args)
             mdb.dot()
 
         self._recursive_addtype(self.mutyper.tlstt_t)

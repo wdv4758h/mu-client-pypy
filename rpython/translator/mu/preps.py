@@ -47,14 +47,7 @@ def chop(graphs, g_entry):
 
         for blk in graph.iterblocks():
             for op in blk.operations:
-                if op.opname == 'direct_call':
-                    fnc = op.args[0].value._obj
-                    try:
-                        _visit(fnc.graph)
-                    except AttributeError:
-                        # log.error("Error: \"%s\" function does not have a graph" % fnc._name)
-                        pass
-                elif op.opname == 'indirect_call':
+                if op.opname == 'indirect_call':
                     possible_graphs = op.args[-1].value
                     if possible_graphs:
                         for callee in possible_graphs:

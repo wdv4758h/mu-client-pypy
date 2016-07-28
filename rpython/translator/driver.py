@@ -553,7 +553,19 @@ class TranslationDriver(SimpleTaskEngine):
         self.mutyper.prepare_all()
         self.mutyper.specialise_all()
 
-    @taskdef(["mutype_mu"], "MuIR Code Generation")
+    @taskdef(["mutype_mu"], "Mu backend optimisations.")
+    def task_optimise_mu(self):
+        self.log.info("Task optimise_mu")
+        from rpython.translator.mu.opts.all import mu_backend_opts
+        mu_backend_opts(self.translator.graphs)
+
+    @taskdef(["optimise_mu"], "Collect global defs into a database.")
+    def task_database_mu(self):
+        self.log.info("Task database_mu")
+        self.mudb = MuDatabase(self.translator.graphs, self.mutyper, self.translator.entry_point_graph)
+        self.mudb.collect_gbldefs()
+
+    @taskdef(["database_mu"], "MuIR Code Generation")
     def task_compile_mu(self):
         self.log.info("Task compile_mu")
         target_name = self.compute_exe_name()
@@ -561,10 +573,7 @@ class TranslationDriver(SimpleTaskEngine):
             bundle_name = target_name + MuDatabase.bundle_suffix
         else:
             bundle_name = target_name
-        mudb = MuDatabase(self.translator.graphs, self.mutyper, self.translator.entry_point_graph)
-        mudb.collect_gbldefs()
-
-        builder = MuTextIRBuilder(mudb)
+        builder = MuTextIRBuilder(self.mudb)
         builder.bundlegen(bundle_name)
 
     def proceed(self, goals):

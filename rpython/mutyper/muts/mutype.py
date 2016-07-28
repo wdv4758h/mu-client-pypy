@@ -3,7 +3,7 @@ Define Mu Type System in similar fashion of Low Level Type System.
 """
 import weakref
 from types import NoneType
-
+import math
 from rpython.rlib.objectmodel import Symbolic
 from rpython.rtyper.lltypesystem.lltype import LowLevelType, saferecursive, WeakValueDictionary, frozendict
 from .muentity import MuEntity, MuName
@@ -128,7 +128,12 @@ class _muprimitive(_muobject):
         self.val = val
 
     def __eq__(self, other):
-        return self._TYPE == other._TYPE and self.val == other.val
+        if self._TYPE != other._TYPE:
+            return False
+        if isinstance(self.val, float):
+            if math.isnan(self.val) or math.isinf(self.val):
+                return str(self.val) == str(other.val)
+        return self.val == other.val
 
     def __repr__(self):
         def _scistr(f):
@@ -156,7 +161,11 @@ class _muprimitive(_muobject):
         return repr_str
 
     def __hash__(self):
-        return hash((self._TYPE, self.val))
+        val = self.val
+        if isinstance(self.val, float):
+            if math.isnan(self.val) or math.isinf(self.val):
+                val = str(self.val)
+        return hash((self._TYPE, val))
 
 
 # ----------------------------------------------------------
@@ -306,9 +315,8 @@ class _mustruct(_muparentable, _mucontainer):
             setattr(self, fld, value)
 
         from ..ll2mu import GC_IDHASH_FLD
-        from random import randint
         if GC_IDHASH_FLD in TYPE._flds:
-            setattr(self, GC_IDHASH_FLD, int64_t(randint(0, 0x7FFFFFFFFFFFFFFF)))
+            setattr(self, GC_IDHASH_FLD, int64_t(0))
 
     def __setattr__(self, key, value):
         if hasattr(self, key) and key in self._TYPE._flds:
@@ -776,7 +784,7 @@ class _mufuncref(_mugenref):
             setattr(self, attr, attrs[attr])
 
     def __str__(self):
-        return "# %s" % self.fncname
+        return "# %s" % self.graph.name if self.graph else self.fncname
 
 
 class MuRef(MuRefType):
@@ -802,9 +810,12 @@ class MuRef(MuRefType):
 class _muref(_mugenref, _mucontainer):
     __slots__ = ("_T", "_obj0")
 
-    def __init__(self, TYPE, obj):
+    def __init__(self, TYPE, obj=None):
         _mucontainer.__init__(self, TYPE)
         self._T = TYPE.TO
+        self._obj0 = obj
+
+    def setobj(self, obj):
         self._obj0 = obj
 
     @property       # read only!
