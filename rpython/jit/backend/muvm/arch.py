@@ -2,7 +2,7 @@
 WORD = 4
 DOUBLE_WORD = 8
 
-SIXTYFOUR_OR_THIRTYTWO = 64     # Are we using 64 bit python or 32 bit python?
+INTWIDTH = 64     # Are we using 64 bit python or 32 bit python?
 
 # the number of registers that we need to save around malloc calls
 N_REGISTERS_SAVED_BY_MALLOC = 9

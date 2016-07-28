@@ -92,7 +92,6 @@ class MuVMRegisterManager(RegisterManager):
         else:
             self.reg_bindings = {}
         self.bindings_to_frame_reg = {}
-        self.position = -1
         self.frame_manager = frame_manager
         self.assembler = assembler
 
@@ -131,6 +130,8 @@ class MuVMRegisterManager(RegisterManager):
         """ Override from RegisterManager. This will always succeed.
         INPUTS:
             v: originally a temp var. Now an SSA variable. 
+            selected_reg:    Ignored
+            need_lower_byte: Ignored
         OUTPUS:
             self.register's location of `v`
         NOTE: Have not determined if TempVar is necessary for outside interface
@@ -160,35 +161,6 @@ class MuVMRegisterManager(RegisterManager):
         except:
             print "ERROR: force_spill_var should not be called.",
             print "there is no variable spillage in MuVM."
-
-
-### This may not be necessary. MuVMRegisterManager should take care of
-### everything.
-class VFPRegisterManager(MuVMRegisterManager):
-    all_regs = r.vfpregisters
-    box_types = [FLOAT]
-    save_around_call_regs = r.all_vfp_regs
-
-    def convert_to_imm(self, c):
-        #TODO
-        return None
-    def __init__(self, longevity, frame_manager=None, assembler=None):
-        RegisterManager.__init__(self, longevity, frame_manager, assembler)
-
-    def after_call(self, v):
-        """ Adjust registers according to the result of the call,
-        which is in variable v.
-        """
-        #TODO
-        return None
-
-    def get_scratch_reg(self, type=FLOAT, forbidden_vars=[], selected_reg=None):
-        #TODO
-        return None
-
-
-### Not sure what this is for - int types?
-### Also, we need to figure out what our type system will be
 
 class CoreRegisterManager(MuVMRegisterManager):
     all_regs = r.all_regs
