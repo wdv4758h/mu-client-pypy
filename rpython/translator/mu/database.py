@@ -21,6 +21,7 @@ class MuDatabase:
         self.prog_entry = entry_graph
         self.gbltypes = {}      # type -> set(Mutype)
         self.gblcnsts = set()
+        self.externfncs = set()
         self.hailgen = HAILGenerator()
         graphs.append(self._create_bundle_entry(self.prog_entry))
         self.graphs = graphs
@@ -63,7 +64,12 @@ class MuDatabase:
             if isinstance(v, Constant):
                 assert isinstance(v.value, mutype._muobject)
                 assert not isinstance(v.value, mutype._muref)
-                if isinstance(v.value, mutype._mufuncref):
+                if isinstance(v.value, mutype._muexternfunc):
+                    if not hasattr(v, 'mu_name'):
+                        v.mu_name = v.value.mu_name
+                        assert v.mu_name
+                    self.externfncs.add(v)
+                elif isinstance(v.value, mutype._mufuncref):
                     if not hasattr(v, 'mu_name'):
                         assert getattr(v.value, 'graph', False)
                         v.mu_name = v.value.graph.mu_name
@@ -84,6 +90,8 @@ class MuDatabase:
                     map(_trav_symbol, op._args)
                     if 'CALL' in op.opname:
                         map(_trav_symbol, op.args)
+                        if isinstance(op.callee, mutype._muexternfunc):
+                            self.externfncs.add(op.callee)
                     if op.opname == 'BRANCH':
                         map(_trav_symbol, op.dest.args)
                     if op.opname == 'BRANCH2':

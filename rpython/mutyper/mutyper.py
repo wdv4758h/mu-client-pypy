@@ -2,7 +2,6 @@
 Converts the LLTS types and operations to MuTS.
 """
 from rpython.flowspace.model import Variable, Constant, c_last_exception
-from rpython.mutyper.muts.muni import MuExternalFunc
 from rpython.mutyper.muts.muops import DEST
 from rpython.translator.mu.preps import prepare
 from .muts.muentity import *
@@ -27,7 +26,6 @@ class MuTyper:
         self.ldgcells = {}      # MuGlobalCells that need to be LOADed.
         self._cnst_gcell_dict = {}  # mapping Constant to MuGlobalCell
         self._seen = set()
-        self.externfncs = set()
         self._alias = {}
         self.tlr = translator
         self.mlha = MixLevelHelperAnnotator(self.tlr.rtyper)
@@ -138,9 +136,6 @@ class MuTyper:
             for _o in _muops:
                 for i in range(len(_o._args)):
                     arg = _o._args[i]
-                    if isinstance(arg, MuExternalFunc):
-                        # Addresses of some C functions stored in global cells need to be processed.
-                        self.externfncs.add(arg)
                     if isinstance(arg, mutype._mufuncref) and hasattr(arg, '_llhelper'):
                         # Some added LL helper functions need to be annotated and rtyped.
                         fnr = arg
@@ -204,6 +199,10 @@ class MuTyper:
                         if not isinstance(muv, mutype._munullref) and isinstance(muv._TYPE, mutype.MuUPtr):
                             muv._TYPE = mutype.MuRef(muv._TYPE.TO)
                             mut = muv._TYPE
+                        if isinstance(muv, mutype._muexternfunc):
+                            # Constants containing extern functions should have UFuncPtr type
+                            mut = muv._TYPE
+
                         Constant.__init__(arg, muv, arg.concretetype)
                         arg.mu_type = mut
                         if isinstance(muv, (mutype._muprimitive, mutype._munullref)):
