@@ -298,89 +298,100 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         return nd
     
     def _OP_CALL(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_call(bb, op.mu_type.Sig, op.callee, map(varmap.get, op.args))
     
     def _OP_TAILCALL(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_tailcall(bb, op.mu_type.Sig, op.callee, map(varmap.get, op.args))
     
     def _OP_RET(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_ret(bb, [varmap[op.rv]])
     
     def _OP_THROW(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_throw(bb, varmap[op.excobj])
     
     def _OP_EXTRACTVALUE(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_extractvalue(bb, *map(varmap.get, op.opnd.mu_type, op.idx, op.opnd))
     
     def _OP_INSERTVALUE(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_insertvalue(bb, *map(varmap.get, op.opnd.mu_type, op.idx, op.opnd, op.val))
     
     def _OP_EXTRACTELEMENT(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_extractelement(bb, *map(varmap.get, (op.opnd.mu_type, op.idx.mu_type, op.opnd, op.idx)))
     
     def _OP_INSERTELEMENT(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_insertelement(bb, *map(varmap.get, (op.opnd.mu_type, op.idx.mu_type, op.opnd, op.idx, op.val)))
     
     def _OP_NEW(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_new(bb, varmap[op.T])
     
     def _OP_ALLOCA(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_alloca(bb, varmap[op.T])
     
     def _OP_NEWHYBRID(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_newhybrid(bb, varmap[op.T], varmap[op.length.mu_type], varmap[op.length])
     
     def _OP_ALLOCAHYBRID(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_allocahybrid(bb, varmap[op.T], varmap[op.length.mu_type], varmap[op.length])
     
     def _OP_GETIREF(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_getiref(bb, varmap[op.opnd.mu_type], varmap[op.opnd])
     
     def _OP_GETFIELDIREF(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_getfieldiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
+                                         varmap[op.opnd.mu_type], op.idx, varmap[op.opnd])
     
     def _OP_GETELEMIREF(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_getelemiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
+                                        *map(varmap.get, (op.opnd.mu_type, op.idx.mu_type, op.opnd, op.idx)))
     
     def _OP_SHIFTIREF(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_shiftiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
+                                      *map(varmap.get, (op.opnd.mu_type, op.offset.mu_type, op.opnd, op.offset)))
     
     def _OP_GETVARPARTIREF(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_getvarpartiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
+                                           varmap[op.opnd.mu_type], varmap[op.opnd])
     
     def _OP_LOAD(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_load(bb, isinstance(op.loc.mu_type, mutype.MuUPtr),
+                                 MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type], varmap[op.loc])
     
     def _OP_STORE(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_store(bb, isinstance(op.loc.mu_type, mutype.MuUPtr),
+                                  MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type], varmap[op.loc], varmap[op.val])
     
     def _OP_TRAP(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_trap(bb, varmap[op.T])
     
     def _OP_CCALL(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_ccall(bb, MuCallConv.DEFAULT, varmap[op.callee.mu_type],
+                                  varmap[op.callee.mu_type.Sig], varmap[op.callee],
+                                  map(varmap.get, op.args))
     
     def _OP_THREAD_EXIT(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_comminst(bb, MuCommInst.UVM_THREAD_EXIT, [], [], [], [])
     
     def _OP_NATIVE_PIN(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_PIN, [],
+                                     [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
     
     def _OP_NATIVE_UNPIN(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_UNPIN, [],
+                                     [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
     
     def _OP_NATIVE_EXPOSE(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_EXPOSE, [],
+                                     [], [varmap[op.func.mu_type.Sig]],
+                                     [varmap[op.func], varmap[op.cookie]])
     
     def _OP_NATIVE_UNEXPOSE(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_UNEXPOSE, [], [], [], [varmap[op.value]])
     
     def _OP_GET_THREADLOCAL(self, op, bb, varmap, blkmap):
-        return self.ctx
+        return self.ctx.new_comminst(bb, MuCommInst.UVM_GET_THREADLOCAL, [], [], [], [])
     
     def _OP_SET_THREADLOCAL(self, op, bb, varmap, blkmap):
-        return self.ctx
-        
+        return self.ctx.new_comminst(bb, MuCommInst.UVM_SET_THREADLOCAL, [], [], [], [varmap[op.ref]])
     
     def gen_gcells(self):
         pass
