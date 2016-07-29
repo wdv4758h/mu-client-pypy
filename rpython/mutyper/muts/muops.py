@@ -119,7 +119,8 @@ def _newop(opname, arg_names, rtn_t_fnc, str_fnc):
 
 # ----------------------------------------------------------------
 # Binary Operations
-for opname in "ADD SUB MUL SDIV SREM UDIV UREM SHL LSHR ASHR AND OR XOR FADD FSUB FMUL FDIV FREM".split(' '):
+BINOPS = "ADD SUB MUL SDIV SREM UDIV UREM SHL LSHR ASHR AND OR XOR FADD FSUB FMUL FDIV FREM".split(' ')
+for opname in BINOPS:
     globals()[opname] = _newop(opname, "op1 op2",
                                lambda (op1, op2): op1.mu_type,
                                lambda op: "<%s> %s %s %s" % (op.op1.mu_type.mu_name,
@@ -130,9 +131,10 @@ for opname in "ADD SUB MUL SDIV SREM UDIV UREM SHL LSHR ASHR AND OR XOR FADD FSU
 
 # ----------------------------------------------------------------
 # Compare Operations
-for opname in ("EQ NE SGE SGT SLE SLT UGE UGT ULE ULT "
+CMPOPS = ("EQ NE SGE SGT SLE SLT UGE UGT ULE ULT "
     "FFALSE FTRUE FUNO FUEQ FUNE FUGT FUGE FULT FULE "
-    "FORD FOEQ FONE FOGT FOGE FOLT FOLE").split(' '):
+    "FORD FOEQ FONE FOGT FOGE FOLT FOLE").split(' ')
+for opname in CMPOPS:
     globals()[opname] = _newop(opname, "op1 op2",
                                lambda args: int1_t,
                                lambda op: "<%s> %s %s" % (op.op1.mu_type.mu_name,
@@ -143,7 +145,8 @@ for opname in ("EQ NE SGE SGT SLE SLT UGE UGT ULE ULT "
 # ----------------------------------------------------------------
 # Conversion Operations
 # args: (opnd, T2)
-for opname in "TRUNC ZEXT SEXT FPTRUNC FPEXT FPTOUI FPTOSI UITOFP SITOFP BITCAST REFCAST PTRCAST".split(' '):
+CONVOPS = "TRUNC ZEXT SEXT FPTRUNC FPEXT FPTOUI FPTOSI UITOFP SITOFP BITCAST REFCAST PTRCAST".split(' ')
+for opname in CONVOPS:
     globals()[opname] = _newop(opname, "opnd T2",
                                lambda (opnd, T2): T2,
                                lambda op: "<%s %s> %s" % (op.opnd.mu_type.mu_name, op.T2.mu_name, op.opnd.mu_name))
