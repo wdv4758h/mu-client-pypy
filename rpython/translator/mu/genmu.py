@@ -199,6 +199,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         ctx = self.ctx
         ndmap = self.node_map
         for cst in self.db.gblcnsts:
+            assert isinstance(cst.value, (mutype._muprimitive, mutype._munullref))
             if isinstance(cst.mu_type, mutype.MuInt):
                 ty = cst.mu_type
                 if ty.bits > 64:

@@ -9,6 +9,8 @@ from rpython.mutyper.muts import mutype
 from rpython.translator.mu.hail import HAILGenerator
 from rpython.tool.ansi_mandelbrot import Driver
 from rpython.tool.ansi_print import AnsiLogger
+import ctypes, ctypes.util
+import os, sys
 mdb = Driver()
 
 
@@ -123,6 +125,7 @@ class MuDatabase:
 
         self.log.hailgen("finished.")
 
+        self._match_externfunc_names()
         self.log.collect_gbldefs("finished.")
 
     def _recursive_addtype(self, mut):
@@ -147,3 +150,67 @@ class MuDatabase:
                 ts = mut.ARGS + mut.RTNS
                 for t in ts:
                     self._recursive_addtype(t)
+
+    def _match_externfunc_names(self):
+        # load up the dynamic libraries and find the corresponding functions
+        libc = ctypes.CDLL(ctypes.util.find_library("c"))
+        libm = ctypes.CDLL(ctypes.util.find_library("m"))
+        libutil = ctypes.CDLL(ctypes.util.find_library("util"))
+        librt = ctypes.CDLL(ctypes.util.find_library("rt"))
+        dir_mu = os.path.dirname(__file__)
+        dir_librpyc = os.path.join(dir_mu, 'rpyc')
+        path_librpyc = os.path.join(dir_librpyc, 'librpyc.so')
+
+        try:
+            librpyc = ctypes.CDLL(path_librpyc)
+        except OSError as e:
+            os.write(2, "ERROR: library {} not found.\n"
+                        "Please execute 'make' in the directory {}\n".format(path_librpyc, dir_librpyc))
+            raise e
+
+        libs = (librpyc, libc, libm, libutil, librt)
+
+        _pypy_linux_prefix = "__pypy_mu_linux_"
+        _pypy_apple_prefix = "__pypy_mu_apple_"
+        _pypy_macro_prefix = "__pypy_macro_"
+        _LINUX = sys.platform.startswith('linux')
+        _APPLE = sys.platform.startswith('darwin')
+        def correct_name(c_name):
+            """
+            Correct some function naming
+            especially needed for stat system calls.
+            """
+            if _APPLE:
+                if c_name in ('stat', 'fstat', 'lstat'):
+                    return c_name + '64'  # stat64, fstat64, lstat64
+                if c_name == "readdir":  # fixing the macro defined return type (struct dirent*)
+                    return _pypy_apple_prefix + c_name
+            return c_name
+
+        librpyc = libs[0]
+        for extfn in self.externfncs:
+            c_symname = correct_name(extfn.c_name)
+            dylib = None
+
+            adr = None
+            for lib in libs:
+                try:
+                    adr = ctypes.cast(getattr(lib, c_symname), ctypes.c_void_p).value
+                    dylib = lib
+                    break
+                except AttributeError:
+                    pass
+            if adr is None:
+                for prefix in (_pypy_linux_prefix, _pypy_macro_prefix):
+                    try:
+                        adr = ctypes.cast(getattr(librpyc, prefix + c_symname), ctypes.c_void_p).value
+                        c_symname = prefix + c_symname
+                        dylib = lib
+                        break
+                    except AttributeError:
+                        pass
+            if adr is None:
+                os.write(2, "Failed to find function '%(c_name)s'.\n" % locals())
+                raise NotImplementedError
+
+            extfn.c_symname = c_symname
