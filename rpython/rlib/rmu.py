@@ -677,9 +677,22 @@ class MuContext:
         # type: (MuBBNode) -> MuInstNode
         return self._ctx.c_new_branch(self._ctx, bb)
 
+    def new_branch_ex(self, bb, bbDest, args):
+        # type: (MuBBNode, MuBBNode, [MuVarNode]) -> MuInstNode
+        op = self.new_branch(bb)
+        self.add_dest(op, MuDestKind.NORMAL, bbDest, args)
+        return op
+
     def new_branch2(self, bb, cond):
         # type: (MuBBNode, MuVarNode) -> MuInstNode
         return self._ctx.c_new_branch2(self._ctx, bb, cond)
+
+    def new_branch2_ex(self, bb, cond, bbTrue, argsTrue, bbFalse, argsFalse):
+        # type: (MuBBNode, MuVarNode, MuBBNode, [MuVarNode], MuBBNode, [MuVarNode]) -> MuInstNode
+        op = self.new_branch2(bb, cond)
+        self.add_dest(op, MuDestKind.TRUE, bbTrue, argsTrue)
+        self.add_dest(op, MuDestKind.FALSE, bbFalse, argsFalse)
+        return op
 
     def new_switch(self, bb, opnd_ty, opnd):
         # type: (MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
@@ -751,7 +764,8 @@ class MuContext:
 
     def new_getfieldiref(self, bb, is_ptr, refty, index, opnd):
         # type: (MuBBNode, bool, MuTypeNode, int, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_getfieldiref(self._ctx, bb, is_ptr, refty, rffi.cast(rffi.INT, index), opnd)
+        return self._ctx.c_new_getfieldiref(self._ctx, bb, rffi.cast(MuBool, is_ptr),
+                                            refty, rffi.cast(rffi.INT, index), opnd)
 
     def new_getelemiref(self, bb, is_ptr, refty, indty, opnd, index):
         # type: (MuBBNode, bool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
@@ -799,6 +813,13 @@ class MuContext:
     def new_wpbranch(self, bb, wpid):
         # type: (MuBBNode, MuWPID) -> MuInstNode
         return self._ctx.c_new_wpbranch(self._ctx, bb, wpid)
+
+    def new_wpbranch_ex(self, bb, wpid, bbDisable, argsDisable, bbEnable, argsEnable):
+        # type: (MuBBNode, MuWPID, MuBBNode, [MuVarNode], MuBBNode, [MuVarNode]) -> MuInstNode
+        op = self.new_wpbranch(bb, wpid)
+        self.add_dest(op, MuDestKind.DISABLED, bbDisable, argsDisable)
+        self.add_dest(op, MuDestKind.ENABLED, bbEnable, argsEnable)
+        return op
 
     def new_ccall(self, bb, callconv, callee_ty, sig, callee, args):
         # type: (MuBBNode, MuCallConv, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
