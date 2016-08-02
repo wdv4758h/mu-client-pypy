@@ -764,7 +764,8 @@ class MuContext:
 
     def new_getfieldiref(self, bb, is_ptr, refty, index, opnd):
         # type: (MuBBNode, bool, MuTypeNode, int, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_getfieldiref(self._ctx, bb, is_ptr, refty, rffi.cast(rffi.INT, index), opnd)
+        return self._ctx.c_new_getfieldiref(self._ctx, bb, rffi.cast(MuBool, is_ptr),
+                                            refty, rffi.cast(rffi.INT, index), opnd)
 
     def new_getelemiref(self, bb, is_ptr, refty, indty, opnd, index):
         # type: (MuBBNode, bool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
