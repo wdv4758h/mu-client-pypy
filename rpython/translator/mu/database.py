@@ -128,6 +128,7 @@ class MuDatabase:
         for t in self.objtracer.nullref_ts:
             muv = mutype._munullref(t)
             cst = Constant(muv)
+            cst.mu_type = muv._TYPE
             cst.mu_name = MuName("%s_%s" % (str(cst.value), cst.mu_type.mu_name._name))
             self.gblcnsts.add(cst)
 
@@ -224,7 +225,7 @@ class MuDatabase:
 
 class HeapObjectTracer:
     def __init__(self):
-        self.gcells = []        # forms a list of roots
+        self.gcells = {}        # forms a list of roots
         self.objs = set()
         self.nullref_ts = set()
 

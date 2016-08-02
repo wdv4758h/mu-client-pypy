@@ -135,11 +135,14 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
         self.gen_types()
         self.gen_consts()
-        self.gen_graphs()
         self.gen_gcells()
+        self.gen_graphs()
+        self.log.bundlegen("start making boot image")
+        self.log.bundlegen("%d top level nodes" % len(self.gblnode_map))
         self.mu.make_boot_image(self.gblnode_map.values(), bdlpath)
 
     def gen_types(self):
+        self.log.gen_types("start generating types.")
         bdl = self.bdl
         ctx = self.ctx
         ref_nodes = []  # 2 pass declaration, need to call set_
@@ -173,7 +176,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                     nd = ctx.new_type_array(bdl, _gen_type(t.OF), t.length)
                 elif isinstance(t, mutype.MuRefType):
                     fn = getattr(ctx, "new_type_" + t.__class__.type_constr_name)
-                    nd = fn(ctx, bdl)
+                    nd = fn(bdl)
                     ref_nodes.append((t, nd))
                 elif isinstance(t, mutype.MuFuncSig):
                     nd = ctx.new_funcsig(bdl, map(_gen_type, t.ARGS), map(_gen_type, t.RTNS))
@@ -184,24 +187,27 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                 return nd
 
         for cls in self.db.gbltypes:
+            self.log.gen_types("Generate types under class: %s" % cls)
             for ty in self.db.gbltypes[cls]:
                 _gen_type(ty)
 
         for ref_t, nd in ref_nodes:
             fn = getattr(ctx, "set_type_" + ref_t.__class__.type_constr_name)
-            fn(ctx, nd, _gen_type(ref_t.TO))
+            fn(nd, _gen_type(ref_t.Sig if isinstance(ref_t, mutype.MuFuncRef) else ref_t.TO))
 
     def gen_consts(self):
+        self.log.gen_consts("start generating constants")
+        self.log.gen_consts("%d constants" % len(self.db.gblcnsts))
         bdl = self.bdl
         ctx = self.ctx
         gblndmap = self.gblnode_map
         for cst in self.db.gblcnsts:
+            self.log.gen_consts("generating constant: %s (%s)" % (cst, cst.mu_type))
             assert isinstance(cst.value, (mutype._muprimitive, mutype._munullref))
             if isinstance(cst.mu_type, mutype.MuInt):
                 ty = cst.mu_type
-                if ty.bits > 64:
+                if ty.bits <= 64:
                     nd = ctx.new_const_int(bdl, gblndmap[ty], cst.value.val)
-
                 else:
                     val = cst.value.val
                     words = []
@@ -220,15 +226,17 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             gblndmap[cst] = nd
 
         for extfn in self.db.externfncs:
+            self.log.gen_consts("generating extern function constant: %s" % extfn)
             nd = ctx.new_const_extern(bdl, gblndmap[extfn._TYPE], extfn.c_symname)
             ctx.set_name(bdl, nd, str(extfn.mu_name))
             gblndmap[extfn] = nd
 
     def gen_graphs(self):
+        self.log.gen_graphs("start generating functions")
         bdl = self.bdl
         ctx = self.ctx
         gblndmap = self.gblnode_map
-        
+
         # declare all functions first
         for g in self.db.graphs:
             nd = ctx.new_func(bdl, gblndmap[g.mu_type.Sig])
@@ -236,24 +244,25 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             gblndmap[g] = nd
 
         for g in self.db.graphs:
+            self.log.gen_graphs("generating function %s" % g)
             fn = ctx.new_func_ver(bdl, gblndmap[g])
             blkmap = {}     # block node map per graph
             # create all block nodes first
             for blk in g.iterblocks():
                 bb = ctx.new_bb(fn)
-                ctx.set_name(bdl, bb, str(blk.mu_name))
+                ctx.set_name(bdl, bb, repr(blk.mu_name))
                 blkmap[blk] = bb
                 
             for blk in g.iterblocks():
                 bb = blkmap[blk]
                 varmap = gblndmap.copy()     # local variable nodes map
                 for prm in blk.mu_inputargs:
-                    nd = ctx.new_nor_param(bb, prm.mu_type)
-                    ctx.set_name(bdl, nd, str(prm.mu_name))
+                    nd = ctx.new_nor_param(bb, gblndmap[prm.mu_type])
+                    ctx.set_name(bdl, nd, repr(prm.mu_name))
                     varmap[prm] = nd
                 if hasattr(blk, 'mu_excparam'):
                     nd = ctx.new_exc_param(bb)
-                    ctx.set_name(bdl, nd, str(blk.mu_excparam.mu_name))
+                    ctx.set_name(bdl, nd, repr(blk.mu_excparam.mu_name))
                     varmap[blk.mu_excparam] = nd
                 
                 # generate operations
@@ -270,11 +279,12 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                     else:
                         method = getattr(self, '_OP_'+op.opname, None)
                         assert method, "can't find method to build operation " + op.opname
-                        nd = method(self, op, bb, varmap, blkmap)
+                        nd = method(op, bb, varmap, blkmap)
 
-                    res = ctx.get_inst_res(nd, 0)  # NOTE: things will be difficult when ovf is supported in Mu
-                    ctx.set_name(bdl, res, str(op.result.mu_name))
-                    varmap[op.result] = res
+                    if op.result.mu_type is not mutype.void_t:
+                        res = ctx.get_inst_res(nd, 0)  # NOTE: things will be difficult when ovf is supported in Mu
+                        ctx.set_name(bdl, res, repr(op.result.mu_name))
+                        varmap[op.result] = res
 
     # NOTE: This should be refactored into a OpGen (visitor?) class
     def _OP_SELECT(self, op, bb, varmap, blkmap):
@@ -300,10 +310,10 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         return nd
 
     def _OP_CALL(self, op, bb, varmap, blkmap):
-        return self.ctx.new_call(bb, op.mu_type.Sig, op.callee, map(varmap.get, op.args))
+        return self.ctx.new_call(bb, varmap[op.callee.mu_type.Sig], varmap[op.callee], map(varmap.get, op.args))
 
     def _OP_TAILCALL(self, op, bb, varmap, blkmap):
-        return self.ctx.new_tailcall(bb, op.mu_type.Sig, op.callee, map(varmap.get, op.args))
+        return self.ctx.new_tailcall(bb, varmap[op.callee.mu_type.Sig], varmap[op.callee], map(varmap.get, op.args))
 
     def _OP_RET(self, op, bb, varmap, blkmap):
         return self.ctx.new_ret(bb, [varmap[op.rv]])
@@ -397,6 +407,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
     # NOTE: Heap object initialisation algorithm perhaps should be put into a (visitor?) class
     def gen_gcells(self):
+        self.log.gen_gcells("start creating global cells and heap objects")
         for gcl in self.db.mutyper.ldgcells:
             nd = self.ctx.new_global_cell(self.bdl, self.gblnode_map[gcl._T])
             self.gblnode_map[gcl] = nd
@@ -406,21 +417,25 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
         # store in global cells
         for gcl in self.db.mutyper.ldgcells:
-            nd = self.gblnode_map[gcl]
-            hdl = self._objhdl_map[gcl.value]
-            self.ctx.store(MuMemOrd.NOT_ATOMIC, nd, hdl)
+            gcl_id = self.ctx.get_id(self.bdl, self.gblnode_map[gcl])
+            hgcl = self.ctx.handle_from_global(gcl_id)
+            href = self._objhdl_map[gcl.value]
+            self.ctx.store(MuMemOrd.NOT_ATOMIC, hgcl, href)
 
     def _create_heap_objects(self):
         ctx = self.ctx
         gblndmap = self.gblnode_map
         objtracer = self.db.objtracer
+        self.log.create_heap_objects("%d objects" % len(objtracer.objs))
 
         # allocate memory first
         for obj in objtracer.objs:
+            type_id = ctx.get_id(self.bdl, gblndmap[obj._TYPE])
             if isinstance(obj, mutype._muhybrid):
-                hdl = ctx.new_hybrid(gblndmap[obj._TYPE], obj.length)
+                hlen = ctx.handle_from_uint64(obj.length.val, 64)
+                hdl = ctx.new_hybrid(type_id, hlen)
             else:
-                hdl = ctx.new_fixed(gblndmap[obj._TYPE])
+                hdl = ctx.new_fixed(type_id)
 
             self._objhdl_map[obj] = hdl # add to handle map
 
@@ -435,7 +450,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                     if TYPE.bits <= 64:
                         prefix_signed = 's' if obj.val < 0 else 'u'
                         fn = getattr(ctx, "handle_from_%sint%d" % (prefix_signed, TYPE.bits))
-                        return fn(ctx, obj.val, TYPE.bits)
+                        return fn(obj.val, TYPE.bits)
                     else:
                         val = obj.val
                         words = []
@@ -473,7 +488,8 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                 _init_memarry(iref, obj)
 
             elif isinstance(obj, mutype._muref):
-                return self._objhdl_map[obj._obj0]
+                refobj = obj._obj0._top_container() if isinstance(obj._obj0, mutype._mustruct) else obj._obj0
+                return self._objhdl_map[refobj]
 
         def _init_memarry(iref_root, arr):
             for i in range(len(arr)):
