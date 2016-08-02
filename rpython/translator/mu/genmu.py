@@ -3,13 +3,13 @@ MuIR builder -- builds IR bundle via API calls
 
 This defines an abstract builder that needs to be implemented concretely.
 """
+from rpython.mutyper.muts.muentity import MuName
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.mutyper.muts import mutype, muops
 from rpython.mutyper.tools.textgraph import print_graph
 from rpython.rlib.rmu import (
     Mu, MuDestKind, MuBinOptr, MuCmpOptr, 
-    MuConvOptr, MuCallConv, MuMemOrd, 
-    MuCallConv, MuCommInst)
+    MuConvOptr, MuMemOrd, MuCallConv, MuCommInst)
 from StringIO import StringIO
 import zipfile
 import json
@@ -126,8 +126,6 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         self.mu = Mu()
         self.ctx = self.mu.new_context()
         self.bdl = None
-        self._new_list = []     # used in heap initialisation
-        self._init_list = []    # used in heap initialisation
         self._objhdl_map = {}   # used in heap initialisation; NOTE: referent -> handle (not reference)
 
     def bundlegen(self, bdlpath):
@@ -139,7 +137,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         self.gen_consts()
         self.gen_graphs()
         self.gen_gcells()
-        self.mu.make_boot_image([], bdlpath)
+        self.mu.make_boot_image(self.gblnode_map.values(), bdlpath)
 
     def gen_types(self):
         bdl = self.bdl
@@ -404,11 +402,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             self.gblnode_map[gcl] = nd
             self.ctx.set_name(self.bdl, nd, str(gcl.mu_name))
 
-            # add heap obj into _new_list
-            self._new_list.append(gcl.value)
-
-        self._alloc_heap_objects()  # allocate memory, process _new_list
-        self._init_heap_objects()   # initialise objects, process _init_list
+        self._create_heap_objects()
 
         # store in global cells
         for gcl in self.db.mutyper.ldgcells:
@@ -416,41 +410,91 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             hdl = self._objhdl_map[gcl.value]
             self.ctx.store(MuMemOrd.NOT_ATOMIC, nd, hdl)
 
-    def _alloc_heap_objects(self):
+    def _create_heap_objects(self):
         ctx = self.ctx
         gblndmap = self.gblnode_map
-        while len(self._new_list) > 0:
-            ref = self._new_list.pop()
+        objtracer = self.db.objtracer
 
-            # allocate memory
-            obj = ref._obj0
+        # allocate memory first
+        for obj in objtracer.objs:
             if isinstance(obj, mutype._muhybrid):
                 hdl = ctx.new_hybrid(gblndmap[obj._TYPE], obj.length)
             else:
                 hdl = ctx.new_fixed(gblndmap[obj._TYPE])
 
             self._objhdl_map[obj] = hdl # add to handle map
-            self._init_list.append(ref) # add to init list
 
-            # find references in fields, add to _new_list
+        def _init_obj(obj):
+            """
+            @param obj: a mutype._muobject
+            @return: Mu handle
+            """
             TYPE = obj._TYPE
-            if isinstance(TYPE, mutype.MuStruct):
-                obj = obj._top_container()
-                for fld_n, fld_t in TYPE._flds.items():
-                    if isinstance(fld_t, mutype.MuRef):
-                        self._new_list.append(getattr(obj, fld_n))
-            elif isinstance(TYPE, mutype.MuHybrid):
-                for fld_n in TYPE._names[:-1]:
-                    fld_t = TYPE._flds[fld_n]
-                    if isinstance(fld_t, mutype.MuRef):
-                        self._new_list.append(getattr(obj, fld_n))
-                var_t = TYPE._flds[TYPE._varfld]
-                if isinstance(var_t, mutype.MuRef):
-                    arr = getattr(obj, TYPE._varfld)
-                    for elm in arr:
-                        self._new_list.append(elm)
-            elif isinstance(TYPE, mutype.MuArray):
-                if isinstance(TYPE.OF, mutype.MuRef):
-                    for elm in obj:
-                        self._new_list.append(elm)
+            if isinstance(obj, mutype._muprimitive):
+                if isinstance(TYPE, mutype.MuInt):
+                    if TYPE.bits <= 64:
+                        prefix_signed = 's' if obj.val < 0 else 'u'
+                        fn = getattr(ctx, "handle_from_%sint%d" % (prefix_signed, TYPE.bits))
+                        return fn(ctx, obj.val, TYPE.bits)
+                    else:
+                        val = obj.val
+                        words = []
+                        while val != 0:
+                            words.append(val & 0xFFFFFFFFFFFFFFFF)
+                            val >>= 64
+                        return ctx.handle_from_uint64s([words], TYPE.bits)
+                elif TYPE is mutype.float_t:
+                    return ctx.handle_from_float(obj.val)
+                elif TYPE is mutype.double_t:
+                    return ctx.handle_from_double(obj.val)
 
+            elif isinstance(obj, mutype._munullref):
+                const_id = ctx.id_of(str(MuName("%s_%s" % (str(obj), TYPE.mu_name._name))))
+                return ctx.handle_from_const(const_id)
+
+            elif isinstance(obj, mutype._mustruct):
+                _init_struct(self._objhdl_map[obj], obj)
+
+            elif isinstance(obj, mutype._muhybrid):
+                ref = self._objhdl_map[obj]
+                iref = ctx.get_iref(ref)
+                for fld_n in obj._TYPE._names[:-1]:
+                    fld = getattr(obj, fld_n)
+                    fld_hdl = _init_obj(fld)
+                    fld_iref = ctx.get_field_iref(iref, obj._TYPE._index_of(fld_n))
+                    ctx.store(MuMemOrd.NOT_ATOMIC, fld_iref, fld_hdl)
+                iref_var = ctx.get_var_part_iref(iref)
+                arr = getattr(obj, obj._TYPE._varfld)
+                _init_memarry(iref_var, arr)
+
+            elif isinstance(obj, mutype._muarray):
+                ref = self._objhdl_map[obj]
+                iref = ctx.get_iref(ref)
+                _init_memarry(iref, obj)
+
+            elif isinstance(obj, mutype._muref):
+                return self._objhdl_map[obj._obj0]
+
+        def _init_memarry(iref_root, arr):
+            for i in range(len(arr)):
+                elm = arr[i]
+                elm_hdl = _init_obj(elm)
+                idx_hdl = ctx.handle_from_uint64(i, 64)
+                elm_irf = ctx.shift_iref(iref_root, idx_hdl)
+                ctx.store(MuMemOrd.NOT_ATOMIC, elm_irf, elm_hdl)
+
+        def _init_struct(ref_root, stt):
+            ref = ctx.refcast(ref_root, ctx.get_id(self.bdl, self.gblnode_map[stt._TYPE]))    # pass in root ref, since substructs should be the first field.
+            iref = ctx.get_iref(ref)
+            for fld_n in stt._TYPE._names:
+                fld = getattr(stt, fld_n)
+                if isinstance(fld, mutype._mustruct):
+                    _init_struct(ref, fld)  # recursively initialise substructs
+                else:
+                    fld_hdl = _init_obj(fld)
+                    fld_iref = ctx.get_field_iref(iref, stt._TYPE._index_of(fld_n))
+                    ctx.store(MuMemOrd.NOT_ATOMIC, fld_iref, fld_hdl)
+
+
+        for obj in objtracer.objs:
+            _init_obj(obj)

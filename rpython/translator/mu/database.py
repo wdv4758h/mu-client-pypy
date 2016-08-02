@@ -24,7 +24,7 @@ class MuDatabase:
         self.gbltypes = {}      # type -> set(Mutype)
         self.gblcnsts = set()
         self.externfncs = set()
-        self.hailgen = HAILGenerator()
+        self.objtracer = HeapObjectTracer()
         graphs.append(self._create_bundle_entry(self.prog_entry))
         self.graphs = graphs
         
@@ -116,14 +116,20 @@ class MuDatabase:
 
         mdb.restart()
 
-        self.log.hailgen("start adding global cells...")
+        self.log.hailgen("start tracing heap objects...")
         for gcl in self.mutyper.ldgcells:
-            self.hailgen.add_gcell(gcl)
+            self.objtracer.trace(gcl)
 
-        for t in self.hailgen.get_types():
+        for t in self.objtracer.get_types():
             self._recursive_addtype(t)
 
         self.log.hailgen("finished.")
+
+        for t in self.objtracer.nullref_ts:
+            muv = mutype._munullref(t)
+            cst = Constant(muv)
+            cst.mu_name = MuName("%s_%s" % (str(cst.value), cst.mu_type.mu_name._name))
+            self.gblcnsts.add(cst)
 
         self._match_externfunc_names()
         self.log.collect_gbldefs("finished.")
@@ -214,3 +220,48 @@ class MuDatabase:
                 raise NotImplementedError
 
             extfn.c_symname = c_symname
+
+
+class HeapObjectTracer:
+    def __init__(self):
+        self.gcells = []        # forms a list of roots
+        self.objs = set()
+        self.nullref_ts = set()
+
+    def trace(self, gcell):
+        self._find_refs(gcell._obj)
+
+        # get the top container
+        obj = gcell._obj._obj0
+        if isinstance(obj, mutype._mustruct):
+            obj = obj._top_container()
+        self.gcells[gcell] = obj
+
+    def _find_refs(self, obj):
+        if isinstance(obj, (mutype._muref, mutype._muiref)):
+            refnt = obj._obj0
+            if isinstance(refnt, mutype._mustruct):
+                refnt = refnt._top_container()
+
+            if refnt not in self.objs:
+                self.objs.add(refnt)
+                self._find_refs(refnt)
+
+        elif isinstance(obj, (mutype._mustruct, mutype._muhybrid)):
+            for fld in mutype.mu_typeOf(obj)._flds:
+                self._find_refs(obj._getattr(fld))
+
+        elif isinstance(obj, (mutype._mumemarray)):
+            if isinstance(obj._OF, (mutype.MuContainerType, mutype.MuRef, mutype.MuIRef)):
+                for i in range(len(obj.items)):
+                    itm = obj[i]
+                    self._find_refs(itm)
+        elif isinstance(obj, mutype._munullref):
+            self.nullref_ts.add(obj._TYPE)
+
+    def get_types(self):
+        s = set()
+        for r in self.objs:
+            obj_t = mutype.mu_typeOf(r)
+            s.add(obj_t)
+        return s.union(self.nullref_ts)
