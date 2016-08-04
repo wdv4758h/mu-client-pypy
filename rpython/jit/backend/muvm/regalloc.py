@@ -16,7 +16,11 @@ from rpython.jit.backend.muvm import registers as r
 from rpython.rlib.objectmodel import we_are_translated
 
 #from rpython.jit.backend.arm import conditions as c
-from rpython.jit.backend.muvm import locations
+from rpython.jit.backend.muvm.locations import (Type, SSALocation,
+                                                    LocalSSALocation,
+                                                    GlobalSSALocation,
+                                                    #ImmLocation,
+                                                    ConstLocation)
 #from rpython.jit.backend.arm.locations import imm, get_fp_offset
 from rpython.jit.backend.muvm.helper.regalloc import (prepare_op_by_helper_call,
                                                    prepare_unary_cmp,
@@ -31,7 +35,7 @@ from rpython.jit.backend.muvm.helper.regalloc import (prepare_op_by_helper_call,
                                                    default_imm_size,
                                                    )
 #from rpython.jit.backend.arm.jump import remap_frame_layout_mixed
-#from rpython.jit.backend.arm.arch import WORD, JITFRAME_FIXED_SIZE
+from rpython.jit.backend.muvm.arch import WORD, JITFRAME_FIXED_SIZE, INT_WIDTH
 
 from rpython.jit.codewriter import longlong
 from rpython.jit.metainterp.history import (Const, ConstInt, ConstFloat,
@@ -53,6 +57,7 @@ try:
 except ImportError:
     OrderedDict = dict # too bad
 
+'''
 # Temp Variables -- find out what these are
 class TempInt(TempVar):
     type = INT
@@ -73,17 +78,15 @@ class TempFloat(TempVar):
 
     def __repr__(self):
         return "<TempFloat at %s>" % (id(self),)
+'''
 
 def void(self, op, fcond):
     return []
 
 ### I think we can get away with a single RegisterManager, namely this one.
 class MuVMRegisterManager(RegisterManager):
-    registers = r.registers  # Registers 
+    all_regs = r.registers  # Registers 
     
-    ssanum = 0          # This will be incremented to generate unique names
-                        # for each new SSA
-
     def __init__(self, longevity, frame_manager=None, assembler=None):
         self.longevity = longevity
         self.temp_boxes = []
@@ -95,14 +98,17 @@ class MuVMRegisterManager(RegisterManager):
         self.frame_manager = frame_manager
         self.assembler = assembler
 
+        self.const_bindings = {}    # Map (Type,val) to const
+        self.type_bindings  = {}    # Map
+
     def return_constant(self, v, forbidden_vars=[], selected_reg=None):
         """DEV: Need to determine what this will do in our new model."""
-        # (TempVar, [TempVar], SSA) -> (SSA)
-        ### OVERRIDE
-        self._check_type(v)
-        assert isinstance(v,Const)
-        immloc = self.convert_to_imm(v)
-        return immloc
+        self.check_type(v)
+        if isinstance(v, ConstLocation):
+            loc = self.force_allocate_reg(v.tp)
+            self.assembler.load(loc, v.value)
+            return loc
+            
 
     def convert_to_imm(self, c):
         # (Const) -> (TempVar)
@@ -110,6 +116,7 @@ class MuVMRegisterManager(RegisterManager):
         return
 
     def is_still_alive(self, v):
+        # (SSALocation) -> (Boolean)
         ### OVERRIDE
         return False
 
@@ -126,76 +133,46 @@ class MuVMRegisterManager(RegisterManager):
         ### OVERRIDE
         return None
     
-    def try_allocate_reg(self, v, selected_reg=None, need_lower_byte=False):
+    def try_allocate_reg(self, t, selected_reg=None, need_lower_byte=False):
         """ Override from RegisterManager. This will always succeed.
         INPUTS:
-            v: originally a temp var. Now an SSA variable. 
-            selected_reg:    Ignored
+            t: Type()
+            selected_reg:    Ignore
             need_lower_byte: Ignored
         OUTPUS:
             self.register's location of `v`
-        NOTE: Have not determined if TempVar is necessary for outside interface
-        May need to incorporate tempvars again.
+        NOTE: right now t is instance of Type() class. It may be better
+        to split t in to (t,width) variables.
         """
         ### OVERRIDE
         ### Scratch Method
-        try:
-            assert is_instance(v, SSA)      # This is for debug purposes.
-        except:
-            print "ERROR: {} is not an SSA variable".format(v)
-        self.registers.append(v)
-        return len(self.registers) - 1  # Location of v
+        assert is_instance(t, Type)
+        v = len(self.all_regs)      # Position
+        ssa = SSALocation(v, t)     # SSA variable, to be appended
+        self.all_regs.append(ssa)
+        self.bindings[str(ssa)] = v # update bindings
+        return v                    # Return location in all_regs of ssa
 
-    def force_allocate_reg(self, v, forbidden_vars=[], selected_reg=None,
+    def force_allocate_reg(self, t, forbidden_vars=[], selected_reg=None,
                            need_lower_byte=False):
         """ Forces an allocation of a register. Overridden from parent class.
         This is just a synonym for try_allocate_reg()
         """
         ### OVERRIDE
-        return self.try_allocate_reg(v, selected_reg, need_lower_byte)
+        return self.try_allocate_reg(t, selected_reg, need_lower_byte)
 
     def force_spill_var(self, var):
         ### OVERRIDE
-        try:
-            assert False        # This shouldn't be called
-        except:
-            print "ERROR: force_spill_var should not be called.",
-            print "there is no variable spillage in MuVM."
-
-class CoreRegisterManager(MuVMRegisterManager):
-    all_regs = r.all_regs
-    box_types = None       # or a list of acceptable types
-    no_lower_byte_regs = all_regs
-    save_around_call_regs = r.caller_resp
-
-    def __init__(self, longevity, frame_manager=None, assembler=None):
-        RegisterManager.__init__(self, longevity, frame_manager, assembler)
-
-    def call_result_location(self, v):
-        #TODO
-        return
-
-    def convert_to_imm(self, c):
-        #TODO
-        return
-
-    def get_scratch_reg(self, type=INT, forbidden_vars=[], selected_reg=None):
-        #TODO
-        return
-
-    def get_free_reg(self):
-        #TODO
-        return
-
+        raise RuntimeError("Muvm does not support variable spilling")
 
 class Regalloc(BaseRegalloc):
-
     def __init__(self, assembler):
         self.cpu = assembler.cpu
         self.assembler = assembler
         self.frame_manager = None
         self.jump_target_descr = None
         self.final_jump_op = None
+
 
     def loc(self, var):
         #TODO
@@ -238,15 +215,7 @@ class Regalloc(BaseRegalloc):
         #TODO
         pass
 
-    def possibly_free_var(self, var):
-        #TODO
-        pass
-
     def possibly_free_vars_for_op(self, op):
-        #TODO
-        pass
-
-    def possibly_free_vars(self, vars):
         #TODO
         pass
 
@@ -271,9 +240,19 @@ class Regalloc(BaseRegalloc):
         pass
 
     def _prepare(self, inputargs, operations, allgcrefs):
+        ''' Copied from arm/regalloc.py as a placeholder '''
         #TODO
-        pass
+        cpu = self.cpu
+        operations = cpu.gc_ll_descr.rewrite_assembler(cpu, operations, 
+                                                        allgcrefs)
+        # Compute longevity
+        longevity, last_real_usage = compute_vars_longevity(inputargs, 
+                                                            operations)
+        self.longevity = longevity
+        self.last_real_usage = last_real_usage
+        self.rm = MuVMRegisterManager(longevity)
 
+        
     def prepare_loop(self, inputargs, operations, looptoken, allgcrefs):
         #TODO
         pass
