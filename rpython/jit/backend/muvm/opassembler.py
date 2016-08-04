@@ -282,24 +282,24 @@ class GuardOpAssembler(object):
 
     def _emit_guard(self, op, arglocs, is_guard_not_invalidated=False):
         pass
-        _emit_guard.wpid += 1
         if is_guard_not_invalidated:
             fcond = c.cond_none
         else:
             fcond = self.guard_success_cc
             self.guard_success_cc = c.cond_none
             assert fcond != c.cond_none
-            fcond = c.negate(fcond)
         token = self.build_guard_token(op, arglocs[0].value, arglocs[1:], fcond)
-        #token.pos_jump_offset = self.mc.currpos()
         assert token.guard_not_invalidated() == is_guard_not_invalidated
         if not is_guard_not_invalidated:
-            inst = self.mc.new_wpbranch(self.bb, wpid)
-            wpbranch = self.mc.get_inst_res(inst, 0)
+            inst = self.mc.new_branch2(self.bb, fcond)
+            branch2 = self.mc.get_inst_res(inst, 0)
             norm_path = self.mc.new_bb(self.fv)
-            #self.mc.add_dest(wpbranch, self.mc.MuDestKind.DISABLED, norm_path, regalloc.get_live_vars())
-            #self.mc.add_dest(wpbranch, self.mc.MuDestKind.ENABLED, guard_block, guard_args)
+            guard_block = self.mc.new_bb(self.fv) #TODO: Generate code for guard block, remove need for guard tokens
+            self.mc.add_dest(branch2, self.mc.MuDestKind.TRUE, norm_path, regalloc.get_live_vars())
+            #self.mc.add_dest(branch2, self.mc.MuDestKind.FALSE, guard_block, guard_args)
             self.bb = norm_path
+        else:
+            #TODO: create a wpbranch
         self.pending_guard_tokens.append(token)
 
     _emit_guard.wpid = 0
@@ -317,12 +317,16 @@ class GuardOpAssembler(object):
 
     def emit_guard_true(self, op, arglocs, regalloc):
         pass
+        """
         self._emit_guard(op, arglocs)
+        """
 
     def emit_guard_false(self, op, arglocs, regalloc):
         pass
-        self.guard_success_cc = c.negate(self.guard_success_cc)
+        """
+        self.guard_success_cc = c.invert(self.guard_success_cc)
         self._emit_guard(op, arglocs)
+        """
 
     def emit_guard_overflow(self, op, arglocs, regalloc):
         pass
@@ -351,7 +355,9 @@ class GuardOpAssembler(object):
             v0 = get_float(l0)
             v1 = get_float(l1)
             inst = self.mc.new_cmp(self.bb, self.mc.MuCmpOptr.FOEQ, self.type_float, v0, v1)
-        self.guard_success_cc = c.EQ
+        inst_res = self.mc.get_inst_res(inst, 0)
+        #Issue: MuCondition currently takes an ssaReg, no ssaReg given to store inst_res
+        self.guard_success_cc = c.MuCondition(inst_res)
         self._emit_guard(op, failargs)
         """
         l0 = arglocs[0]
@@ -1575,6 +1581,7 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
                   AllocOpAssembler, FloatOpAssembler):
     _mixin_ = True
 
+    #Temporary until regalloc has functionality to keep track of variables
     def get_int(arg):
         if arg in self.vars:
             var = self.vars[arg]
