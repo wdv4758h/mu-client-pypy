@@ -3,28 +3,54 @@ from rpython.jit.metainterp.history import  (INT, FLOAT, VOID,
 from rpython.jit.backend.muvm.arch import (WORD, DOUBLE_WORD, 
                                         JITFRAME_FIXED_SIZE, INT_WIDTH)
 
-typemap = { INT : 'INT', FLOAT : 'FLOAT', VOID : 'VOID', STRUCT : 'STRCT', 
-            REF : 'REF', VECTOR : 'VEC'}
+# Type bindings 
+type_bindings = {}
+
 class Type(object):
     ''' Type value for SSALocations. Includes type and width info.'''
-    def __init__(self, t = INT, width = INT_WIDTH):
-        self.t  = t
+    def __init__(self, ty = INT, width = INT_WIDTH):
+        self.ty  = ty
         self.width = width
     
     def prefix(self):
         """Return type signature"""
-        res = self.t
-        if self.t == INT:
+        res = self.ty
+        if self.ty == INT:
             res += str(self.width)
         return res
 
     def __repr__(self):
         return '@' + self.prefix() + '_t'
+    
+    def __eq__(self, other):
+        return self.ty == other.ty and self.width == other.width
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    def __hash__(self):
+        return hash( (self.ty, self.width) )   # Just hash the tuple
+
+def get_type( ty, width):
+    if (ty, width) not in type_bindings:
+        type_bindings[ (ty, width) ] = Type(ty, width)
+    return type_bindings[ (ty, width) ]
+
+INT64   = get_type(INT,   64)
+INT32   = get_type(INT,   32)
+FLOAT32 = get_type(FLOAT, 32)
+FLOAT64 = get_type(FLOAT, 64)
+
+
+
+INT_DEFAULT = INT64
+if INT_WIDTH == 32:
+    INT_DEFAULT = INT32
+
+
 
 class AssemblerLocation(object):
     _immutable_ = True
     value  = None
-    t = Type(INT, INT_WIDTH)
+    ty = Type(INT, INT_WIDTH)
     type = INT
 
     def is_imm(self):
@@ -63,26 +89,28 @@ class SSALocation(AssemblerLocation):
     and `width` (WORD*8 = 32 by default). The `width` parameter is necessary for
     ints and does not need to be specified for other types (as of now).
     """
+    ### DEV: t,width -> Type()
     _immutable_ = True
 
-    def __init__(self, value, t=INT, width=INT_WIDTH):
+    def __init__(self, value, ty=INT_DEFAULT):
         '''Constructor for SSALocation class. Parameters as follow
-            value: int:       index in registers
-            t:     type str:  (INT = 'i', FLOAT = 'f', etc)
-            width: int:       for int types only
-                Defaults to 64 bits - we are doing 64 bit python for now
+           value: int:       index in registers. Default is none: auto
+           t:     type str:  (INT = 'i', FLOAT = 'f', etc)
+           width: int:       for int types only
+           Defaults to 64 bits - we are doing 64 bit python for now
         '''
         self.value  = value
-        self.t      = Type(t = t, width=width)
-        self.type   = t
+        self.ty = ty
 
     def __repr__(self):
         """Temp implementation. Will update"""
-        return '{}_{}'.format( self.t.prefix(), self.value)
-
+        return '{}_{}'.format( self.ty.prefix(), self.value)
+    
     def is_core_reg(self):
+        # TODO find out what this implies
         return True
-
+    def is_float(self):
+        return self.ty.ty == FLOAT
     def is_local(self):
         return False
 
@@ -96,65 +124,72 @@ class SSALocation(AssemblerLocation):
         return self.value
 
 class LocalSSALocation(SSALocation):
+    ''' Represents a local ssa variable in the Mu VM. 
+        If `value` var of constructor is an instance of an SSALocation, cast it
+        as a LocalSSALocation (acts as a copy constructor). Otherwise, 
+        treat as normal.
+    '''
+
+    def __init__(self, value, ty=INT_DEFAULT ):
+        # TODO handle value when used as a copy constructor. This should be
+        # updated.
+
+        if isinstance(value, SSALocation):
+            super(LocalSSALocation, self).__init__(value.value, value.ty)
+        else:
+            self.value = value
+            self.ty = ty
+
     def is_local(self):
         return True
     
     def __repr__(self):
         return '%{}_{}'.format(self.t.prefix(), self.value)
-
+    
 class GlobalSSALocation(SSALocation):
+    def __init__(self, value=None, ty=None, ):
+        if isinstance(value, SSALocation):
+            super(GlobalSSALocation, self).__init__(value.value, value.ty)
+        else:
+            self.value = value
+            self.ty = ty
     def is_global(self):
         return True
 
     def __repr__(self):
         return '@{}_{}'.format(self.t.prefix(), self.value)
-    
-    
 
-### Maybe use this for constant class?
-class ImmLocation(AssemblerLocation):
-    _immutable_ = True
-    width = WORD
-
-    def __init__(self, value, t=INT, width=INT_WIDTH):
-        self.type = Type(t=t, width=width)
+class ConstLocation(SSALocation):
+    def __init__(self, value, ty=Type()):
+        ''' Constructor:
+            value: literal value of the constant
+            ty: Type() instance
+        '''
+        self.ty = ty
         self.value = value
 
-    def getint(self):
+    def getval(self):
+        '''used to be getint()'''
         return self.value
 
     def __repr__(self):
-        return "imm(%d)" % (self.value)
-
-    def is_imm(self):
-        return True
-
-
-class ConstFloatLoc(AssemblerLocation):
-    """This class represents an imm float value which is stored in memory at
-    the address stored in the field value"""
-    _immutable_ = True
-    width = 2 * WORD
-    type = FLOAT
-
-    def __init__(self, value):
-        self.value = value
-
-    def getint(self):
-        return self.value
-
-    def __repr__(self):
-        return "imm_float(stored at %d)" % (self.value)
+        return "@c_{}_{}".format(self.t.prefix(), self.value)
 
     def is_imm_float(self):
-        return True
+        ''' Do we need this? '''
+        return self.ty.ty == FLOAT
 
     def as_key(self):          # a real address + 1
         return self.value | 1
 
     def is_float(self):
-        return True
+        return self.ty.ty == FLOAT
 
+    def is_int(self):
+        return self.ty.tyh == INT
+
+
+"""
 class StackLocation(AssemblerLocation):
     _immutable_ = True
 
@@ -210,10 +245,16 @@ class RawSPStackLocation(AssemblerLocation):
 
     def as_key(self):            # a word >= 1000, and < 1000 + size of SP frame
         return self.value + 1000
-
+"""
 
 def imm(i):
     return ImmLocation(i)
+
+def imm_float(i):
+    return ImmLocation(i, t=FLOAT, width=INT_SIZE)
+
+def imm_int(i):
+    return ImmLocation(i, t=INT, width=INT_SIZE)
 
 
 def get_fp_offset(base_ofs, position):

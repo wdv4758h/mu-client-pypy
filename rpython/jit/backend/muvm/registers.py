@@ -1,8 +1,6 @@
 """ Modified version of ../arm/registers.py. Will update as needed.
 """
-from rpython.jit.backend.muvm.locations import VFPSSA
-from rpython.jit.backend.muvm.locations import SVFPSSA
-from rpython.jit.backend.muvm.locations import SSA
+from rpython.jit.backend.muvm.locations import SSALocation
 from rpython.jit.metainterp.history import (Const, ConstInt, ConstFloat,
                                             ConstPtr,
                                             INT, REF, FLOAT)
@@ -10,6 +8,7 @@ from rpython.jit.metainterp.history import (Const, ConstInt, ConstFloat,
 registers = []      # Holds SSA vars
 vfpregisters = []   # Only using registers for now
 svfpregisters = []  # Currently unused
+returns = [None]    # This is a hack
 
 
 all_regs = []
