@@ -725,8 +725,6 @@ __spec_cast_map = {
     ('truncate', 'longlong', 'int'):        'TRUNC',
     ('convert', 'float_bytes', 'longlong'): 'BITCAST',
     ('convert', 'longlong_bytes', 'float'): 'BITCAST',
-    ('convert', 'single_float_bytes', 'uint'): 'BITCAST',
-    ('convert', 'uint_bytes', 'single_float'): 'BITCAST'
 }
 
 for triplet in __spec_cast_map:

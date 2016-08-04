@@ -364,8 +364,6 @@ LL_OPERATIONS = {
     'force_cast':           LLOp(sideeffects=False),    # only for rffi.cast()
     'convert_float_bytes_to_longlong': LLOp(canfold=True),
     'convert_longlong_bytes_to_float': LLOp(canfold=True),
-    'convert_single_float_bytes_to_uint': LLOp(canfold=True),
-    'convert_uint_bytes_to_single_float': LLOp(canfold=True),
 
     'likely':               LLOp(canfold=True),
     'unlikely':             LLOp(canfold=True),
