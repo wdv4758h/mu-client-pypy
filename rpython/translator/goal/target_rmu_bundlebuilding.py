@@ -100,9 +100,9 @@ def main_build(argv):
     # blk0
     blk0 = ctx.new_bb(fac_v1)
     n_0 = ctx.new_nor_param(blk0, i64)
-    v5 = ctx.new_inst_res(ctx.new_cmp(blk0, MuCmpOptr.EQ, i64, n_0, c_0_i64))
-    v6 = ctx.new_inst_res(ctx.new_cmp(blk0, MuCmpOptr.EQ, i64, n_0, c_1_i64))
-    v7 = ctx.new_inst_res(ctx.new_binop(blk0, MuBinOptr.OR, i1, v5, v6))
+    v5 = ctx.get_inst_res(ctx.new_cmp(blk0, MuCmpOptr.EQ, i64, n_0, c_0_i64), 0)
+    v6 = ctx.get_inst_res(ctx.new_cmp(blk0, MuCmpOptr.EQ, i64, n_0, c_1_i64), 0)
+    v7 = ctx.get_inst_res(ctx.new_binop(blk0, MuBinOptr.OR, i1, v5, v6), 0)
     br2 = ctx.new_branch2(blk0, v7)
     blk1 = ctx.new_bb(fac_v1)
     blk2 = ctx.new_bb(fac_v1)
@@ -111,9 +111,9 @@ def main_build(argv):
 
     # blk1
     n_1 = ctx.new_nor_param(blk1, i64)
-    v8 = ctx.new_inst_res(ctx.new_binop(blk1, MuBinOptr.SUB, i64, n_1, c_1_i64))
-    v9 = ctx.new_inst_res(ctx.new_call(blk1, sig_i64_i64, fac, [v8]))
-    v10 = ctx.new_inst_res(ctx.new_binop(blk1, MuBinOptr.MUL, i64, n_1, v9))
+    v8 = ctx.get_inst_res(ctx.new_binop(blk1, MuBinOptr.SUB, i64, n_1, c_1_i64), 0)
+    v9 = ctx.get_inst_res(ctx.new_call(blk1, sig_i64_i64, fac, [v8]), 0)
+    v10 = ctx.get_inst_res(ctx.new_binop(blk1, MuBinOptr.MUL, i64, n_1, v9), 0)
     br = ctx.new_branch(blk1)
     ctx.add_dest(br, MuDestKind.NORMAL, blk2, [v10])
 
@@ -131,7 +131,7 @@ def main_build(argv):
 
     # blk0
     blk0 = ctx.new_bb(main_v1)
-    res = ctx.new_inst_res(ctx.new_call(blk0, sig_i64_i64, fac, [c_10_i64]))
+    res = ctx.get_inst_res(ctx.new_call(blk0, sig_i64_i64, fac, [c_10_i64]), 0)
     ctx.new_store(blk0, False, MuMemOrd.NOT_ATOMIC, i64, gblres, res)
     ctx.new_comminst(blk0, MuCommInst.UVM_THREAD_EXIT, [], [], [], [])
 
