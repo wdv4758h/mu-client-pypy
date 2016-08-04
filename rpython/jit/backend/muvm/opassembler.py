@@ -7,7 +7,7 @@ from rpython.jit.backend.muvm.locations import imm
 from rpython.jit.backend.muvm.locations import imm as make_imm_loc
 from rpython.jit.backend.llsupport.assembler import GuardToken
 from rpython.jit.backend.llsupport.gcmap import allocate_gcmap
-from rpython.rlib import rmu
+from rpython.rlib.rmu import *
 
 """
 from rpython.jit.backend.ppc.helper.assembler import gen_emit_cmp_op
@@ -282,6 +282,7 @@ class GuardOpAssembler(object):
 
     def _emit_guard(self, op, arglocs, is_guard_not_invalidated=False):
         pass
+        _emit_guard.wpid += 1
         if is_guard_not_invalidated:
             fcond = c.cond_none
         else:
@@ -293,8 +294,15 @@ class GuardOpAssembler(object):
         #token.pos_jump_offset = self.mc.currpos()
         assert token.guard_not_invalidated() == is_guard_not_invalidated
         if not is_guard_not_invalidated:
-            #self.mc.trap()     # has to be patched later on
+            inst = self.mc.new_wpbranch(self.bb, wpid)
+            wpbranch = self.mc.get_inst_res(inst, 0)
+            norm_path = self.mc.new_bb(self.fv)
+            #self.mc.add_dest(wpbranch, self.mc.MuDestKind.DISABLED, norm_path, regalloc.get_live_vars())
+            #self.mc.add_dest(wpbranch, self.mc.MuDestKind.ENABLED, guard_block, guard_args)
+            self.bb = norm_path
         self.pending_guard_tokens.append(token)
+
+    _emit_guard.wpid = 0
 
     def build_guard_token(self, op, frame_depth, arglocs, fcond):
         pass
@@ -309,16 +317,12 @@ class GuardOpAssembler(object):
 
     def emit_guard_true(self, op, arglocs, regalloc):
         pass
-        """
         self._emit_guard(op, arglocs)
-        """
 
     def emit_guard_false(self, op, arglocs, regalloc):
         pass
-        """
         self.guard_success_cc = c.negate(self.guard_success_cc)
         self._emit_guard(op, arglocs)
-        """
 
     def emit_guard_overflow(self, op, arglocs, regalloc):
         pass
@@ -336,6 +340,19 @@ class GuardOpAssembler(object):
 
     def emit_guard_value(self, op, arglocs, regalloc):
         pass
+        l0 = arglocs[0]
+        l1 = arglocs[1]
+        failargs = arglocs[2:]
+        if not l0.is_float():
+            v0 = get_int(l0)
+            v1 = get_int(l1)
+            inst = self.mc.new_cmp(self.bb, self.mc.MuCmpOptr.EQ, self.type_int, v0, v1)
+        else:
+            v0 = get_float(l0)
+            v1 = get_float(l1)
+            inst = self.mc.new_cmp(self.bb, self.mc.MuCmpOptr.FOEQ, self.type_float, v0, v1)
+        self.guard_success_cc = c.EQ
+        self._emit_guard(op, failargs)
         """
         l0 = arglocs[0]
         l1 = arglocs[1]
@@ -1558,24 +1575,6 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
                   AllocOpAssembler, FloatOpAssembler):
     _mixin_ = True
 
-    def __init__(self):
-        muvm = Mu
-        mc = muvm.new_context()
-        bndl = mc.new_bundle()
-        vars = dict()
-        type_int = mc.new_type_int(bndl, 32)
-        type_int_64 = mc.new_type_int(bndl, 64)
-        type_float = mc.new_type_float(bndl)
-        #temporary constant declarations
-        const_int_0 = mc.new_const_int(bndl, type_int, 0)
-        const_float_0 = mc.new_const_float(bndl, type_float, 0.0)
-        const_int_neg = mc.new_const_int(bndl, type_int, -1)
-        
-        sig = self.mc.new_funcsig(bndl, [], [])
-        func = self.mc.new_func(bndl, sig)
-        fv = self.mc.new_funcver(bndl, func)
-        bb = self.mc.new_bb(fv)
-    
     def get_int(arg):
         if arg in self.vars:
             var = self.vars[arg]
@@ -1583,7 +1582,7 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
             var = self.mc.new_const_int(bndl, self.type_int, arg.value)
             self.vars[arg] = var
         return var
-    
+
     def get_float(arg):
         if arg in self.vars:
             var = self.vars[arg]
@@ -1591,5 +1590,5 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
             var = self.mc.new_const_float(bndl, self.type_float, arg.value)
             self.vars[arg] = var
         return var
-    
+
     def nop(self):
