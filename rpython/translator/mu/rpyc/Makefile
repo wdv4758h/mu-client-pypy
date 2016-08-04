@@ -9,7 +9,7 @@ RPYC_DIR = ../../c
 RPYC_SRC_DIR = $(RPYC_DIR)/src
 PYPY_MOD_DIR = ../../../../pypy/module
 CC = cc
-OBJS = dtoa.o utils.o errno.o tscmp.o linux_debug.o fakestack.o
+OBJS = dtoa.o utils.o errno.o tscmp.o linux_debug.o fakestack.o signals.o
 FLAGS = -D__MU__
 
 dtoa.o: $(RPYC_SRC_DIR)/dtoa.c $(RPYC_SRC_DIR)/dtoa.h
@@ -30,12 +30,12 @@ linux_debug.o: src/linux_debug.c
 fakestack.o: src/fakestack.c
 	$(CC) -fPIC $(FLAGS) -c -o $@ $<
 
+signals.o: $(RPYC_SRC_DIR)/signals.c $(RPYC_SRC_DIR)/signals.h
+	$(CC) -fPIC $(FLAGS) -c  -I $(RPYC_DIR) -o $@ $<
+
 librpyc.so: $(OBJS)
 	$(CC) -shared -o $@ $(OBJS)
 	rm $(OBJS)
 	
 clean:
 	rm librpyc.so
-
-
-# vim: ts=8 sw=8 sts=0 noet ai

@@ -651,9 +651,17 @@ def byteswap(arg):
     from rpython.rlib.longlong2float import longlong2float, float2longlong,\
          uint2singlefloat, singlefloat2uint
 
+    from rpython.rlib.objectmodel import fetch_translated_config
+    from rpython.rtyper.lltypesystem import lloperation as llop
+    config = fetch_translated_config()
+    _MU = config and config.translation.backend == "mu"
+
     T = lltype.typeOf(arg)
     if T == lltype.SingleFloat:
-        arg = singlefloat2uint(arg)
+        if _MU:
+            arg = llop.convert_single_float_bytes_to_uint(arg)
+        else:
+            arg = singlefloat2uint(arg)
     elif T == lltype.Float:
         arg = float2longlong(arg)
     elif T == lltype.LongFloat:
@@ -686,7 +694,10 @@ def byteswap(arg):
         assert False # unreachable code
 
     if T == lltype.SingleFloat:
-        return uint2singlefloat(rffi.cast(rffi.UINT, res))
+        if _MU:
+            return llop.convert_uint_bytes_to_single_float(rffi.cast(rffi.UINT, res))
+        else:
+            return uint2singlefloat(rffi.cast(rffi.UINT, res))
     if T == lltype.Float:
         return longlong2float(rffi.cast(rffi.LONGLONG, res))
     return rffi.cast(T, res)

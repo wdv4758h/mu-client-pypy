@@ -54,9 +54,21 @@ ZEROF = getfloatstorage(0.0)
 # ____________________________________________________________
 
 def int2singlefloat(x):
+    from rpython.rlib.objectmodel import fetch_translated_config
+    from rpython.rtyper.lltypesystem import lloperation as llop
+    config = fetch_translated_config()
+    if config and config.translation.backend == "mu":  # translated
+        return llop.convert_uint_bytes_to_single_float(x)
+
     x = rffi.r_uint(x)
     return longlong2float.uint2singlefloat(x)
 
 def singlefloat2int(x):
-    x = longlong2float.singlefloat2uint(x)
+    from rpython.rlib.objectmodel import fetch_translated_config
+    from rpython.rtyper.lltypesystem import lloperation as llop
+    config = fetch_translated_config()
+    if config and config.translation.backend == "mu":  # translated
+        x = llop.convert_single_float_bytes_to_uint(x)
+    else:
+        x = longlong2float.singlefloat2uint(x)
     return rffi.cast(lltype.Signed, x)
