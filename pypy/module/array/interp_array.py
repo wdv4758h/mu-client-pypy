@@ -828,7 +828,8 @@ def make_array(mytype):
             return rffi.cast(lltype.Unsigned, self.buffer)
 
         def _charbuf_stop(self):
-            keepalive_until_here(self)
+            # keepalive_until_here(self)
+            pass
 
         def w_getitem(self, space, idx):
             item = self.buffer[idx]
