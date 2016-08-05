@@ -58,8 +58,9 @@ class IntOpAssembler(object):
         v1 = get_int(l1)
         inst = self.mc.new_binop(self.bb, optr, self.type_int, v0, v1)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
-    
+
     def gen_emit_int_op(optr):
         def f(self, op, arglocs, regalloc):
             do_emit_int_op(self, arglocs, optr)
@@ -90,8 +91,9 @@ class IntOpAssembler(object):
         v1 = get_int(l1)
         inst = self.mc.new_cmp(self.bb, condition, self.type_int, v0, v1)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
-    
+
     def gen_emit_cmp_op(condition):
         def f(self, op, arglocs, regalloc):
             do_emit_cmp_op(self, arglocs, condition)
@@ -125,6 +127,7 @@ class IntOpAssembler(object):
         v0 = get_int(l0)
         inst = self.mc.new_binop(self.bb, self.mc.MuBinOptr.SUB, self.type_int, self.const_int_0, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
     def emit_int_invert(self, op, arglocs, regalloc):
@@ -133,6 +136,7 @@ class IntOpAssembler(object):
         v0 = get_int(l0)
         inst = self.mc.new_binop(self.bb, self.mc.MuBinOptr.SUB, self.type_int, self.const_int_neg, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
     def emit_int_signext(self, op, arglocs, regalloc):
@@ -141,6 +145,7 @@ class IntOpAssembler(object):
         v0 = get_int(l0)
         inst = self.mc.new_conv(self.bb, self.mc.MuConvOptr.SEXT, self.type_int, self.type_int_64, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
     def emit_int_force_ge_zero(self, op, arglocs, regalloc):
@@ -166,8 +171,9 @@ class FloatOpAssembler(object):
         v1 = get_float(l1)
         inst = self.mc.new_binop(self.bb, optr, self.type_float, v0, v1)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
-    
+
     def gen_emit_float_op(optr):
         def f(self, op, arglocs, regalloc):
             do_emit_int_op(self, arglocs, optr)
@@ -184,6 +190,7 @@ class FloatOpAssembler(object):
         v0 = get_float(l0)
         inst = self.mc.new_binop(self.bb, self.mc.MuBinOptr.SUB, self.type_float, self.const_float_0, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
     def emit_float_abs(self, op, arglocs, regalloc):
@@ -228,21 +235,20 @@ class FloatOpAssembler(object):
         v1 = get_float(l1)
         inst = self.mc.new_cmp(self.bb, condition, self.type_float, v0, v1)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
-    
+
     def gen_emit_fp_cmp_op(condition):
         def f(self, op, arglocs, regalloc):
             do_emit_fp_cmp_op(self, arglocs, condition)
         return f
-        
-    
+
     emit_float_le = gen_emit_fp_cmp_op(self.mc.MuCmpOptr.FOLE)
     emit_float_lt = gen_emit_fp_cmp_op(self.mc.MuCmpOptr.FOLT)
     emit_float_gt = gen_emit_fp_cmp_op(self.mc.MuCmpOptr.FOGT)
     emit_float_ge = gen_emit_fp_cmp_op(self.mc.MuCmpOptr.FOGE)
     emit_float_eq = gen_emit_fp_cmp_op(self.mc.MuCmpOptr.FOEQ)
     emit_float_ne = gen_emit_fp_cmp_op(self.mc.MuCmpOptr.FONE)
-    
 
     def emit_cast_float_to_int(self, op, arglocs, regalloc):
         pass
@@ -250,6 +256,7 @@ class FloatOpAssembler(object):
         v0 = get_float(l0)
         inst = self.mc.new_conv(self.bb, self.mc.MuConvOptr.FPTOSI, self.type_float, self.type_int, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
     def emit_cast_int_to_float(self, op, arglocs, regalloc):
@@ -258,6 +265,7 @@ class FloatOpAssembler(object):
         v0 = get_int(l0)
         inst = self.mc.new_conv(self.bb, self.mc.MuConvOptr.SITOFP, self.type_int, self.type_float, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
     def emit_convert_float_bytes_to_longlong(self, op, arglocs, regalloc):
@@ -266,6 +274,7 @@ class FloatOpAssembler(object):
         v0 = get_float(l0)
         inst = self.mc.new_conv(self.bb, self.mc.MuConvOptr.FPTOSI, self.type_float, self.type_int_64, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
     def emit_convert_longlong_bytes_to_float(self, op, arglocs, regalloc):
@@ -274,6 +283,7 @@ class FloatOpAssembler(object):
         v0 = get_int(l0)
         inst = self.mc.new_conv(self.bb, self.mc.MuConvOptr.SITOFP, self.type_int_64, self.type_float, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
 class GuardOpAssembler(object):
@@ -301,8 +311,6 @@ class GuardOpAssembler(object):
         else:
             #TODO: create a wpbranch
         self.pending_guard_tokens.append(token)
-
-    _emit_guard.wpid = 0
 
     def build_guard_token(self, op, frame_depth, arglocs, fcond):
         pass
@@ -347,7 +355,7 @@ class GuardOpAssembler(object):
         l0 = arglocs[0]
         l1 = arglocs[1]
         failargs = arglocs[2:]
-        if not l0.is_float():
+        if l0.is_int():
             v0 = get_int(l0)
             v1 = get_int(l1)
             inst = self.mc.new_cmp(self.bb, self.mc.MuCmpOptr.EQ, self.type_int, v0, v1)
@@ -356,7 +364,6 @@ class GuardOpAssembler(object):
             v1 = get_float(l1)
             inst = self.mc.new_cmp(self.bb, self.mc.MuCmpOptr.FOEQ, self.type_float, v0, v1)
         inst_res = self.mc.get_inst_res(inst, 0)
-        #Issue: MuCondition currently takes an ssaReg, no ssaReg given to store inst_res
         self.guard_success_cc = c.MuCondition(inst_res)
         self._emit_guard(op, failargs)
         """
@@ -1586,7 +1593,7 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
         if arg in self.vars:
             var = self.vars[arg]
         else
-            var = self.mc.new_const_int(bndl, self.type_int, arg.value)
+            var = self.mc.new_const_int(self.bndl, self.type_int, arg.value)
             self.vars[arg] = var
         return var
 
@@ -1594,7 +1601,7 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
         if arg in self.vars:
             var = self.vars[arg]
         else
-            var = self.mc.new_const_float(bndl, self.type_float, arg.value)
+            var = self.mc.new_const_float(self.bndl, self.type_float, arg.value)
             self.vars[arg] = var
         return var
 
