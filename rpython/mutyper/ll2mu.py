@@ -1065,7 +1065,10 @@ def _llop2mu_direct_arrayitems(ptr, res=None, llopname='direct_arrayitems'):
 # ----------------
 # address operations
 def _llop2mu_keepalive(ptr, res=None, llopname='keepalive'):
-    return [muops.NATIVE_UNPIN(ptr, result=res)]
+    if isinstance(ptr.mu_type, mutype.MuRef):
+        return [muops.NATIVE_UNPIN(ptr, result=res)]
+    else:
+        return [], res
 
 
 def __raw2ccall(*args, **kwargs):
