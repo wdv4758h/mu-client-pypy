@@ -11,6 +11,9 @@ def get_compiler_info():
     you're freezing the string '(untranslated)' into the executable!
     """
     if we_are_translated():
+        from rpython.rlib.objectmodel import fetch_translated_config
+        if fetch_translated_config().translation.backend == "mu":
+            return "Mu"
         return rffi.charp2str(COMPILER_INFO)
     return "(untranslated)"
 
