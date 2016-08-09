@@ -828,6 +828,9 @@ def make_array(mytype):
             return rffi.cast(lltype.Unsigned, self.buffer)
 
         def _charbuf_stop(self):
+            from rpython.rlib.objectmodel import fetch_translated_config
+            if fetch_translated_config().translation.backend == "mu":
+                return  # In mu backend, keepalive -> unpin. Here 'self' is not pinned. This will be an error.
             keepalive_until_here(self)
 
         def w_getitem(self, space, idx):
