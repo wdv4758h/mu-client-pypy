@@ -24,6 +24,7 @@ class MuDatabase:
         self.gbltypes = {}      # type -> set(Mutype)
         self.gblcnsts = set()
         self.externfncs = set()
+        self.dylibs = None
         self.objtracer = HeapObjectTracer()
         graphs.append(self._create_bundle_entry(self.prog_entry))
         self.graphs = graphs
@@ -176,7 +177,7 @@ class MuDatabase:
             raise e
 
         libs = (librpyc, libc, libm, libutil, librt)
-
+        self.dylibs = libs
         _pypy_linux_prefix = "__pypy_mu_linux_"
         _pypy_apple_prefix = "__pypy_mu_apple_"
         _pypy_macro_prefix = "__pypy_macro_"
@@ -221,7 +222,7 @@ class MuDatabase:
                 raise NotImplementedError
 
             extfn.c_symname = c_symname
-
+            extfn.lib = dylib
 
 class HeapObjectTracer:
     def __init__(self):

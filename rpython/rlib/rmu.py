@@ -18,8 +18,9 @@ eci = ExternalCompilationInfo(includes=['refimpl2-start.h', 'muapi.h'],
 # -------------------------------------------------------------------------------------------------------
 # OO wrappers
 class Mu:
-    def __init__(self):
-        self._mu = mu_new()
+    def __init__(self, config_str=""):
+        with rffi.scoped_str2charp(config_str) as buf:
+            self._mu = mu_new_ex(buf)
 
     # scope support
     def __enter__(self):
@@ -1440,6 +1441,7 @@ MuCtx.become(rffi.CStruct(
 ))
 
 mu_new = rffi.llexternal('mu_refimpl2_new', [], MuVMPtr, compilation_info=eci)
+mu_new_ex = rffi.llexternal('mu_refimpl2_new_ex', [rffi.CCHARP], MuVMPtr, compilation_info=eci)
 mu_close = rffi.llexternal('mu_refimpl2_close', [MuVMPtr], lltype.Void, compilation_info=eci)
 
 

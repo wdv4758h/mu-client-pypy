@@ -121,9 +121,19 @@ class MuTextBundleGenerator(MuBundleGenerator):
 # NOTE: when rewriting, use visitor pattern for type generation
 class MuAPIBundleGenerator(MuBundleGenerator):
     def __init__(self, db):
+        def get_config_str():
+            extlibs = []
+            for lib in db.dylibs:
+                extlibs.append(lib._name)
+            libconfig_s ="""
+extraLibs={extraLibs}
+dumpBundle={dumpBundles}
+""".format(extraLibs=":".join(extlibs), dumpBundles=True)
+            return libconfig_s
+
         MuBundleGenerator.__init__(self, db)
         self.gblnode_map = {}
-        self.mu = Mu()
+        self.mu = Mu(get_config_str())
         self.ctx = self.mu.new_context()
         self.bdl = None
         self._objhdl_map = {}   # used in heap initialisation; NOTE: referent -> handle (not reference)
@@ -137,6 +147,13 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         self.gen_consts()
         self.gen_gcells()
         self.gen_graphs()
+
+        self.log.bundlegen("load bundle into Mu")
+        self.ctx.load_bundle_from_node(self.bdl)
+
+        self.log.bundlegen("start initialise heap objects")
+        self.init_heap()
+
         self.log.bundlegen("start making boot image")
         self.log.bundlegen("%d top level nodes" % len(self.gblnode_map))
         self.mu.make_boot_image(self.gblnode_map.values(), bdlpath)
@@ -160,6 +177,8 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                 mutype.void_t: ctx.new_type_void(bdl),
             }
         )
+        for k, v in gblndmap.items():
+            ctx.set_name(bdl, v, str(k.mu_name))
 
         def _gen_type(t):
             try:
@@ -250,7 +269,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             # create all block nodes first
             for blk in g.iterblocks():
                 bb = ctx.new_bb(fn)
-                ctx.set_name(bdl, bb, repr(blk.mu_name))
+                # ctx.set_name(bdl, bb, repr(blk.mu_name))
                 blkmap[blk] = bb
                 
             for blk in g.iterblocks():
@@ -258,11 +277,11 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                 varmap = gblndmap.copy()     # local variable nodes map
                 for prm in blk.mu_inputargs:
                     nd = ctx.new_nor_param(bb, gblndmap[prm.mu_type])
-                    ctx.set_name(bdl, nd, repr(prm.mu_name))
+                    # ctx.set_name(bdl, nd, repr(prm.mu_name))
                     varmap[prm] = nd
                 if hasattr(blk, 'mu_excparam'):
                     nd = ctx.new_exc_param(bb)
-                    ctx.set_name(bdl, nd, repr(blk.mu_excparam.mu_name))
+                    # ctx.set_name(bdl, nd, repr(blk.mu_excparam.mu_name))
                     varmap[blk.mu_excparam] = nd
                 
                 # generate operations
@@ -283,8 +302,11 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
                     if op.result.mu_type is not mutype.void_t:
                         res = ctx.get_inst_res(nd, 0)  # NOTE: things will be difficult when ovf is supported in Mu
-                        ctx.set_name(bdl, res, repr(op.result.mu_name))
+                        # ctx.set_name(bdl, res, repr(op.result.mu_name))
                         varmap[op.result] = res
+                    if op.exc.nor and op.exc.exc:
+                        ctx.add_dest(nd, MuDestKind.NORMAL, blkmap[op.exc.nor.blk], map(varmap.get, op.exc.nor.args))
+                        ctx.add_dest(nd, MuDestKind.EXCEPT, blkmap[op.exc.exc.blk], map(varmap.get, op.exc.exc.args))
 
     # NOTE: This should be refactored into a OpGen (visitor?) class
     def _OP_SELECT(self, op, bb, varmap, blkmap):
@@ -293,7 +315,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
     def _OP_BRANCH(self, op, bb, varmap, blkmap):
         nd = self.ctx.new_branch(bb)
-        self.ctx.add_dest(nd, MuDestKind.NORMAL, blkmap[op.dst.blk], map(varmap.get, op.dst.args))
+        self.ctx.add_dest(nd, MuDestKind.NORMAL, blkmap[op.dest.blk], map(varmap.get, op.dest.args))
         return nd
 
     def _OP_BRANCH2(self, op, bb, varmap, blkmap):
@@ -316,7 +338,9 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         return self.ctx.new_tailcall(bb, varmap[op.callee.mu_type.Sig], varmap[op.callee], map(varmap.get, op.args))
 
     def _OP_RET(self, op, bb, varmap, blkmap):
-        return self.ctx.new_ret(bb, [varmap[op.rv]])
+        if op.rv:
+            return self.ctx.new_ret(bb, [varmap[op.rv]])
+        return self.ctx.new_ret(bb, [])
 
     def _OP_THROW(self, op, bb, varmap, blkmap):
         return self.ctx.new_throw(bb, varmap[op.excobj])
@@ -350,19 +374,19 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
     def _OP_GETFIELDIREF(self, op, bb, varmap, blkmap):
         return self.ctx.new_getfieldiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
-                                         varmap[op.opnd.mu_type], op.idx, varmap[op.opnd])
+                                         varmap[op.opnd.mu_type.TO], op.idx, varmap[op.opnd])
 
     def _OP_GETELEMIREF(self, op, bb, varmap, blkmap):
         return self.ctx.new_getelemiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
-                                        *map(varmap.get, (op.opnd.mu_type, op.idx.mu_type, op.opnd, op.idx)))
+                                        *map(varmap.get, (op.opnd.mu_type.TO, op.idx.mu_type, op.opnd, op.idx)))
 
     def _OP_SHIFTIREF(self, op, bb, varmap, blkmap):
         return self.ctx.new_shiftiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
-                                      *map(varmap.get, (op.opnd.mu_type, op.offset.mu_type, op.opnd, op.offset)))
+                                      *map(varmap.get, (op.opnd.mu_type.TO, op.offset.mu_type, op.opnd, op.offset)))
 
     def _OP_GETVARPARTIREF(self, op, bb, varmap, blkmap):
         return self.ctx.new_getvarpartiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
-                                           varmap[op.opnd.mu_type], varmap[op.opnd])
+                                           varmap[op.opnd.mu_type.TO], varmap[op.opnd])
 
     def _OP_LOAD(self, op, bb, varmap, blkmap):
         return self.ctx.new_load(bb, isinstance(op.loc.mu_type, mutype.MuUPtr),
@@ -380,39 +404,38 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                                   varmap[op.callee.mu_type.Sig], varmap[op.callee],
                                   map(varmap.get, op.args))
 
-    def _OP_THREAD_EXIT(self, op, bb, varmap, blkmap):
-        return self.ctx.new_comminst(bb, MuCommInst.UVM_THREAD_EXIT, [], [], [], [])
-
-    def _OP_NATIVE_PIN(self, op, bb, varmap, blkmap):
-        return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_PIN, [],
-                                     [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
-
-    def _OP_NATIVE_UNPIN(self, op, bb, varmap, blkmap):
-        return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_UNPIN, [],
-                                     [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
-
-    def _OP_NATIVE_EXPOSE(self, op, bb, varmap, blkmap):
-        return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_EXPOSE, [],
-                                     [], [varmap[op.func.mu_type.Sig]],
-                                     [varmap[op.func], varmap[op.cookie]])
-
-    def _OP_NATIVE_UNEXPOSE(self, op, bb, varmap, blkmap):
-        return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_UNEXPOSE, [], [], [], [varmap[op.value]])
-
-    def _OP_GET_THREADLOCAL(self, op, bb, varmap, blkmap):
-        return self.ctx.new_comminst(bb, MuCommInst.UVM_GET_THREADLOCAL, [], [], [], [])
-
-    def _OP_SET_THREADLOCAL(self, op, bb, varmap, blkmap):
-        return self.ctx.new_comminst(bb, MuCommInst.UVM_SET_THREADLOCAL, [], [], [], [varmap[op.ref]])
+    def _OP_COMMINST(self, op, bb, varmap, blkmap):
+        cls = op.__class__
+        if cls is muops.THREAD_EXIT:
+            return self.ctx.new_comminst(bb, MuCommInst.UVM_THREAD_EXIT, [], [], [], [])
+        elif cls is muops.NATIVE_PIN:
+            return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_PIN, [],
+                                         [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
+        elif cls is muops.NATIVE_UNPIN:
+            return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_UNPIN, [],
+                                         [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
+        elif cls is muops.NATIVE_EXPOSE:
+            return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_EXPOSE, [],
+                                         [], [varmap[op.func.mu_type.Sig]],
+                                         [varmap[op.func], varmap[op.cookie]])
+        elif cls is muops.NATIVE_UNEXPOSE:
+            return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_UNEXPOSE, [], [], [], [varmap[op.value]])
+        elif cls is muops.GET_THREADLOCAL:
+            return self.ctx.new_comminst(bb, MuCommInst.UVM_GET_THREADLOCAL, [], [], [], [])
+        elif cls is muops.SET_THREADLOCAL:
+            return self.ctx.new_comminst(bb, MuCommInst.UVM_SET_THREADLOCAL, [], [], [], [varmap[op.ref]])
+        else:
+            raise NotImplementedError("Building method for %s not implemented" % op)
 
     # NOTE: Heap object initialisation algorithm perhaps should be put into a (visitor?) class
     def gen_gcells(self):
-        self.log.gen_gcells("start creating global cells and heap objects")
+        self.log.gen_gcells("start defining global cells")
         for gcl in self.db.mutyper.ldgcells:
             nd = self.ctx.new_global_cell(self.bdl, self.gblnode_map[gcl._T])
             self.gblnode_map[gcl] = nd
             self.ctx.set_name(self.bdl, nd, str(gcl.mu_name))
 
+    def init_heap(self):
         self._create_heap_objects()
 
         # store in global cells
@@ -424,13 +447,12 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
     def _create_heap_objects(self):
         ctx = self.ctx
-        gblndmap = self.gblnode_map
         objtracer = self.db.objtracer
         self.log.create_heap_objects("%d objects" % len(objtracer.objs))
 
         # allocate memory first
         for obj in objtracer.objs:
-            type_id = ctx.get_id(self.bdl, gblndmap[obj._TYPE])
+            type_id = ctx.id_of(str(obj._TYPE.mu_name))
             if isinstance(obj, mutype._muhybrid):
                 hlen = ctx.handle_from_uint64(obj.length.val, 64)
                 hdl = ctx.new_hybrid(type_id, hlen)
@@ -500,7 +522,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                 ctx.store(MuMemOrd.NOT_ATOMIC, elm_irf, elm_hdl)
 
         def _init_struct(ref_root, stt):
-            ref = ctx.refcast(ref_root, ctx.get_id(self.bdl, self.gblnode_map[stt._TYPE]))    # pass in root ref, since substructs should be the first field.
+            ref = ctx.refcast(ref_root, ctx.id_of(str(stt._TYPE.mu_name)))    # pass in root ref, since substructs should be the first field.
             iref = ctx.get_iref(ref)
             for fld_n in stt._TYPE._names:
                 fld = getattr(stt, fld_n)
