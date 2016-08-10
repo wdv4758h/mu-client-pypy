@@ -122,14 +122,18 @@ class MuTextBundleGenerator(MuBundleGenerator):
 class MuAPIBundleGenerator(MuBundleGenerator):
     def __init__(self, db):
         def get_config_str():
+            libconfig = []
+
+            # extraLibs
             extlibs = []
             for lib in db.dylibs:
                 extlibs.append(lib._name)
-            libconfig_s ="""
-extraLibs={extraLibs}
-dumpBundle={dumpBundles}
-""".format(extraLibs=":".join(extlibs), dumpBundles=True)
-            return libconfig_s
+            libconfig.append("extraLibs=" + ":".join(extlibs))
+
+            # dumpBundle
+            libconfig.append("dumpBundle=%s" % True)
+
+            return "\n".join(libconfig)
 
         MuBundleGenerator.__init__(self, db)
         self.gblnode_map = {}
@@ -148,6 +152,7 @@ dumpBundle={dumpBundles}
         self.gen_gcells()
         self.gen_graphs()
 
+        wlst = map(lambda nd: self.ctx.get_id(self.bdl, nd),self.gblnode_map.values())
         self.log.bundlegen("load bundle into Mu")
         self.ctx.load_bundle_from_node(self.bdl)
 
@@ -156,7 +161,8 @@ dumpBundle={dumpBundles}
 
         self.log.bundlegen("start making boot image")
         self.log.bundlegen("%d top level nodes" % len(self.gblnode_map))
-        self.mu.make_boot_image(self.gblnode_map.values(), bdlpath)
+        print bdlpath
+        self.mu.make_boot_image(wlst, str(bdlpath))
 
     def gen_types(self):
         self.log.gen_types("start generating types.")
@@ -442,7 +448,7 @@ dumpBundle={dumpBundles}
         for gcl in self.db.mutyper.ldgcells:
             gcl_id = self.ctx.get_id(self.bdl, self.gblnode_map[gcl])
             hgcl = self.ctx.handle_from_global(gcl_id)
-            href = self._objhdl_map[gcl.value]
+            href = self._objhdl_map[self.db.objtracer.gcells[gcl]]  # object root in gcell -> handle
             self.ctx.store(MuMemOrd.NOT_ATOMIC, hgcl, href)
 
     def _create_heap_objects(self):
@@ -461,7 +467,7 @@ dumpBundle={dumpBundles}
 
             self._objhdl_map[obj] = hdl # add to handle map
 
-        def _init_obj(obj):
+        def _init_obj(obj, hiref=None):
             """
             @param obj: a mutype._muobject
             @return: Mu handle
@@ -490,24 +496,33 @@ dumpBundle={dumpBundles}
                 return ctx.handle_from_const(const_id)
 
             elif isinstance(obj, mutype._mustruct):
-                _init_struct(self._objhdl_map[obj], obj)
+                if not hiref:
+                    href = self._objhdl_map[obj]
+                    hiref = ctx.get_iref(href)
+                _init_struct(hiref, obj)
 
             elif isinstance(obj, mutype._muhybrid):
-                ref = self._objhdl_map[obj]
-                iref = ctx.get_iref(ref)
+                if not hiref:
+                    href = self._objhdl_map[obj]
+                    hiref = ctx.get_iref(href)
+
+                # fixed fields
                 for fld_n in obj._TYPE._names[:-1]:
                     fld = getattr(obj, fld_n)
-                    fld_hdl = _init_obj(fld)
-                    fld_iref = ctx.get_field_iref(iref, obj._TYPE._index_of(fld_n))
-                    ctx.store(MuMemOrd.NOT_ATOMIC, fld_iref, fld_hdl)
-                iref_var = ctx.get_var_part_iref(iref)
+                    fld_iref = ctx.get_field_iref(hiref, obj._TYPE._index_of(fld_n))
+                    fld_hdl = _init_obj(fld, fld_iref)
+                    if fld_hdl:
+                        ctx.store(MuMemOrd.NOT_ATOMIC, fld_iref, fld_hdl)
+
+                # var fields
+                iref_var = ctx.get_var_part_iref(hiref)
                 arr = getattr(obj, obj._TYPE._varfld)
                 _init_memarry(iref_var, arr)
 
             elif isinstance(obj, mutype._muarray):
-                ref = self._objhdl_map[obj]
-                iref = ctx.get_iref(ref)
-                _init_memarry(iref, obj)
+                href = self._objhdl_map[obj]
+                hiref = ctx.get_iref(href)
+                _init_memarry(hiref, obj)
 
             elif isinstance(obj, mutype._muref):
                 refobj = obj._obj0._top_container() if isinstance(obj._obj0, mutype._mustruct) else obj._obj0
@@ -516,18 +531,20 @@ dumpBundle={dumpBundles}
         def _init_memarry(iref_root, arr):
             for i in range(len(arr)):
                 elm = arr[i]
-                elm_hdl = _init_obj(elm)
                 idx_hdl = ctx.handle_from_uint64(i, 64)
                 elm_irf = ctx.shift_iref(iref_root, idx_hdl)
-                ctx.store(MuMemOrd.NOT_ATOMIC, elm_irf, elm_hdl)
+                elm_hdl = _init_obj(elm, elm_irf)
+                if elm_hdl:
+                    ctx.store(MuMemOrd.NOT_ATOMIC, elm_irf, elm_hdl)
 
-        def _init_struct(ref_root, stt):
-            ref = ctx.refcast(ref_root, ctx.id_of(str(stt._TYPE.mu_name)))    # pass in root ref, since substructs should be the first field.
-            iref = ctx.get_iref(ref)
+        def _init_struct(iref_root, stt):
+            # ref = ctx.refcast(ref_root, ctx.id_of(str(stt._TYPE.mu_name)))    # pass in root ref, since substructs should be the first field.
+            # iref = ctx.get_iref(ref)
+            iref = ctx.refcast(iref_root, ctx.id_of(str(mutype.MuIRef(stt._TYPE).mu_name)))
             for fld_n in stt._TYPE._names:
                 fld = getattr(stt, fld_n)
                 if isinstance(fld, mutype._mustruct):
-                    _init_struct(ref, fld)  # recursively initialise substructs
+                    _init_struct(iref, fld)  # recursively initialise substructs
                 else:
                     fld_hdl = _init_obj(fld)
                     fld_iref = ctx.get_field_iref(iref, stt._TYPE._index_of(fld_n))

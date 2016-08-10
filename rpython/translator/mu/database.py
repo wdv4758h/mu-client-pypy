@@ -126,6 +126,18 @@ class MuDatabase:
 
         self.log.hailgen("finished.")
 
+        # for each container type, declare all reference types to that type
+        for cont_cls in (mutype.MuStruct, mutype.MuHybrid, mutype.MuArray):
+            if cont_cls in self.gbltypes:
+                for cont_t in self.gbltypes[cont_cls]:
+                    for ref_cls in (mutype.MuRef, mutype.MuIRef, mutype.MuUPtr):
+                        if ref_cls not in self.gbltypes:
+                            self.gbltypes[ref_cls] = set()
+                        ref_t = ref_cls(cont_t)
+                        ref_set = self.gbltypes[ref_cls]
+                        if ref_t not in ref_set:
+                            ref_set.add(ref_t)
+
         for t in self.objtracer.nullref_ts:
             muv = mutype._munullref(t)
             cst = Constant(muv)
@@ -164,7 +176,6 @@ class MuDatabase:
         libc = ctypes.CDLL(ctypes.util.find_library("c"))
         libm = ctypes.CDLL(ctypes.util.find_library("m"))
         libutil = ctypes.CDLL(ctypes.util.find_library("util"))
-        librt = ctypes.CDLL(ctypes.util.find_library("rt"))
         dir_mu = os.path.dirname(__file__)
         dir_librpyc = os.path.join(dir_mu, 'rpyc')
         path_librpyc = os.path.join(dir_librpyc, 'librpyc.so')
@@ -176,7 +187,7 @@ class MuDatabase:
                         "Please execute 'make' in the directory {}\n".format(path_librpyc, dir_librpyc))
             raise e
 
-        libs = (librpyc, libc, libm, libutil, librt)
+        libs = (librpyc, libc, libm, libutil)
         self.dylibs = libs
         _pypy_linux_prefix = "__pypy_mu_linux_"
         _pypy_apple_prefix = "__pypy_mu_apple_"

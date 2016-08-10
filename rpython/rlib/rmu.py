@@ -49,7 +49,7 @@ class Mu:
 
     def make_boot_image(self, whitelist, output_file):
         # type ([MuID], str) -> None
-        with scoped_lst2arr(MuID, whitelist) as (arr, sz):
+        with scoped_lst2arr(MuID, whitelist, need_rffi_cast=True) as (arr, sz):
             with rffi.scoped_str2charp(output_file) as buf:
                 self._mu.c_make_boot_image(self._mu, arr, sz, buf)
 
