@@ -14,6 +14,7 @@ from StringIO import StringIO
 import zipfile
 import json
 from rpython.tool.ansi_mandelbrot import Driver
+from mar import mu_meta_set
 
 try:
     import zlib
@@ -161,8 +162,13 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
         self.log.bundlegen("start making boot image")
         self.log.bundlegen("%d top level nodes" % len(self.gblnode_map))
-        print bdlpath
+
         self.mu.make_boot_image(wlst, str(bdlpath))
+
+
+        mu_meta_set(str(bdlpath),
+                    entry_point_name=str(self.db.prog_entry.mu_name),
+                    extra_libraries=":".join(map(lambda lib: lib._name, self.db.dylibs)))
 
     def gen_types(self):
         self.log.gen_types("start generating types.")
@@ -396,11 +402,11 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
     def _OP_LOAD(self, op, bb, varmap, blkmap):
         return self.ctx.new_load(bb, isinstance(op.loc.mu_type, mutype.MuUPtr),
-                                 MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type], varmap[op.loc])
+                                 MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc])
 
     def _OP_STORE(self, op, bb, varmap, blkmap):
         return self.ctx.new_store(bb, isinstance(op.loc.mu_type, mutype.MuUPtr),
-                                  MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type], varmap[op.loc], varmap[op.val])
+                                  MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc], varmap[op.val])
 
     def _OP_TRAP(self, op, bb, varmap, blkmap):
         return self.ctx.new_trap(bb, varmap[op.T])

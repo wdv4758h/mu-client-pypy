@@ -1,10 +1,8 @@
 """
 Mu IR text-form generation code
 """
-from rpython.flowspace.model import FunctionGraph, Block, Variable, Constant
-from rpython.mutyper.ll2mu import _MuOpList
+from rpython.flowspace.model import Constant
 from rpython.mutyper.muts.muentity import MuName
-from rpython.mutyper.muts.muops import CALL, THREAD_EXIT, STORE, GETIREF
 from rpython.mutyper.muts import mutype
 from rpython.translator.mu.hail import HAILGenerator
 from rpython.tool.ansi_mandelbrot import Driver
@@ -26,37 +24,9 @@ class MuDatabase:
         self.externfncs = set()
         self.dylibs = None
         self.objtracer = HeapObjectTracer()
-        graphs.append(self._create_bundle_entry(self.prog_entry))
         self.graphs = graphs
         
         self.log = AnsiLogger(self.__class__.__name__)
-
-    def _create_bundle_entry(self, pe):
-        blk = Block([])
-        blk.mu_inputargs = []
-
-        be = FunctionGraph(MuDatabase.BUNDLE_ENTRY_NAME, blk)
-        be.mu_name = MuName(be.name)
-        ver = Variable('_ver')
-        ver.mu_name = MuName(ver.name, be)
-        be.mu_version = ver
-        blk.mu_name = MuName("entry", be)
-
-        rtnbox = Variable('rtnbox')
-        rtnbox.mu_name = MuName(rtnbox.name, be.startblock)
-        rtnbox.mu_type = mutype.MuRef(pe.mu_type.Sig.RTNS[0])
-        blk.mu_inputargs = pe.startblock.mu_inputargs + [rtnbox]
-
-        be.mu_type = mutype.MuFuncRef(mutype.MuFuncSig(map(lambda arg: arg.mu_type, blk.mu_inputargs), ()))
-        self._recursive_addtype(be.mu_type)
-        ops = _MuOpList()
-        rtn = ops.append(CALL(pe, tuple(pe.startblock.mu_inputargs)))
-        rtn.mu_name.scope = blk
-        irfrtnbox = ops.append(GETIREF(rtnbox))
-        ops.append(STORE(irfrtnbox, rtn))
-        ops.append(THREAD_EXIT())
-        blk.mu_operations = tuple(ops)
-        return be
 
     def collect_gbldefs(self):
         self.log.collect_gbldefs("start collecting...")

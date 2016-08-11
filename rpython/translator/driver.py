@@ -543,9 +543,29 @@ class TranslationDriver(SimpleTaskEngine):
 
         log.llinterpret("result -> %s" % v)
 
+    def _mu_create_entry_point(self):
+        from rpython.rtyper.lltypesystem import rffi, lltype
+        from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
+        from rpython.rtyper.llannotation import lltype_to_annotation as l2a
+        from rpython.translator.backendopt.all import backend_optimizations
+        def pypy_mu_main(argc, argv):
+            args = []
+            for i in range(argc):
+                s = rffi.charp2str(argv[i])
+                args.append(s)
+            return self.entry_point(args)
+
+        mlha = MixLevelHelperAnnotator(self.translator.rtyper)
+        g = mlha.getgraph(pypy_mu_main, [l2a(rffi.INT), l2a(rffi.CCHARPP)], l2a(lltype.Signed))
+        mlha.finish()
+        backend_optimizations(self.translator)
+        self.translator.entry_point_graph = g
+
     @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
     def task_mutype_mu(self):
         self.log.info("Task mutype_mu.")
+        self._mu_create_entry_point()
+
         exctran = MuExceptionTransformer(self.translator)
         exctran.transform_all()
 

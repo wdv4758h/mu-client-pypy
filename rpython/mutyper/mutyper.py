@@ -64,7 +64,7 @@ class MuTyper:
         mdb.restart()
 
     def specialise(self, g):
-        # log.info("specialising graph '%s'" % g.name)
+        log.info("specialising graph '%s'" % g.name)
         g.mu_name = MuName(g.name)
         get_arg_types = lambda lst: map(ll2mu.ll2mu_ty, map(lambda arg: arg.concretetype, lst))
         g.mu_type = mutype.MuFuncRef(mutype.MuFuncSig(get_arg_types(g.startblock.mu_inputargs),
