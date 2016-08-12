@@ -548,12 +548,16 @@ class TranslationDriver(SimpleTaskEngine):
         from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
         from rpython.rtyper.llannotation import lltype_to_annotation as l2a
         from rpython.translator.backendopt.all import backend_optimizations
+        from rpython.rtyper.lltypesystem.lloperation import llop
         def pypy_mu_main(argc, argv):
             args = []
             for i in range(argc):
                 s = rffi.charp2str(argv[i])
                 args.append(s)
-            return self.entry_point(args)
+            llop.mu_threadlocalref_init(lltype.Void)
+            exitcode = self.entry_point(args)
+            # What do I do with the exitcode?
+            return exitcode
 
         mlha = MixLevelHelperAnnotator(self.translator.rtyper)
         g = mlha.getgraph(pypy_mu_main, [l2a(rffi.INT), l2a(rffi.CCHARPP)], l2a(lltype.Signed))

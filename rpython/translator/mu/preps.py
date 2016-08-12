@@ -4,7 +4,7 @@ Preparations before the MuTyper process
 import py
 from rpython.mutyper.muts.muentity import MuName
 from rpython.rtyper.lltypesystem import lltype
-from rpython.flowspace.model import Constant, Variable
+from rpython.flowspace.model import Constant, Variable, SpaceOperation
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.rtyper.lltypesystem.lloperation import LL_OPERATIONS
 from copy import copy
@@ -151,4 +151,9 @@ def prepare(graphs, entry_graph, name_dic={}):
 
         if not hasattr(g.returnblock, 'mu_inputargs'):
             g.returnblock.mu_inputargs = [arg for arg in g.returnblock.inputargs if arg.concretetype != lltype.Void]
+
+    # Hack the return block of the entry point to exit thread instead of returning
+    v = Variable()
+    v.concretetype = lltype.Void
+    entry_graph.returnblock.operations = (SpaceOperation('mu_thread_exit', [], v), )
     return graphs

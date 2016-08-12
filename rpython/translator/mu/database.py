@@ -25,7 +25,6 @@ class MuDatabase:
         self.dylibs = None
         self.objtracer = HeapObjectTracer()
         self.graphs = graphs
-        
         self.log = AnsiLogger(self.__class__.__name__)
 
     def collect_gbldefs(self):

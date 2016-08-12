@@ -1338,6 +1338,22 @@ def _llop2mu_threadlocalref_addr(res=None, llopname='threadlocalref_addr'):
     return ops
 
 
+def _llop2mu_mu_threadlocalref_init(res=None, llopname='mu_threadlocalref_init'):
+    ops = _MuOpList()
+
+    # HACK!
+    tlstt_t = globals().get('__mu_threadlocalstt_t', None)
+    assert tlstt_t
+
+    ref = ops.append(muops.NEW(tlstt_t))
+    ops.append(muops.SET_THREADLOCAL(ref))
+    return ops
+
+
+def _llop2mu_mu_thread_exit(res=None, llopname='mu_thread_exit'):
+    return [muops.THREAD_EXIT()]
+
+
 # ----------------
 # Weak references
 def _llop2mu_weakref_create(ptr, res=None, llopname='weakref_create'):

@@ -97,7 +97,7 @@ class MuTyper:
             self.proc_arglist(e.mu_args, blk)
         if blk.exitswitch is not c_last_exception:
             if len(blk.exits) == 0:
-                if not (len(muops) > 0 and muops[-1].opname == 'THROW'):
+                if len(muops) == 0 or muops[-1].opname not in ("THROW", "COMMINST"):
                     muops.append(muop.RET(blk.mu_inputargs[0] if len(blk.mu_inputargs) == 1 else None))
             elif len(blk.exits) == 1:
                 muops.append(muop.BRANCH(DEST.from_link(blk.exits[0])))
