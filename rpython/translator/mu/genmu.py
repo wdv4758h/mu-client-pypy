@@ -281,7 +281,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             # create all block nodes first
             for blk in g.iterblocks():
                 bb = ctx.new_bb(fn)
-                # ctx.set_name(bdl, bb, repr(blk.mu_name))
+                ctx.set_name(bdl, bb, repr(blk.mu_name))
                 blkmap[blk] = bb
                 
             for blk in g.iterblocks():
@@ -289,11 +289,11 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                 varmap = gblndmap.copy()     # local variable nodes map
                 for prm in blk.mu_inputargs:
                     nd = ctx.new_nor_param(bb, gblndmap[prm.mu_type])
-                    # ctx.set_name(bdl, nd, repr(prm.mu_name))
+                    ctx.set_name(bdl, nd, repr(prm.mu_name))
                     varmap[prm] = nd
                 if hasattr(blk, 'mu_excparam'):
                     nd = ctx.new_exc_param(bb)
-                    # ctx.set_name(bdl, nd, repr(blk.mu_excparam.mu_name))
+                    ctx.set_name(bdl, nd, repr(blk.mu_excparam.mu_name))
                     varmap[blk.mu_excparam] = nd
                 
                 # generate operations
@@ -314,7 +314,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
                     if op.result.mu_type is not mutype.void_t:
                         res = ctx.get_inst_res(nd, 0)  # NOTE: things will be difficult when ovf is supported in Mu
-                        # ctx.set_name(bdl, res, repr(op.result.mu_name))
+                        ctx.set_name(bdl, res, repr(op.result.mu_name))
                         varmap[op.result] = res
                     if op.exc.nor and op.exc.exc:
                         ctx.add_dest(nd, MuDestKind.NORMAL, blkmap[op.exc.nor.blk], map(varmap.get, op.exc.nor.args))
