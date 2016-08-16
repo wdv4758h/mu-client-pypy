@@ -116,6 +116,67 @@ class MuExceptionTransformer:
                 self.exctran_block(blk)
 
     def exctran_block(self, excblk):
+        """
+        An example of what this should do:
+                               +--------+
+                               | excblk |
+                               +--------+
+                                 |  |  |      [last_exception, last_exc_value]
+                 +---------------+  |  +--------------------+
+                 | [a, b]           |                       |
+                 |                  |[c, d, last_exc_value] |
+              +--v---+       +------v------+         +------v-------+
+              |[a, b]|       |[c, d, exc_v]|         |[exc_t, exc_v]|
+              |      |       |             |         |              |
+              | blk0 |       |    blk1     |         |     blk2     |
+              +------+       +-------------+         +--------------+
+
+                                    ++
+                                    ||
+                                    ||
+                                    ||
+                                    ||
+                                    ||
+                                    ||
+                                    ||
+                                    vv
+
+                                +--------+
+                                | excblk |
+                                +--------+
+                                  |  |
+                  +---------------+  |[c, d]
+                  |    [a, b]        |
+                  |                  |
+               +--v---+       +------v------+
+               |[a, b]|       |   [c, d]    |
+               |      |       |             |
+               | blk0 |       |   catblk    |
+               +------+       +-------------+
+                                     |
+                                     |[exc_t, exc_v, c, d]
+                                     |
+                                     v
+                          +--------------------+
+                          |[exc_t, exc_v, c, d]|
+                          |       cmpblk       |
+                          | cmp_res = call(...)|
+                          |                    |
+                          |exitswitch: cmp_res |
+                          +--------------------+
+                               |       |
+                    +----------+       +---------+ [exc_t, exc_v]
+                    |  [c, d, exc_v]             |
+                    |                            |
+             +------v------+              +------v-------+
+             |[c, d, exc_v]|              |[exc_t, exc_v]|
+             |             |              |              |
+             |    blk1     |              |     blk2     |
+             +-------------+              +--------------+
+
+        @param excblk:
+        @return:
+        """
         def _create_catch_block(args):
             blk_catch = Block(args)
             ops = []
@@ -138,146 +199,88 @@ class MuExceptionTransformer:
             blk_catch.operations = tuple(ops)
             return blk_catch, exc_t, exc_v
 
-        def _collect_args(links):
-            norm_args = set()
-            for lnk in links:
-                for arg in lnk.args:
-                    if not arg in (lnk.last_exception, lnk.last_exc_value):
-                        norm_args.add(arg)
-            return list(norm_args)
-
-        def _link(src_blk, dst_blk, args, exitcase=None):
-            lnk = Link(args, dst_blk)
-            lnk.prevblock = src_blk
-            lnk.exitcase = exitcase
-            return lnk
-
-        def _has_excinfo_var(exclnk):
-            return (isinstance(exclnk.last_exception, Variable) and exclnk.last_exception in exclnk.args) or \
-                   (isinstance(exclnk.last_exc_value, Variable) and exclnk.last_exc_value in exclnk.args)
-
-        def _create_compare_blocks(lnks, cases, args):
-            """
-            For each link, create a compare block.
-            The block should contain:
-            - A call to mupyexc_checktype operation,
-            - conditional branching based on the result
-                - successful, then to what the original destination of the link
-                - unsuccessful, then keep comparing and go to the next block.
-
-            The input arguments for these comparison blocks are:
-            - thrown exception type variable
-            - thrown exception value variable
-            - exception type to check against
-            - other arguments
-
-            :param lnks: The original links
-            :param args: input args for the compare block
-            :return: the head of the compare block chain.
-            """
-            # Create the compare block
-            # Varaibles for the inputargs
-            _, inargs = _localise_args(lnks, args)
-            cmpblk = Block(inargs)
-            ops = []
-
-            vexc_t, vexc_v = inargs[:2]
-            case = cases[0]
-
-            cmpres = Variable("cmpres")
-            cmpres.concretetype = lltype.Bool
-            ops.append(SpaceOperation('direct_call',
-                                      [self.mupyexc_checktype, vexc_t, case],
-                                      cmpres))
-            cmpblk.operations = tuple(ops)
-            cmpblk.exitswitch = cmpres
-
-            if len(lnks) == 2:
-                lnks[0].prevblock = cmpblk
-                lnks[1].prevblock = cmpblk
-                cmpblk.exits = (lnks[1], lnks[0])
-            else:
-                _args = [vexc_t, vexc_v] + list(set(inargs[2:]) & set(_collect_args(lnks[1:])))
-                chain = _create_compare_blocks(lnks[1:], cases[1:], _args)
-                cmpblk.exits = (_link(cmpblk, chain, _args), lnks[0])
-
-            return cmpblk
-
-        def _localise_args(lnks, inargs):
+        def _get_local_varmap(inlnk_args):
             varmap = {}
-            for arg in inargs:
-                if isinstance(arg, Variable):
-                    varmap[arg] = copy(arg)
-                else:
-                    varmap[arg] = arg
-            inargs = map(varmap.get, inargs)
-            for l in lnks:
-                l.args = map(varmap.get, l.args)
-            return lnks, inargs
+            for a in filter(lambda a: isinstance(a, Variable), inlnk_args):
+                v = Variable(a._name[:-1])
+                v.concretetype = a.concretetype
+                varmap[a] = v
+            return varmap
+        def _localise_args(args, varmap):
+            return [varmap[a] if isinstance(a, Variable) else a for a in args]
 
-        def _copy_arg_list(args):
-            return [copy(a) if isinstance(a, Variable) else a for a in args] # give arguments local identity
+        def _process_exception(exclnks, cases, inlnk_args):
+            # NOTE: this function returns a link rather than block
+            if len(exclnks) == 1:
+                # directly return this link
+                return exclnks[0]
 
-        def _catch_and_compare_exception(exclnks, cases, lnkargs):
-            inargs =  _copy_arg_list(lnkargs)
-            catblk, vexc_t, vexc_v = _create_catch_block(inargs)
+            else: # otherwise, create a compare block
+                # localise variables
+                lvmap = _get_local_varmap(inlnk_args)
+                inargs_cmpblk = _localise_args(inlnk_args, lvmap)
+                for lnk in exclnks:
+                    lnk.args = _localise_args(lnk.args, lvmap)
+                # pickout things specific to this comparison
+                vexc_t, vexc_v = inargs_cmpblk[:2]
+                case = cases.pop(0)
+                exclnk = exclnks.pop(0)
+
+                cmpblk = Block(inargs_cmpblk)
+
+                # add compare call to block
+                cmpres = Variable("cmpres")
+                cmpres.concretetype = lltype.Bool
+                cmpblk.operations = (SpaceOperation('direct_call', [self.mupyexc_checktype, vexc_t, case], cmpres), )
+                cmpblk.exitswitch = cmpres
+
+                # recursively call on rest of the links
+                norm_args = _collect_normal_args(exclnks)
+                lnk_rest = _process_exception(exclnks, cases, norm_args)
+                lnk_rest.prevblock = cmpblk
+                cmpblk.exits = (lnk_rest, exclnk)
+
+                # return a link to this comparison block
+                return Link(inlnk_args, cmpblk)
+
+        def _catch_and_process_exception(exclnks, cases, inlnk_args):
+            # create catch block
+            lvmap = _get_local_varmap(inlnk_args)
+            inargs_catblk = _localise_args(inlnk_args, lvmap)
+            catblk, vexc_t_catblk, vexc_v_catblk = _create_catch_block(inargs_catblk)
 
             # replace the exception info vars with the unpacked vars
             for l in exclnks:
-                if l.last_exception in l.args:
-                    l.args[l.args.index(l.last_exception)] = vexc_t
-                if l.last_exc_value in l.args:
-                    l.args[l.args.index(l.last_exc_value)] = vexc_v
+                if isinstance(l.last_exception, Variable) and l.last_exception in l.args:
+                    lvmap[l.last_exception] = vexc_t_catblk
+                if isinstance(l.last_exc_value, Variable) and l.last_exc_value in l.args:
+                    lvmap[l.last_exc_value] = vexc_v_catblk
 
-            args = [vexc_t, vexc_v] + inargs
+            # localise all link arguments
+            for lnk in exclnks:
+                lnk.args = _localise_args(lnk.args, lvmap)
 
-            cmpblk = _create_compare_blocks(exclnks, cases, args)
-            catblk.exits = (_link(catblk, cmpblk, args), )
+            lnk_args = [vexc_t_catblk, vexc_v_catblk] + inargs_catblk
+
+            lnk_proc = _process_exception(exclnks, cases, lnk_args)
+            lnk_proc.prevblock = catblk
+            catblk.exits = (lnk_proc, )
             return catblk
 
-        if len(excblk.exits) > 2:
-            lnks = excblk.exits[1:]
-            # wrap the llexitcases
-            cases = []
-            for l in lnks:
-                assert isinstance(l.llexitcase, _ptr)
-                cases.append(Constant(l.llexitcase, l.llexitcase._TYPE))
+        exclnks = list(excblk.exits[1:])
+        if len(exclnks) == 1 and not _has_excinfo_var(exclnks[0]):
+            # exception information is not used. -> ignore the raised exception
+            return
 
-            norm_args = _collect_args(lnks)
-            catblk = _catch_and_compare_exception(lnks, cases, norm_args)
-            excblk.exits = (excblk.exits[0], _link(excblk, catblk, norm_args))
-
-        elif len(excblk.exits) == 2:
-            exclnk = excblk.exits[1]
-            if _has_excinfo_var(exclnk):
-                # Exception info in args ->
-                # needs to catch and unpack the exception data
-                args = _collect_args([exclnk])
-                inargs = _copy_arg_list(args)
-                catblk, var_exc_t, var_exc_v = _create_catch_block(inargs)
-                excblk.exits = (excblk.exits[0], _link(excblk, catblk, args))
-
-                # unpack in the catch block
-                # replace the variable in args in exit links
-                if exclnk.last_exception in exclnk.args:
-                    exclnk.args[exclnk.args.index(exclnk.last_exception)] = var_exc_t
-                if exclnk.last_exc_value in exclnk.args:
-                    exclnk.args[exclnk.args.index(exclnk.last_exc_value)] = var_exc_v
-
-                # set the catch block exits
-                exclnk.prevblock = catblk
-                lvmap = {}  # in catch block
-                for i in range(len(args)):
-                    lvmap[args[i]] = inargs[i]
-                for i in range(len(exclnk.args)):
-                    arg = exclnk.args[i]
-                    if arg in lvmap:
-                        exclnk.args[i] = lvmap[arg]
-                    else:
-                        assert arg in (var_exc_t, var_exc_v)
-                catblk.exits = (exclnk, )
-            else:   # exception information is not used. -> ignore the raised exception
-                pass
+        # need to create catch block
+        # wrap the llexitcases
+        cases = []
+        for l in exclnks:
+            assert isinstance(l.llexitcase, _ptr)
+            cases.append(Constant(l.llexitcase, l.llexitcase._TYPE))
+        norm_args = _collect_normal_args(exclnks)
+        catblk = _catch_and_process_exception(exclnks, cases, norm_args)
+        excblk.exits = (excblk.exits[0], _link(excblk, catblk, norm_args))
 
     def _get_pack_ops(self, var_type, var_value):
         """
@@ -305,3 +308,22 @@ class MuExceptionTransformer:
                                   dummy_var))
 
         return ops, excdata
+
+
+def _has_excinfo_var(exclnk):
+    return (isinstance(exclnk.last_exception, Variable) and exclnk.last_exception in exclnk.args) or \
+           (isinstance(exclnk.last_exc_value, Variable) and exclnk.last_exc_value in exclnk.args)
+
+def _collect_normal_args(exclnks):
+    norm_args = set()
+    for lnk in exclnks:
+        for arg in lnk.args:
+            if not arg in (lnk.last_exception, lnk.last_exc_value):
+                norm_args.add(arg)
+    return list(norm_args)
+
+def _link(src_blk, dst_blk, args, exitcase=None):
+    lnk = Link(args, dst_blk)
+    lnk.prevblock = src_blk
+    lnk.exitcase = exitcase
+    return lnk
