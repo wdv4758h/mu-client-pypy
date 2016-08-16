@@ -152,8 +152,4 @@ def prepare(graphs, entry_graph, name_dic={}):
         if not hasattr(g.returnblock, 'mu_inputargs'):
             g.returnblock.mu_inputargs = [arg for arg in g.returnblock.inputargs if arg.concretetype != lltype.Void]
 
-    # Hack the return block of the entry point to exit thread instead of returning
-    v = Variable()
-    v.concretetype = lltype.Void
-    entry_graph.returnblock.operations = (SpaceOperation('mu_thread_exit', [], v), )
     return graphs

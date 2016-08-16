@@ -555,7 +555,11 @@ class TranslationDriver(SimpleTaskEngine):
                 s = rffi.charp2str(argv[i])
                 args.append(s)
             llop.mu_threadlocalref_init(lltype.Void)
-            exitcode = self.entry_point(args)
+            try:
+                exitcode = self.entry_point(args)
+            except Exception as e:
+                os.write(2, "Caught exception: %s\n" % str(e))
+                return 1
             # What do I do with the exitcode?
             return exitcode
 
@@ -563,6 +567,12 @@ class TranslationDriver(SimpleTaskEngine):
         g = mlha.getgraph(pypy_mu_main, [l2a(rffi.INT), l2a(rffi.CCHARPP)], l2a(lltype.Signed))
         mlha.finish()
         backend_optimizations(self.translator)
+
+        # Hack the return block of the entry point to exit thread instead of returning
+        from rpython.flowspace.model import Variable, SpaceOperation
+        v = Variable()
+        v.concretetype = lltype.Void
+        g.returnblock.operations = (SpaceOperation('mu_thread_exit', [], v),)
         self.translator.entry_point_graph = g
 
     @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
