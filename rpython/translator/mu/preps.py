@@ -2,7 +2,7 @@
 Preparations before the MuTyper process
 """
 from rpython.rtyper.lltypesystem import lltype
-from rpython.flowspace.model import Constant, Variable, SpaceOperation
+from rpython.flowspace.model import Constant, Variable
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.rtyper.lltypesystem.lloperation import LL_OPERATIONS
 
