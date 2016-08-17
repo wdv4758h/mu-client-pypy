@@ -251,7 +251,10 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             elif cst.mu_type == mutype.double_t:
                 nd = ctx.new_const_double(bdl, gblndmap[cst.mu_type], cst.value.val)
             elif isinstance(cst.value, mutype._munullref):
-                nd = ctx.new_const_null(bdl, gblndmap[cst.mu_type])
+                if isinstance(cst.mu_type, mutype.MuUPtr):
+                    nd = ctx.new_const_int(bdl, gblndmap[cst.mu_type], 0)
+                else:
+                    nd = ctx.new_const_null(bdl, gblndmap[cst.mu_type])
 
             ctx.set_name(bdl, nd, str(cst.mu_name))
             gblndmap[cst] = nd
@@ -478,6 +481,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             @param obj: a mutype._muobject
             @return: Mu handle
             """
+            print "_init_obj: ", obj
             TYPE = obj._TYPE
             if isinstance(obj, mutype._muprimitive):
                 if isinstance(TYPE, mutype.MuInt):
@@ -521,18 +525,24 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                         ctx.store(MuMemOrd.NOT_ATOMIC, fld_iref, fld_hdl)
 
                 # var fields
-                iref_var = ctx.get_var_part_iref(hiref)
                 arr = getattr(obj, obj._TYPE._varfld)
-                _init_memarry(iref_var, arr)
+                if len(arr) > 0:
+                    iref_var = ctx.get_var_part_iref(hiref)
+                    _init_memarry(iref_var, arr)
 
             elif isinstance(obj, mutype._muarray):
                 href = self._objhdl_map[obj]
-                hiref = ctx.get_iref(href)
-                _init_memarry(hiref, obj)
+                if len(obj) > 0:
+                    hiref = ctx.get_iref(href)
+                    _init_memarry(hiref, obj)
 
             elif isinstance(obj, mutype._muref):
                 refobj = obj._obj0._top_container() if isinstance(obj._obj0, mutype._mustruct) else obj._obj0
                 return self._objhdl_map[refobj]
+
+            elif isinstance(obj, mutype._mufuncref):
+                graph = obj.graph
+                return ctx.handle_from_func(ctx.id_of(str(graph.mu_name)))
 
         def _init_memarry(iref_root, arr):
             for i in range(len(arr)):

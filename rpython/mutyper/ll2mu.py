@@ -855,7 +855,7 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
     try:
         _rflenfld, _ops = __getfieldiref(obj, 'length')
         ops.extend(_ops)
-        ops.append(muops.STORE(_rflenfld, n))
+        ops.append(__store(_rflenfld, n))
     except KeyError:  # doesn't have a length field
         # log.malloc_varsize("Ignored setting length field in type '%s'." % obj)
         pass
@@ -902,11 +902,16 @@ def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
         raise IgnoredLLOp
     return ops
 
+def __store(iref, val):
+    if isinstance(val, Constant) and isinstance(val.value, mutype._mufuncref) and hasattr(val.value, 'graph'):
+        return muops.STORE(iref, val.value.graph)
+    else:
+        return muops.STORE(iref, val)
 
 def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
     try:
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
-        ops.append(muops.STORE(iref_fld, val))
+        ops.append(__store(iref_fld, val))
     except KeyError:
         if val.concretetype is lltype.Void:     # trying to set a field with a value that can't be translated.
             raise IgnoredLLOp
@@ -942,7 +947,7 @@ def _llop2mu_getarraysubstruct(var, idx, res=None, llopname='getarraysubstruct')
 
 def _llop2mu_setarrayitem(var, idx, val, res=None, llopname='setarrayitem'):
     iref_itm, ops = __getarrayitemiref(var, idx)
-    ops.append(muops.STORE(iref_itm, val))
+    ops.append(__store(iref_itm, val))
     return ops
 
 
@@ -990,7 +995,7 @@ def _llop2mu_setinteriorfield(var, *offsets_val, **kwards):
     offsets, val = offsets_val[:-1], offsets_val[-1]
     try:
         iref, ops = __getinterioriref(var, offsets)
-        ops.append(muops.STORE(iref, val))
+        ops.append(__store(iref, val))
     except KeyError:
         if val.concretetype is lltype.Void:
             raise IgnoredLLOp
@@ -1144,7 +1149,7 @@ def _llop2mu_raw_store(adr, ofs, val, res=None, llopname='raw_store'):
         ops = _MuOpList()
         loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
         loc_ptr = ops.append(muops.PTRCAST(loc_adr, mutype.MuUPtr(val.mu_type)))
-        ops.append(muops.STORE(loc_ptr, val))
+        ops.append(__store(loc_ptr, val))
         return ops
     elif isinstance(adr.mu_type, mutype.MuRef):
         assert isinstance(ofs.value, CDefinedIntSymbolic)
