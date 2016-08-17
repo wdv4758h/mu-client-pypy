@@ -34,7 +34,7 @@ def chop(graphs, g_entry):
             if isinstance(obj, lltype._func):
                 return True
         return False
-
+    is_ptr_const = lambda a: isinstance(a, Constant) and isinstance(a.value, lltype._ptr)
     def visit(graph):
         def _visit(callee):
             try:
@@ -45,6 +45,28 @@ def chop(graphs, g_entry):
             except AssertionError:
                 log.error("Error: \"%s\" graph not found" % callee._name)
 
+        def _find_funcrefs(obj):
+            if isinstance(obj, lltype._ptr):
+                refnt = obj._obj
+                if isinstance(refnt, lltype._struct):
+                    refnt = refnt._normalizedcontainer()
+
+                _find_funcrefs(refnt)
+
+            elif isinstance(obj, lltype._struct):
+                for fld in lltype.typeOf(obj)._flds:
+                    _find_funcrefs(obj._getattr(fld))
+
+            elif isinstance(obj, lltype._array):
+                if isinstance(lltype.typeOf(obj).OF, (lltype.ContainerType, lltype.Ptr)):
+                    for i in range(len(obj.items)):
+                        itm = obj.getitem(i)
+                        _find_funcrefs(itm)
+
+            elif isinstance(obj, lltype._func):
+                if hasattr(obj, 'graph'):
+                    _visit(obj.graph)
+
         for blk in graph.iterblocks():
             for op in blk.operations:
                 if op.opname == 'indirect_call':
@@ -53,12 +75,11 @@ def chop(graphs, g_entry):
                         for callee in possible_graphs:
                             _visit(callee)
                 else:
-                    for arg in filter(is_fncptr_cnst, op.args):
-                        fnc = arg.value._obj
-                        try:
-                            _visit(fnc.graph)
-                        except AttributeError:
-                            pass
+                    for arg in filter(is_ptr_const, op.args):
+                        _find_funcrefs(arg.value)
+            for e in blk.exits:
+                for arg in filter(is_ptr_const, e.args):
+                    _find_funcrefs(arg.value)
 
     ref[g_entry] = True
     visit(g_entry)
