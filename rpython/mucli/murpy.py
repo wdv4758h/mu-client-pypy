@@ -1,9 +1,5 @@
-from __future__ import division, absolute_import, print_function, unicode_literals
-import sys
-
-import ctypes, ctypes.util
-from libmu import *
-import os
+import ctypes
+import libmu
 
 import argparse
 import zipfile
@@ -77,169 +73,50 @@ def parse_args():
 
 def extract_bundle(bdl):
     zf = zipfile.ZipFile(bdl, 'r')
-    ir, hail, exfn = map(zf.read, zf.namelist()[:3])    # disregard the 4-th text graph file.
+    ir, hail, info = map(zf.read, zf.namelist()[:3])    # disregard the 4-th text graph file.
     zf.close()
-    return ir, hail, json.loads(exfn)
+    return ir, hail, json.loads(info)
 
 
-def build_arglist(ctx, argv):
-    _id = ctx.id_of
+def get_c_args(ctx, args):
+    length = len(args)
+    argc = ctx.handle_from_int(length, 32)
+    buf = (ctypes.c_char_p * length)()
+    for i in range(length):
+        arg = args[i]
+        buf[i] = ctypes.cast(ctypes.create_string_buffer(arg), ctypes.c_char_p)
 
-    def build_string(s):
-        with DelayedDisposer() as dd:
-            length = len(s)
-            hlength = dd << ctx.handle_from_int(length, 64)
-            hstr = ctx.new_hybrid(_id("@hybrpy_string_0"), hlength)   # don't add handle to dd
-            ir = dd << ctx.get_iref(hstr)
-
-            # hash
-            hir_hash = dd << ctx.get_field_iref(ir, 1)
-            ctx.store(hir_hash, dd << ctx.handle_from_int(hash(s), 64))
-
-            # length
-            hir_length = dd << ctx.get_field_iref(ir, 2)
-            ctx.store(hir_length, hlength)
-
-            # chars
-            hir_var = dd << ctx.get_var_part_iref(ir)
-            for i, ch in enumerate(s):
-                with DelayedDisposer() as _dd:
-                    hi = _dd << ctx.handle_from_int(i, 64)
-                    hir_elm = _dd << ctx.shift_iref(hir_var, hi)
-                    hch = _dd << ctx.handle_from_int(ord(ch), 8)
-                    ctx.store(hir_elm, hch)
-            return hstr
-
-    with DelayedDisposer() as dd:
-        # Create new list
-        refstt = ctx.new_fixed(_id("@sttlist_0"))     # don't add to dd
-        irefstt = dd << ctx.get_iref(refstt)
-
-        # Set the length of the list
-        ireffld_len = dd << ctx.get_field_iref(irefstt, 1)
-        hlen = dd << ctx.handle_from_int(len(argv), 64)
-        ctx.store(ireffld_len, hlen)
-
-        # Create the hybrid items
-        ireffld_items = dd << ctx.get_field_iref(irefstt, 2)
-        refhyb_items = dd << ctx.new_hybrid(_id("@hybrpy_stringPtr_0"), hlen)
-        ctx.store(ireffld_items, refhyb_items)
-
-        # Set the length field of the hybrid type.
-        irefhyb = dd << ctx.get_iref(refhyb_items)
-        irefhyblen = dd << ctx.get_field_iref(irefhyb, 1)
-        ctx.store(irefhyblen, hlen)
-
-        # Store the strings
-        irefvar = dd << ctx.get_var_part_iref(irefhyb)
-        for i, s in enumerate(argv):
-            hidx = dd << ctx.handle_from_int(i, 64)
-            irefelm = ctx.shift_iref(irefvar, hidx)
-            refhyb = build_string(s)
-            ctx.store(irefelm, refhyb)
-
-    return refstt
-
-loaded_extfncs = []     # Keep them in a global variable so that PyPy's GC will not finalize these libraries.
-
-def ensure_open_libs():
-    if len(loaded_extfncs) != 0:
-        return loaded_extfncs
-    
-    libc = ctypes.CDLL(ctypes.util.find_library("c"))
-    libm = ctypes.CDLL(ctypes.util.find_library("m"))
-    libutil = ctypes.CDLL(ctypes.util.find_library("util"))
-    librt = ctypes.CDLL(ctypes.util.find_library("rt"))
-    dir_rpython = os.path.dirname(os.path.dirname(__file__))
-    dir_librpyc = os.path.join(dir_rpython, 'translator', 'mu', 'rpyc')
-    path_librpyc = os.path.join(dir_librpyc, 'librpyc.so')
-
-    try:
-        librpyc = ctypes.CDLL(path_librpyc)
-    except OSError as e:
-        os.write(2, "ERROR: library {} not found. "
-                    "Please execute 'make' in the directory {}\n".format(path_librpyc, dir_librpyc))
-        raise e
-
-    loaded_extfncs[:] = [librpyc, libc, libm, libutil, librt]
-    
-    return loaded_extfncs
-    
-
-def load_extfncs(ctx, exfns):
-    _pypy_linux_prefix = "__pypy_mu_linux_"
-    _pypy_apple_prefix = "__pypy_mu_apple_"
-    _pypy_macro_prefix = "__pypy_macro_"
-
-    def correct_name(c_name):
-        """
-        Correct some function naming
-        especially needed for stat system calls.
-        """
-        if sys.platform.startswith('darwin'):  # Apple
-            if c_name in ('stat', 'fstat', 'lstat'):
-                return c_name + '64'    # stat64, fstat64, lstat64
-            if c_name == "readdir":     # fixing the macro defined return type (struct dirent*)
-                return _pypy_apple_prefix + c_name
-        return c_name
-
-    libs = ensure_open_libs()
-    librpyc = libs[0]
-    for c_name, fncptr_name, gcl_name, hdrs in exfns:
-        c_name = correct_name(c_name)
-        with DelayedDisposer() as dd:
-            adr = None
-            for lib in libs:
-                try:
-                    adr = ctypes.cast(getattr(lib, c_name), ctypes.c_void_p).value
-                    break
-                except AttributeError:
-                    pass
-            if adr is None:
-                for prefix in (_pypy_linux_prefix, _pypy_macro_prefix):
-                    try:
-                        adr = ctypes.cast(getattr(librpyc, prefix + c_name), ctypes.c_void_p).value
-                    except AttributeError:
-                        pass
-            if adr is None:
-                os.write(2, "Failed to load function '%(c_name)s'.\n" % locals())
-                raise NotImplementedError
-            
-            # print("func: {}, addr: {} 0x{:x}".format(c_name, adr, adr))
-
-            hadr = dd << ctx.handle_from_fp(ctx.id_of(fncptr_name), adr)
-            hgcl = dd << ctx.handle_from_global(ctx.id_of(gcl_name))
-            ctx.store(hgcl, hadr)
+    argv = ctx.handle_from_ptr(ctx.id_of("@ptrhybarrayPtr_0"), ctypes.cast(buf, ctypes.c_void_p))
+    return argc, argv
 
 
-def launch(cmdargs, ir, hail, exfns, args):
-    dll = MuRefImpl2StartDLL("libmurefimpl2start.so")
+def launch(cmdargs, ir, hail, info, args):
+    dll = libmu.MuRefImpl2StartDLL("libmurefimpl2start.so")
     vmopts = get_vm_opts(cmdargs)
+    vmopts['extraLibs'] = info['libdeps']
     mu = dll.mu_refimpl2_new_ex(**vmopts)
 
     with mu.new_context() as ctx:
         ctx.load_bundle(ir)
         ctx.load_hail(hail)
-        load_extfncs(ctx, exfns)
 
         if cmdargs.checkOnly:
             return 0
 
-        refstt_arglst = build_arglist(ctx, args)
-        refrtnbox = ctx.new_fixed(ctx.id_of("@i64"))
-        bundle_entry = ctx.handle_from_func(ctx.id_of("@_mu_bundle_entry"))
+        argc, argv = get_c_args(ctx, args)
+        bundle_entry = ctx.handle_from_func(ctx.id_of(info['entrypoint']))
         st = ctx.new_stack(bundle_entry)
-        reftl = ctx.new_fixed(ctx.id_of("@sttmu_threadlocal"))
-        th = ctx.new_thread(st, reftl, PassValues(refstt_arglst, refrtnbox))
+        th = ctx.new_thread(st, None, libmu.PassValues(argc, argv))
 
         mu.execute()
 
-        irefrtnbox = ctx.get_iref(refrtnbox)
-        hrtnval = ctx.load(irefrtnbox).cast(MuIntValue)
-        rtnval = ctx.handle_to_sint(hrtnval)
-
-        # print("Program exited with value %(rtnval)d" % locals())
-        return rtnval
+        # irefrtnbox = ctx.get_iref(refrtnbox)
+        # hrtnval = ctx.load(irefrtnbox).cast(MuIntValue)
+        # rtnval = ctx.handle_to_sint(hrtnval)
+        #
+        # # print("Program exited with value %(rtnval)d" % locals())
+        # return rtnval
+        return 0
 
 
 def main():
@@ -249,5 +126,6 @@ def main():
 
 
 if __name__ == "__main__":
+    import sys
     exitcode = main()
     sys.exit(exitcode)

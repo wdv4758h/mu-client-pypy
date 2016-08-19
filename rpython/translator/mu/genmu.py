@@ -10,6 +10,7 @@ from rpython.mutyper.tools.textgraph import print_graph
 from rpython.rlib.rmu import (
     Mu, MuDestKind, MuBinOptr, MuCmpOptr, 
     MuConvOptr, MuMemOrd, MuCallConv, MuCommInst)
+from rpython.translator.mu.hail import HAILGenerator
 from StringIO import StringIO
 import zipfile
 import json
@@ -47,9 +48,9 @@ class MuTextBundleGenerator(MuBundleGenerator):
     def bundlegen(self, bdlpath):
         strio_ir = StringIO()
         strio_hail = StringIO()
-        strio_exfn = StringIO()
+        strio_info = StringIO()
         strio_graphs = StringIO()
-        self.codegen(strio_ir, strio_hail, strio_exfn, strio_graphs)
+        self.codegen(strio_ir, strio_hail, strio_info, strio_graphs)
 
         self.log.zipbundle("generate zip bundle...")
         zf = zipfile.ZipFile(bdlpath.strpath, mode="w", compression=zip_compression)
@@ -61,17 +62,15 @@ class MuTextBundleGenerator(MuBundleGenerator):
 
         _writefrom(bdlpath.basename.replace('.mu', '.uir'), strio_ir)
         _writefrom(bdlpath.basename.replace('.mu', '.hail'), strio_hail)
-        _writefrom(bdlpath.basename.replace('.mu', '.exfn'), strio_exfn)
+        _writefrom(bdlpath.basename.replace('.mu', '.info'), strio_info)
         _writefrom(bdlpath.basename.replace('.mu', '.txt'), strio_graphs)
         zf.close()
         self.log.zipbundle("done.")
 
-    def codegen(self, fp_ir, fp_hail, fp_exfn, fp_rpy_graphs=None):
+    def codegen(self, fp_ir, fp_hail, fp_info, fp_rpy_graphs=None):
         """
         Generate bundle code to a writable file fp.
         """
-
-
         self.log.codegen("generating bundle code...")
         for cls in self.db.gbltypes:
             for t in self.db.gbltypes[cls]:
@@ -86,13 +85,10 @@ class MuTextBundleGenerator(MuBundleGenerator):
         for gcell in self.db.mutyper.ldgcells:
             fp_ir.write(".global %s <%s>\n" % (gcell.mu_name, gcell._T.mu_name))
 
-        self.db.hailgen.codegen(fp_hail)
-
         fncs = []
         for extfn in self.db.externfncs:
             fp_ir.write(".const %s <%s> = EXTERN \"%s\"\n" % (extfn.mu_name, extfn._TYPE.mu_name, extfn.c_symname))
             fncs.append((extfn.c_name, str(extfn._TYPE.mu_name), str(extfn.mu_name), extfn.eci.libraries))
-        fp_exfn.write(json.dumps(fncs))
 
         for g in self.graphs:
             fp_ir.write(".funcdef %s VERSION %s <%s> {\n" % (
@@ -100,9 +96,22 @@ class MuTextBundleGenerator(MuBundleGenerator):
             self._genblocks(g, fp_ir)
             fp_ir.write("}\n")
 
+        self.log.codegen("generating HAIL script...")
+        # HAIL script
+        hailgen = HAILGenerator(self.db.objtracer)
+        hailgen.codegen(fp_hail)
+
+        # save the text flow graph
         if fp_rpy_graphs:
             for g in self.graphs:
                 print_graph(g, fp_rpy_graphs)
+
+        # some extra information
+        info = {
+            "libdeps": ":".join(map(lambda lib: lib._name, self.db.dylibs)),
+            "entrypoint": str(self.db.prog_entry.mu_name)
+        }
+        fp_info.write(json.dumps(info))
 
         self.log.codegen("finished.")
 

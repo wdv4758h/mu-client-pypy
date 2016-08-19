@@ -86,14 +86,14 @@ class MuDatabase:
 
         mdb.restart()
 
-        self.log.hailgen("start tracing heap objects...")
+        self.log.objtracer("start tracing heap objects...")
         for gcl in self.mutyper.ldgcells:
             self.objtracer.trace(gcl)
 
         for t in self.objtracer.get_types():
             self._recursive_addtype(t)
 
-        self.log.hailgen("finished.")
+        self.log.objtracer("finished.")
 
         # for each container type, declare all reference types to that type
         for cont_cls in (mutype.MuStruct, mutype.MuHybrid, mutype.MuArray):

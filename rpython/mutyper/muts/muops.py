@@ -325,6 +325,6 @@ NATIVE_UNEXPOSE = _newcomminst("uvm.native.unexpose", "value",
 
 GET_THREADLOCAL = _newcomminst("uvm.get_threadlocal", "", lambda args: MuRef(void_t), lambda op: "")
 
-SET_THREADLOCAL = _newcomminst("uvm.set_threadlocal", "ref", lambda args: void_t, lambda op: "(%s)" % op.ref)
+SET_THREADLOCAL = _newcomminst("uvm.set_threadlocal", "ref", lambda args: void_t, lambda op: "(%s)" % op.ref.mu_name)
 
 # TODO: a few more?
