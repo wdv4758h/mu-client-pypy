@@ -60,10 +60,10 @@ class MuTextBundleGenerator(MuBundleGenerator):
             strio.close()
             zf.writestr(entry_name, s)
 
-        _writefrom(bdlpath.basename.replace('.mu', '.uir'), strio_ir)
-        _writefrom(bdlpath.basename.replace('.mu', '.hail'), strio_hail)
-        _writefrom(bdlpath.basename.replace('.mu', '.info'), strio_info)
-        _writefrom(bdlpath.basename.replace('.mu', '.txt'), strio_graphs)
+        _writefrom(bdlpath.basename.replace(bdlpath.ext, '.uir'), strio_ir)
+        _writefrom(bdlpath.basename.replace(bdlpath.ext, '.hail'), strio_hail)
+        _writefrom(bdlpath.basename.replace(bdlpath.ext, '.info'), strio_info)
+        _writefrom(bdlpath.basename.replace(bdlpath.ext, '.txt'), strio_graphs)
         zf.close()
         self.log.zipbundle("done.")
 
@@ -109,7 +109,8 @@ class MuTextBundleGenerator(MuBundleGenerator):
         # some extra information
         info = {
             "libdeps": ":".join(map(lambda lib: lib._name, self.db.dylibs)),
-            "entrypoint": str(self.db.prog_entry.mu_name)
+            "entrypoint": str(self.db.prog_entry.mu_name),
+            "argv_t": str(self.db.prog_entry.startblock.mu_inputargs[1].mu_type.mu_name)
         }
         fp_info.write(json.dumps(info))
 
@@ -141,7 +142,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             libconfig.append("extraLibs=" + ":".join(extlibs))
 
             # dumpBundle
-            libconfig.append("dumpBundle=%s" % True)
+            libconfig.append("dumpBundle=%s" % False)
 
             return "\n".join(libconfig)
 

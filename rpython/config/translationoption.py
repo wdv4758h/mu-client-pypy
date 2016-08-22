@@ -291,7 +291,7 @@ translation_optiondescription = OptionDescription(
 
     # Mu backend options
     ChoiceOption("mucodegen", "Code generator to use for Mu backend",
-                 ["text", "api"], default="text", cmdline="--mugen"),
+                 ["text", "api", "both"], default="text", cmdline="--mugen"),
 ])
 
 def get_combined_translation_config(other_optdescr=None,

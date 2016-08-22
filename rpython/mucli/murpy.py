@@ -78,7 +78,7 @@ def extract_bundle(bdl):
     return ir, hail, json.loads(info)
 
 
-def get_c_args(ctx, args):
+def get_c_args(ctx, args, info):
     length = len(args)
     argc = ctx.handle_from_int(length, 32)
     buf = (ctypes.c_char_p * length)()
@@ -86,7 +86,7 @@ def get_c_args(ctx, args):
         arg = args[i]
         buf[i] = ctypes.cast(ctypes.create_string_buffer(arg), ctypes.c_char_p)
 
-    argv = ctx.handle_from_ptr(ctx.id_of("@ptrhybarrayPtr_0"), ctypes.cast(buf, ctypes.c_void_p))
+    argv = ctx.handle_from_ptr(ctx.id_of(info['argv_t']), ctypes.cast(buf, ctypes.c_void_p))
     return argc, argv
 
 
@@ -103,7 +103,7 @@ def launch(cmdargs, ir, hail, info, args):
         if cmdargs.checkOnly:
             return 0
 
-        argc, argv = get_c_args(ctx, args)
+        argc, argv = get_c_args(ctx, args, info)
         bundle_entry = ctx.handle_from_func(ctx.id_of(info['entrypoint']))
         st = ctx.new_stack(bundle_entry)
         th = ctx.new_thread(st, None, libmu.PassValues(argc, argv))
