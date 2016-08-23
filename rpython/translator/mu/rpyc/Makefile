@@ -9,7 +9,7 @@ RPYC_DIR = ../../c
 RPYC_SRC_DIR = $(RPYC_DIR)/src
 PYPY_MOD_DIR = ../../../../pypy/module
 CC = cc
-OBJS = dtoa.o utils.o errno.o tscmp.o linux_debug.o fakestack.o
+OBJS = dtoa.o utils.o errno.o tscmp.o linux_debug.o fakestack.o bitcastfloat.o
 FLAGS = -D__MU__
 
 dtoa.o: $(RPYC_SRC_DIR)/dtoa.c $(RPYC_SRC_DIR)/dtoa.h
@@ -28,6 +28,9 @@ linux_debug.o: src/linux_debug.c
 	$(CC) -fPIC $(FLAGS) -c -o $@ $<
 
 fakestack.o: src/fakestack.c
+	$(CC) -fPIC $(FLAGS) -c -o $@ $<
+
+bitcastfloat.o: src/bitcastfloat.c
 	$(CC) -fPIC $(FLAGS) -c -o $@ $<
 
 librpyc.so: $(OBJS)
