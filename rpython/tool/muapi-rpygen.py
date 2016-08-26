@@ -1,6 +1,7 @@
 from muapiparser import parse_muapi
 from pprint import PrettyPrinter
 from collections import OrderedDict
+from copy import copy
 import sys
 pprint = PrettyPrinter().pprint
 
@@ -61,9 +62,9 @@ def gen_typedefs(db, fp):
     specially_defined_types = {'MuValuesFreer', 'MuTrapHandler', 'MuBinOptr', 'MuCmpOptr', 'MuConvOptr', 'MuMemOrd',
                                'MuAtomicRMWOptr', 'MuCallConv', 'MuCommInst'}
 
-    def define_type(type_name, type_def):
+    def define_type(type_name, type_def, ptr_type='rffi.CArrayPtr'):
         fp.write('%(type_name)s = %(type_def)s\n' % locals())
-        fp.write('%(type_name)sPtr = rffi.CArrayPtr(%(type_name)s)\n' % locals())
+        fp.write('%(type_name)sPtr = %(ptr_type)s(%(type_name)s)\n' % locals())
         defined_types.add(type_name)
         defined_types.add(type_name + 'Ptr')
 
@@ -81,9 +82,10 @@ def gen_typedefs(db, fp):
     define_type('MuValuesFreer',
                 'rffi.CCallback([MuValuePtr, MuCPtr], lltype.Void)')
 
-    define_type('_MuVM', 'lltype.ForwardReference()')
-    define_type('_MuCtx', 'lltype.ForwardReference()')
-    define_type('_MuIRBuilder', 'lltype.ForwardReference()')
+
+    define_type('_MuVM', 'lltype.ForwardReference()', 'lltype.Ptr')
+    define_type('_MuCtx', 'lltype.ForwardReference()', 'lltype.Ptr')
+    define_type('_MuIRBuilder', 'lltype.ForwardReference()', 'lltype.Ptr')
 
     define_type('MuTrapHandler',
 """\
@@ -111,15 +113,17 @@ class MuFlag:
 
 
 # ------------------------------------------------------------
+enum_types = ['MuFlag']
 def gen_enums(db, fp):
     fp.write('# -------------------------------------------------------------------------------------------------------\n')
     fp.write('# Flags\n')
     for enum in db['enums']:
-
+        if len(enum['defs']) == 0:
+            continue
         _removable_prefixes = ['BINOP', 'CMP', 'CONV', 'ORD', 'ARMW', 'CC', 'CI_UVM']
 
         fp.write('class _%(name)sCls(MuFlag):\n' % enum)
-
+        enum_types.append(enum['name'])
         for valdef in enum['defs']:
             defname = valdef['name']
             value = valdef['value']
@@ -152,13 +156,16 @@ def gen_structs(db, fp):
         for mtd in stt['methods']:
             prm_ts = [p['type'] for p in mtd['params']]
             prm_ts = list(map(map_type, prm_ts))
+            for idx in range(len(prm_ts)):
+                if prm_ts[idx] in enum_types:
+                    prm_ts[idx] = 'MuFlag._lltype'
             rtn_t = map_type(mtd['ret_ty'])
-            fp.write(idt + '(\'%(name)s\', rffi.CCallback(%(arg_ts)s, %(ret_t)s)\n' % {
+            fp.write(idt + '(\'%(name)s\', rffi.CCallback(%(arg_ts)s, %(ret_t)s)),\n' % {
                 "name": mtd['name'],
                 "arg_ts": '[%s]' % ', '.join(prm_ts),
                 "ret_t": rtn_t
             })
-        fp.write(')\n')
+        fp.write('))\n')
 
     fp.write('\n')
 
@@ -205,13 +212,19 @@ def _oogen_method(sttname, mtd, fp):
         if not arg.get('is_sz_param', False):
             rpy_param_type_map[arg['name']] = get_param_type(arg['type'], arg.get('array_sz_param', False))
 
+    # process the optionals
     arg_names = []
-    for p in mtd['params']:
+    params = copy(mtd['params'])
+    params.reverse()
+    can_be_optional = True
+    for p in params:
         if p['name'] in rpy_param_type_map:
-            if p.get('is_optional', False):
-                arg_names.append('%(name)s=None' % p)
+            if p.get('is_optional', False) and can_be_optional:
+                arg_names.insert(0, '%(name)s=None' % p)
             else:
-                arg_names.append('%(name)s' % p)
+                arg_names.insert(0, '%(name)s' % p)
+                can_be_optional = False
+    # arg_names = [p['name'] for p in mtd['params'][1:]]
     arg_names.insert(0, 'self')
     fp.write(idt + 'def {}({}):\n'.format(
         mtd['name'],
@@ -247,7 +260,7 @@ def _oogen_method(sttname, mtd, fp):
             cur_idt += idt
         elif prm_t in ('int', 'float', 'double'):
             cast_var = prm + '_c'
-            cast_t = org_mtd_type_map[prm]
+            cast_t = map_type(org_mtd_type_map[prm])
             scoped_conv_map[prm] = cast_var
             fp.write(cur_idt +
                     '%(cast_var)s = rffi.cast(%(cast_t)s, %(prm)s)\n' % locals())
