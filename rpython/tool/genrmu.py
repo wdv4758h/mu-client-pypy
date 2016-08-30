@@ -1,7 +1,5 @@
 from muapiparser import parse_muapi
 from pprint import PrettyPrinter
-from collections import OrderedDict
-from copy import copy
 import sys
 pprint = PrettyPrinter().pprint
 
@@ -265,17 +263,39 @@ def _oogen_method(sttname, mtd, fp):
     }
 
     res_str = call_str
-    if mtd['ret_rpy_type'] in ('int', 'float', 'bool', 'MuVM', 'MuCtx', 'MuIRBuilder'):
+    if mtd['ret_rpy_type'] in ('int', 'float', 'bool'):
         res_str = '%(ret_t)s(%(res_str)s)' % {'ret_t': mtd['ret_rpy_type'], 'res_str': res_str}
-    res_str += '\n'
+    elif mtd['ret_rpy_type'] == 'str':
+        res_str = 'rffi.charp2str(%(res_str)s)' % locals()
+    elif mtd['ret_rpy_type'] in ('MuCtx', 'MuIRBuilder'):
+        res_str = '%(ret_t)s(self, %(res_str)s)' % {'ret_t': mtd['ret_rpy_type'], 'res_str': res_str}
 
     if mtd['ret_rpy_type'] != 'None':
-        fp.write(cur_idt + 'return ' + res_str)
-    else:
-        fp.write(cur_idt + res_str)
+        res_str = 'res = %(res_str)s' % locals()
+    fp.write(cur_idt + res_str + '\n')
+
+    # Mu error handling
+    if mtd['name'] != 'get_mu_error_ptr':   # otherwise there will be infinite recursion...
+        fp.write(cur_idt + 'muerrno = %(mu)s.get_errno()\n' % {
+            'mu': 'self' if sttname == "MuVM" else "self._mu"
+        })
+        fp.write(cur_idt + 'if muerrno:\n')
+        fp.write(cur_idt + idt + 'raise MuRuntimeError(muerrno)\n')
+
+    if mtd['ret_rpy_type'] != 'None':
+        fp.write(cur_idt + 'return res\n')
 
     fp.write('\n')
 
+
+def _gen_struct_extras(stt, db, fp):
+    if stt['name'] == 'MuVM':
+        fp.write(
+            "    def get_errno(self):\n"
+            "        # type: () -> int\n"
+            "        return int(self._mu_errno_ptr[0])\n"
+            "\n"
+        )
 
 def gen_oowrapper(db, fp):
     fp.write(
@@ -285,20 +305,35 @@ def gen_oowrapper(db, fp):
         'MuVM':
             ("    def __init__(self, config_str=\"\"):\n"
              "        with rffi.scoped_str2charp(config_str) as buf:\n"
-             "            self._mu = mu_new_ex(buf)\n"),
+             "            self._mu = mu_new_ex(buf)\n"
+             "        self._mu_errno_ptr = rffi.cast(rffi.CArrayPtr(rffi.INT), self.get_mu_error_ptr())\n"
+             "\n"),
         'MuCtx':
-            ("    def __init__(self, rffi_ctx_ptr):\n"
-             "        self._ctx = rffi_ctx_ptr\n"),
+            ("    def __init__(self, mu, rffi_ctx_ptr):\n"
+             "        self._mu = mu\n"
+             "        self._ctx = rffi_ctx_ptr\n"
+             "\n"),
         'MuIRBuilder':
-            ("    def __init__(self, rffi_bldr_ptr):\n"
-             "        self._bldr = rffi_bldr_ptr\n")
+            ("    def __init__(self, ctx, rffi_bldr_ptr):\n"
+             "        self._mu = ctx._mu\n"
+             "        self._bldr = rffi_bldr_ptr\n"
+             "\n")
     }
-
+    fp.write(
+        "class MuRuntimeError(Exception):\n"
+        "    def __init__(self, muerrno):\n"
+        "        self.muerrno = muerrno\n"
+        "\n"
+        "    def __str__(self):\n"
+        "        return 'Error thrown in Mu: %d' % self.muerrno \n"
+        "\n"
+    )
     for stt in db['structs']:
         fp.write('class %(name)s:\n' % stt)
         fp.write(init_funcs[stt['name']])
         for mtd in stt['methods']:
             _oogen_method(stt['name'], mtd, fp)
+        _gen_struct_extras(stt, db, fp)
         fp.write('\n')
 
 

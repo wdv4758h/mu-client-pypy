@@ -336,577 +336,1050 @@ class MuCommInst:
 
 # -------------------------------------------------------------------------------------------------------
 # OO wrappers
+class MuRuntimeError(Exception):
+    def __init__(self, muerrno):
+        self.muerrno = muerrno
+
+    def __str__(self):
+        return 'Error thrown in Mu: %d' % self.muerrno 
+
 class MuVM:
     def __init__(self, config_str=""):
         with rffi.scoped_str2charp(config_str) as buf:
             self._mu = mu_new_ex(buf)
+        self._mu_errno_ptr = rffi.cast(rffi.CArrayPtr(rffi.INT), self.get_mu_error_ptr())
+
     def new_context(self):
         # type: () -> MuCtx
-        return MuCtx(self._mu.c_new_context(self._mu))
+        res = MuCtx(self, self._mu.c_new_context(self._mu))
+        muerrno = self.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def id_of(self, name):
         # type: (str) -> MuID
         with rffi.scoped_str2charp(name) as name_buf:
-            return self._mu.c_id_of(self._mu, name_buf)
+            res = self._mu.c_id_of(self._mu, name_buf)
+            muerrno = self.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
+            return res
 
     def name_of(self, id):
         # type: (MuID) -> str
-        return self._mu.c_name_of(self._mu, id)
+        res = rffi.charp2str(self._mu.c_name_of(self._mu, id))
+        muerrno = self.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def set_trap_handler(self, trap_handler, userdata):
         # type: (MuTrapHandler, MuCPtr) -> None
         self._mu.c_set_trap_handler(self._mu, trap_handler, userdata)
+        muerrno = self.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def make_boot_image(self, whitelist, output_file):
         # type: ([MuID], str) -> None
         with scoped_lst2arr(MuID, whitelist) as (whitelist_arr, whitelist_sz):
             with rffi.scoped_str2charp(output_file) as output_file_buf:
                 self._mu.c_make_boot_image(self._mu, whitelist_arr, whitelist_sz, output_file_buf)
+                muerrno = self.get_errno()
+                if muerrno:
+                    raise MuRuntimeError(muerrno)
 
     def execute(self):
         # type: () -> None
         self._mu.c_execute(self._mu)
+        muerrno = self.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def get_mu_error_ptr(self):
         # type: () -> rffi.INTP
-        return self._mu.c_get_mu_error_ptr(self._mu)
+        res = self._mu.c_get_mu_error_ptr(self._mu)
+        return res
+
+    def get_errno(self):
+        # type: () -> int
+        return int(self._mu_errno_ptr[0])
 
 
 class MuCtx:
-    def __init__(self, rffi_ctx_ptr):
+    def __init__(self, mu, rffi_ctx_ptr):
+        self._mu = mu
         self._ctx = rffi_ctx_ptr
+
     def id_of(self, name):
         # type: (str) -> MuID
         with rffi.scoped_str2charp(name) as name_buf:
-            return self._ctx.c_id_of(self._ctx, name_buf)
+            res = self._ctx.c_id_of(self._ctx, name_buf)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
+            return res
 
     def name_of(self, id):
         # type: (MuID) -> str
-        return self._ctx.c_name_of(self._ctx, id)
+        res = rffi.charp2str(self._ctx.c_name_of(self._ctx, id))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def close_context(self):
         # type: () -> None
         self._ctx.c_close_context(self._ctx)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def load_bundle(self, buf):
         # type: (str) -> None
         with rffi.scoped_str2charp(buf) as buf_buf:
             sz = rffi.cast(MuArraySize, len(buf))
             self._ctx.c_load_bundle(self._ctx, buf_buf, sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def load_hail(self, buf):
         # type: (str) -> None
         with rffi.scoped_str2charp(buf) as buf_buf:
             sz = rffi.cast(MuArraySize, len(buf))
             self._ctx.c_load_hail(self._ctx, buf_buf, sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def handle_from_sint8(self, num, len):
         # type: (int, int) -> MuIntValue
         num_c = rffi.cast(rffi.CHAR, num)
         len_c = rffi.cast(rffi.INT, len)
-        return self._ctx.c_handle_from_sint8(self._ctx, num_c, len_c)
+        res = self._ctx.c_handle_from_sint8(self._ctx, num_c, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_uint8(self, num, len):
         # type: (int, int) -> MuIntValue
         num_c = rffi.cast(rffi.UCHAR, num)
         len_c = rffi.cast(rffi.INT, len)
-        return self._ctx.c_handle_from_uint8(self._ctx, num_c, len_c)
+        res = self._ctx.c_handle_from_uint8(self._ctx, num_c, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_sint16(self, num, len):
         # type: (int, int) -> MuIntValue
         num_c = rffi.cast(rffi.SHORT, num)
         len_c = rffi.cast(rffi.INT, len)
-        return self._ctx.c_handle_from_sint16(self._ctx, num_c, len_c)
+        res = self._ctx.c_handle_from_sint16(self._ctx, num_c, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_uint16(self, num, len):
         # type: (int, int) -> MuIntValue
         num_c = rffi.cast(rffi.USHORT, num)
         len_c = rffi.cast(rffi.INT, len)
-        return self._ctx.c_handle_from_uint16(self._ctx, num_c, len_c)
+        res = self._ctx.c_handle_from_uint16(self._ctx, num_c, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_sint32(self, num, len):
         # type: (int, int) -> MuIntValue
         num_c = rffi.cast(rffi.INT, num)
         len_c = rffi.cast(rffi.INT, len)
-        return self._ctx.c_handle_from_sint32(self._ctx, num_c, len_c)
+        res = self._ctx.c_handle_from_sint32(self._ctx, num_c, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_uint32(self, num, len):
         # type: (int, int) -> MuIntValue
         num_c = rffi.cast(rffi.UINT, num)
         len_c = rffi.cast(rffi.INT, len)
-        return self._ctx.c_handle_from_uint32(self._ctx, num_c, len_c)
+        res = self._ctx.c_handle_from_uint32(self._ctx, num_c, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_sint64(self, num, len):
         # type: (int, int) -> MuIntValue
         num_c = rffi.cast(rffi.LONG, num)
         len_c = rffi.cast(rffi.INT, len)
-        return self._ctx.c_handle_from_sint64(self._ctx, num_c, len_c)
+        res = self._ctx.c_handle_from_sint64(self._ctx, num_c, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_uint64(self, num, len):
         # type: (int, int) -> MuIntValue
         num_c = rffi.cast(rffi.ULONG, num)
         len_c = rffi.cast(rffi.INT, len)
-        return self._ctx.c_handle_from_uint64(self._ctx, num_c, len_c)
+        res = self._ctx.c_handle_from_uint64(self._ctx, num_c, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_uint64s(self, nums, len):
         # type: ([rffi.ULONG], int) -> MuIntValue
         with scoped_lst2arr(rffi.ULONG, nums) as (nums_arr, nums_sz):
             len_c = rffi.cast(rffi.INT, len)
-            return self._ctx.c_handle_from_uint64s(self._ctx, nums_arr, nums_sz, len_c)
+            res = self._ctx.c_handle_from_uint64s(self._ctx, nums_arr, nums_sz, len_c)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
+            return res
 
     def handle_from_float(self, num):
         # type: (float) -> MuFloatValue
         num_c = rffi.cast(rffi.FLOAT, num)
-        return self._ctx.c_handle_from_float(self._ctx, num_c)
+        res = self._ctx.c_handle_from_float(self._ctx, num_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_double(self, num):
         # type: (float) -> MuDoubleValue
         num_c = rffi.cast(rffi.DOUBLE, num)
-        return self._ctx.c_handle_from_double(self._ctx, num_c)
+        res = self._ctx.c_handle_from_double(self._ctx, num_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_ptr(self, mu_type, ptr):
         # type: (MuID, MuCPtr) -> MuUPtrValue
-        return self._ctx.c_handle_from_ptr(self._ctx, mu_type, ptr)
+        res = self._ctx.c_handle_from_ptr(self._ctx, mu_type, ptr)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_fp(self, mu_type, fp):
         # type: (MuID, MuCFP) -> MuUFPValue
-        return self._ctx.c_handle_from_fp(self._ctx, mu_type, fp)
+        res = self._ctx.c_handle_from_fp(self._ctx, mu_type, fp)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_sint8(self, opnd):
         # type: (MuIntValue) -> int
-        return int(self._ctx.c_handle_to_sint8(self._ctx, opnd))
+        res = int(self._ctx.c_handle_to_sint8(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_uint8(self, opnd):
         # type: (MuIntValue) -> int
-        return int(self._ctx.c_handle_to_uint8(self._ctx, opnd))
+        res = int(self._ctx.c_handle_to_uint8(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_sint16(self, opnd):
         # type: (MuIntValue) -> int
-        return int(self._ctx.c_handle_to_sint16(self._ctx, opnd))
+        res = int(self._ctx.c_handle_to_sint16(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_uint16(self, opnd):
         # type: (MuIntValue) -> int
-        return int(self._ctx.c_handle_to_uint16(self._ctx, opnd))
+        res = int(self._ctx.c_handle_to_uint16(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_sint32(self, opnd):
         # type: (MuIntValue) -> int
-        return int(self._ctx.c_handle_to_sint32(self._ctx, opnd))
+        res = int(self._ctx.c_handle_to_sint32(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_uint32(self, opnd):
         # type: (MuIntValue) -> int
-        return int(self._ctx.c_handle_to_uint32(self._ctx, opnd))
+        res = int(self._ctx.c_handle_to_uint32(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_sint64(self, opnd):
         # type: (MuIntValue) -> int
-        return int(self._ctx.c_handle_to_sint64(self._ctx, opnd))
+        res = int(self._ctx.c_handle_to_sint64(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_uint64(self, opnd):
         # type: (MuIntValue) -> int
-        return int(self._ctx.c_handle_to_uint64(self._ctx, opnd))
+        res = int(self._ctx.c_handle_to_uint64(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_float(self, opnd):
         # type: (MuFloatValue) -> float
-        return float(self._ctx.c_handle_to_float(self._ctx, opnd))
+        res = float(self._ctx.c_handle_to_float(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_double(self, opnd):
         # type: (MuDoubleValue) -> float
-        return float(self._ctx.c_handle_to_double(self._ctx, opnd))
+        res = float(self._ctx.c_handle_to_double(self._ctx, opnd))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_ptr(self, opnd):
         # type: (MuUPtrValue) -> MuCPtr
-        return self._ctx.c_handle_to_ptr(self._ctx, opnd)
+        res = self._ctx.c_handle_to_ptr(self._ctx, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_to_fp(self, opnd):
         # type: (MuUFPValue) -> MuCFP
-        return self._ctx.c_handle_to_fp(self._ctx, opnd)
+        res = self._ctx.c_handle_to_fp(self._ctx, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_const(self, id):
         # type: (MuID) -> MuValue
-        return self._ctx.c_handle_from_const(self._ctx, id)
+        res = self._ctx.c_handle_from_const(self._ctx, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_global(self, id):
         # type: (MuID) -> MuIRefValue
-        return self._ctx.c_handle_from_global(self._ctx, id)
+        res = self._ctx.c_handle_from_global(self._ctx, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_func(self, id):
         # type: (MuID) -> MuFuncRefValue
-        return self._ctx.c_handle_from_func(self._ctx, id)
+        res = self._ctx.c_handle_from_func(self._ctx, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def handle_from_expose(self, id):
         # type: (MuID) -> MuValue
-        return self._ctx.c_handle_from_expose(self._ctx, id)
+        res = self._ctx.c_handle_from_expose(self._ctx, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def delete_value(self, opnd):
         # type: (MuValue) -> None
         self._ctx.c_delete_value(self._ctx, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def ref_eq(self, lhs, rhs):
         # type: (MuGenRefValue, MuGenRefValue) -> bool
-        return bool(self._ctx.c_ref_eq(self._ctx, lhs, rhs))
+        res = bool(self._ctx.c_ref_eq(self._ctx, lhs, rhs))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def ref_ult(self, lhs, rhs):
         # type: (MuIRefValue, MuIRefValue) -> bool
-        return bool(self._ctx.c_ref_ult(self._ctx, lhs, rhs))
+        res = bool(self._ctx.c_ref_ult(self._ctx, lhs, rhs))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def extract_value(self, str, index):
         # type: (MuStructValue, int) -> MuValue
         index_c = rffi.cast(rffi.INT, index)
-        return self._ctx.c_extract_value(self._ctx, str, index_c)
+        res = self._ctx.c_extract_value(self._ctx, str, index_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def insert_value(self, str, index, newval):
         # type: (MuStructValue, int, MuValue) -> MuStructValue
         index_c = rffi.cast(rffi.INT, index)
-        return self._ctx.c_insert_value(self._ctx, str, index_c, newval)
+        res = self._ctx.c_insert_value(self._ctx, str, index_c, newval)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def extract_element(self, str, index):
         # type: (MuSeqValue, MuIntValue) -> MuValue
-        return self._ctx.c_extract_element(self._ctx, str, index)
+        res = self._ctx.c_extract_element(self._ctx, str, index)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def insert_element(self, str, index, newval):
         # type: (MuSeqValue, MuIntValue, MuValue) -> MuSeqValue
-        return self._ctx.c_insert_element(self._ctx, str, index, newval)
+        res = self._ctx.c_insert_element(self._ctx, str, index, newval)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def new_fixed(self, mu_type):
         # type: (MuID) -> MuRefValue
-        return self._ctx.c_new_fixed(self._ctx, mu_type)
+        res = self._ctx.c_new_fixed(self._ctx, mu_type)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def new_hybrid(self, mu_type, length):
         # type: (MuID, MuIntValue) -> MuRefValue
-        return self._ctx.c_new_hybrid(self._ctx, mu_type, length)
+        res = self._ctx.c_new_hybrid(self._ctx, mu_type, length)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def refcast(self, opnd, new_type):
         # type: (MuGenRefValue, MuID) -> MuGenRefValue
-        return self._ctx.c_refcast(self._ctx, opnd, new_type)
+        res = self._ctx.c_refcast(self._ctx, opnd, new_type)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def get_iref(self, opnd):
         # type: (MuRefValue) -> MuIRefValue
-        return self._ctx.c_get_iref(self._ctx, opnd)
+        res = self._ctx.c_get_iref(self._ctx, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def get_field_iref(self, opnd, field):
         # type: (MuIRefValue, int) -> MuIRefValue
         field_c = rffi.cast(rffi.INT, field)
-        return self._ctx.c_get_field_iref(self._ctx, opnd, field_c)
+        res = self._ctx.c_get_field_iref(self._ctx, opnd, field_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def get_elem_iref(self, opnd, index):
         # type: (MuIRefValue, MuIntValue) -> MuIRefValue
-        return self._ctx.c_get_elem_iref(self._ctx, opnd, index)
+        res = self._ctx.c_get_elem_iref(self._ctx, opnd, index)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def shift_iref(self, opnd, offset):
         # type: (MuIRefValue, MuIntValue) -> MuIRefValue
-        return self._ctx.c_shift_iref(self._ctx, opnd, offset)
+        res = self._ctx.c_shift_iref(self._ctx, opnd, offset)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def get_var_part_iref(self, opnd):
         # type: (MuIRefValue) -> MuIRefValue
-        return self._ctx.c_get_var_part_iref(self._ctx, opnd)
+        res = self._ctx.c_get_var_part_iref(self._ctx, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def load(self, ord, loc):
         # type: (MuFlag, MuIRefValue) -> MuValue
-        return self._ctx.c_load(self._ctx, ord, loc)
+        res = self._ctx.c_load(self._ctx, ord, loc)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def store(self, ord, loc, newval):
         # type: (MuFlag, MuIRefValue, MuValue) -> None
         self._ctx.c_store(self._ctx, ord, loc, newval)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def cmpxchg(self, ord_succ, ord_fail, weak, loc, expected, desired, is_succ):
         # type: (MuFlag, MuFlag, bool, MuIRefValue, MuValue, MuValue, MuBoolPtr) -> MuValue
         weak_c = rffi.cast(MuBool, weak)
-        return self._ctx.c_cmpxchg(self._ctx, ord_succ, ord_fail, weak_c, loc, expected, desired, is_succ)
+        res = self._ctx.c_cmpxchg(self._ctx, ord_succ, ord_fail, weak_c, loc, expected, desired, is_succ)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def atomicrmw(self, ord, op, loc, opnd):
         # type: (MuFlag, MuFlag, MuIRefValue, MuValue) -> MuValue
-        return self._ctx.c_atomicrmw(self._ctx, ord, op, loc, opnd)
+        res = self._ctx.c_atomicrmw(self._ctx, ord, op, loc, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def fence(self, ord):
         # type: (MuFlag) -> None
         self._ctx.c_fence(self._ctx, ord)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_stack(self, func):
         # type: (MuFuncRefValue) -> MuStackRefValue
-        return self._ctx.c_new_stack(self._ctx, func)
+        res = self._ctx.c_new_stack(self._ctx, func)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def new_thread_nor(self, stack, threadlocal, vals):
         # type: (MuStackRefValue, MuRefValue, [MuValue]) -> MuThreadRefValue
         with scoped_lst2arr(MuValue, vals) as (vals_arr, vals_sz):
-            return self._ctx.c_new_thread_nor(self._ctx, stack, threadlocal, vals_arr, vals_sz)
+            res = self._ctx.c_new_thread_nor(self._ctx, stack, threadlocal, vals_arr, vals_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
+            return res
 
     def new_thread_exc(self, stack, threadlocal, exc):
         # type: (MuStackRefValue, MuRefValue, MuRefValue) -> MuThreadRefValue
-        return self._ctx.c_new_thread_exc(self._ctx, stack, threadlocal, exc)
+        res = self._ctx.c_new_thread_exc(self._ctx, stack, threadlocal, exc)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def kill_stack(self, stack):
         # type: (MuStackRefValue) -> None
         self._ctx.c_kill_stack(self._ctx, stack)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def set_threadlocal(self, thread, threadlocal):
         # type: (MuThreadRefValue, MuRefValue) -> None
         self._ctx.c_set_threadlocal(self._ctx, thread, threadlocal)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def get_threadlocal(self, thread):
         # type: (MuThreadRefValue) -> MuRefValue
-        return self._ctx.c_get_threadlocal(self._ctx, thread)
+        res = self._ctx.c_get_threadlocal(self._ctx, thread)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def new_cursor(self, stack):
         # type: (MuStackRefValue) -> MuFCRefValue
-        return self._ctx.c_new_cursor(self._ctx, stack)
+        res = self._ctx.c_new_cursor(self._ctx, stack)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def next_frame(self, cursor):
         # type: (MuFCRefValue) -> None
         self._ctx.c_next_frame(self._ctx, cursor)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def copy_cursor(self, cursor):
         # type: (MuFCRefValue) -> MuFCRefValue
-        return self._ctx.c_copy_cursor(self._ctx, cursor)
+        res = self._ctx.c_copy_cursor(self._ctx, cursor)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def close_cursor(self, cursor):
         # type: (MuFCRefValue) -> None
         self._ctx.c_close_cursor(self._ctx, cursor)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def cur_func(self, cursor):
         # type: (MuFCRefValue) -> MuID
-        return self._ctx.c_cur_func(self._ctx, cursor)
+        res = self._ctx.c_cur_func(self._ctx, cursor)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def cur_func_ver(self, cursor):
         # type: (MuFCRefValue) -> MuID
-        return self._ctx.c_cur_func_ver(self._ctx, cursor)
+        res = self._ctx.c_cur_func_ver(self._ctx, cursor)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def cur_inst(self, cursor):
         # type: (MuFCRefValue) -> MuID
-        return self._ctx.c_cur_inst(self._ctx, cursor)
+        res = self._ctx.c_cur_inst(self._ctx, cursor)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def dump_keepalives(self, cursor, results):
         # type: (MuFCRefValue, MuValuePtr) -> None
         self._ctx.c_dump_keepalives(self._ctx, cursor, results)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def pop_frames_to(self, cursor):
         # type: (MuFCRefValue) -> None
         self._ctx.c_pop_frames_to(self._ctx, cursor)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def push_frame(self, stack, func):
         # type: (MuStackRefValue, MuFuncRefValue) -> None
         self._ctx.c_push_frame(self._ctx, stack, func)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def tr64_is_fp(self, value):
         # type: (MuTagRef64Value) -> bool
-        return bool(self._ctx.c_tr64_is_fp(self._ctx, value))
+        res = bool(self._ctx.c_tr64_is_fp(self._ctx, value))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def tr64_is_int(self, value):
         # type: (MuTagRef64Value) -> bool
-        return bool(self._ctx.c_tr64_is_int(self._ctx, value))
+        res = bool(self._ctx.c_tr64_is_int(self._ctx, value))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def tr64_is_ref(self, value):
         # type: (MuTagRef64Value) -> bool
-        return bool(self._ctx.c_tr64_is_ref(self._ctx, value))
+        res = bool(self._ctx.c_tr64_is_ref(self._ctx, value))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def tr64_to_fp(self, value):
         # type: (MuTagRef64Value) -> MuDoubleValue
-        return self._ctx.c_tr64_to_fp(self._ctx, value)
+        res = self._ctx.c_tr64_to_fp(self._ctx, value)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def tr64_to_int(self, value):
         # type: (MuTagRef64Value) -> MuIntValue
-        return self._ctx.c_tr64_to_int(self._ctx, value)
+        res = self._ctx.c_tr64_to_int(self._ctx, value)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def tr64_to_ref(self, value):
         # type: (MuTagRef64Value) -> MuRefValue
-        return self._ctx.c_tr64_to_ref(self._ctx, value)
+        res = self._ctx.c_tr64_to_ref(self._ctx, value)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def tr64_to_tag(self, value):
         # type: (MuTagRef64Value) -> MuIntValue
-        return self._ctx.c_tr64_to_tag(self._ctx, value)
+        res = self._ctx.c_tr64_to_tag(self._ctx, value)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def tr64_from_fp(self, value):
         # type: (MuDoubleValue) -> MuTagRef64Value
-        return self._ctx.c_tr64_from_fp(self._ctx, value)
+        res = self._ctx.c_tr64_from_fp(self._ctx, value)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def tr64_from_int(self, value):
         # type: (MuIntValue) -> MuTagRef64Value
-        return self._ctx.c_tr64_from_int(self._ctx, value)
+        res = self._ctx.c_tr64_from_int(self._ctx, value)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def tr64_from_ref(self, ref, tag):
         # type: (MuRefValue, MuIntValue) -> MuTagRef64Value
-        return self._ctx.c_tr64_from_ref(self._ctx, ref, tag)
+        res = self._ctx.c_tr64_from_ref(self._ctx, ref, tag)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def enable_watchpoint(self, wpid):
         # type: (MuWPID) -> None
         self._ctx.c_enable_watchpoint(self._ctx, wpid)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def disable_watchpoint(self, wpid):
         # type: (MuWPID) -> None
         self._ctx.c_disable_watchpoint(self._ctx, wpid)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def pin(self, loc):
         # type: (MuValue) -> MuUPtrValue
-        return self._ctx.c_pin(self._ctx, loc)
+        res = self._ctx.c_pin(self._ctx, loc)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def unpin(self, loc):
         # type: (MuValue) -> None
         self._ctx.c_unpin(self._ctx, loc)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def expose(self, func, call_conv, cookie):
         # type: (MuFuncRefValue, MuFlag, MuIntValue) -> MuValue
-        return self._ctx.c_expose(self._ctx, func, call_conv, cookie)
+        res = self._ctx.c_expose(self._ctx, func, call_conv, cookie)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
     def unexpose(self, call_conv, value):
         # type: (MuFlag, MuValue) -> None
         self._ctx.c_unexpose(self._ctx, call_conv, value)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_ir_builder(self):
         # type: () -> MuIRBuilder
-        return MuIRBuilder(self._ctx.c_new_ir_builder(self._ctx))
+        res = MuIRBuilder(self, self._ctx.c_new_ir_builder(self._ctx))
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
 
 
 class MuIRBuilder:
-    def __init__(self, rffi_bldr_ptr):
+    def __init__(self, ctx, rffi_bldr_ptr):
+        self._mu = ctx._mu
         self._bldr = rffi_bldr_ptr
+
     def load(self):
         # type: () -> None
         self._bldr.c_load(self._bldr)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def abort(self):
         # type: () -> None
         self._bldr.c_abort(self._bldr)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def gen_sym(self, name):
         # type: (str) -> MuID
         with rffi.scoped_str2charp(name) as name_buf:
-            return self._bldr.c_gen_sym(self._bldr, name_buf)
+            res = self._bldr.c_gen_sym(self._bldr, name_buf)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
+            return res
 
     def new_type_int(self, id, len):
         # type: (MuID, int) -> None
         len_c = rffi.cast(rffi.INT, len)
         self._bldr.c_new_type_int(self._bldr, id, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_float(self, id):
         # type: (MuID) -> None
         self._bldr.c_new_type_float(self._bldr, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_double(self, id):
         # type: (MuID) -> None
         self._bldr.c_new_type_double(self._bldr, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_uptr(self, id, ty):
         # type: (MuID, MuTypeNode) -> None
         self._bldr.c_new_type_uptr(self._bldr, id, ty)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_ufuncptr(self, id, sig):
         # type: (MuID, MuFuncSigNode) -> None
         self._bldr.c_new_type_ufuncptr(self._bldr, id, sig)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_struct(self, id, fieldtys):
         # type: (MuID, [MuTypeNode]) -> None
         with scoped_lst2arr(MuTypeNode, fieldtys) as (fieldtys_arr, fieldtys_sz):
             self._bldr.c_new_type_struct(self._bldr, id, fieldtys_arr, fieldtys_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_type_hybrid(self, id, fixedtys, varty):
         # type: (MuID, [MuTypeNode], MuTypeNode) -> None
         with scoped_lst2arr(MuTypeNode, fixedtys) as (fixedtys_arr, fixedtys_sz):
             self._bldr.c_new_type_hybrid(self._bldr, id, fixedtys_arr, fixedtys_sz, varty)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_type_array(self, id, elemty, len):
         # type: (MuID, MuTypeNode, int) -> None
         len_c = rffi.cast(rffi.ULONG, len)
         self._bldr.c_new_type_array(self._bldr, id, elemty, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_vector(self, id, elemty, len):
         # type: (MuID, MuTypeNode, int) -> None
         len_c = rffi.cast(rffi.ULONG, len)
         self._bldr.c_new_type_vector(self._bldr, id, elemty, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_void(self, id):
         # type: (MuID) -> None
         self._bldr.c_new_type_void(self._bldr, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_ref(self, id, ty):
         # type: (MuID, MuTypeNode) -> None
         self._bldr.c_new_type_ref(self._bldr, id, ty)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_iref(self, id, ty):
         # type: (MuID, MuTypeNode) -> None
         self._bldr.c_new_type_iref(self._bldr, id, ty)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_weakref(self, id, ty):
         # type: (MuID, MuTypeNode) -> None
         self._bldr.c_new_type_weakref(self._bldr, id, ty)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_funcref(self, id, sig):
         # type: (MuID, MuFuncSigNode) -> None
         self._bldr.c_new_type_funcref(self._bldr, id, sig)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_tagref64(self, id):
         # type: (MuID) -> None
         self._bldr.c_new_type_tagref64(self._bldr, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_threadref(self, id):
         # type: (MuID) -> None
         self._bldr.c_new_type_threadref(self._bldr, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_stackref(self, id):
         # type: (MuID) -> None
         self._bldr.c_new_type_stackref(self._bldr, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_framecursorref(self, id):
         # type: (MuID) -> None
         self._bldr.c_new_type_framecursorref(self._bldr, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_type_irbuilderref(self, id):
         # type: (MuID) -> None
         self._bldr.c_new_type_irbuilderref(self._bldr, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_funcsig(self, id, paramtys, rettys):
         # type: (MuID, [MuTypeNode], [MuTypeNode]) -> None
         with scoped_lst2arr(MuTypeNode, paramtys) as (paramtys_arr, paramtys_sz):
             with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
                 self._bldr.c_new_funcsig(self._bldr, id, paramtys_arr, paramtys_sz, rettys_arr, rettys_sz)
+                muerrno = self._mu.get_errno()
+                if muerrno:
+                    raise MuRuntimeError(muerrno)
 
     def new_const_int(self, id, ty, value):
         # type: (MuID, MuTypeNode, int) -> None
         value_c = rffi.cast(rffi.ULONG, value)
         self._bldr.c_new_const_int(self._bldr, id, ty, value_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_const_int_ex(self, id, ty, values):
         # type: (MuID, MuTypeNode, [rffi.ULONG]) -> None
         with scoped_lst2arr(rffi.ULONG, values) as (values_arr, values_sz):
             self._bldr.c_new_const_int_ex(self._bldr, id, ty, values_arr, values_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_const_float(self, id, ty, value):
         # type: (MuID, MuTypeNode, float) -> None
         value_c = rffi.cast(rffi.FLOAT, value)
         self._bldr.c_new_const_float(self._bldr, id, ty, value_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_const_double(self, id, ty, value):
         # type: (MuID, MuTypeNode, float) -> None
         value_c = rffi.cast(rffi.DOUBLE, value)
         self._bldr.c_new_const_double(self._bldr, id, ty, value_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_const_null(self, id, ty):
         # type: (MuID, MuTypeNode) -> None
         self._bldr.c_new_const_null(self._bldr, id, ty)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_const_seq(self, id, ty, elems):
         # type: (MuID, MuTypeNode, [MuGlobalVarNode]) -> None
         with scoped_lst2arr(MuGlobalVarNode, elems) as (elems_arr, elems_sz):
             self._bldr.c_new_const_seq(self._bldr, id, ty, elems_arr, elems_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_const_extern(self, id, ty, symbol):
         # type: (MuID, MuTypeNode, str) -> None
         with rffi.scoped_str2charp(symbol) as symbol_buf:
             self._bldr.c_new_const_extern(self._bldr, id, ty, symbol_buf)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_global_cell(self, id, ty):
         # type: (MuID, MuTypeNode) -> None
         self._bldr.c_new_global_cell(self._bldr, id, ty)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_func(self, id, sig):
         # type: (MuID, MuFuncSigNode) -> None
         self._bldr.c_new_func(self._bldr, id, sig)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_exp_func(self, id, func, callconv, cookie):
         # type: (MuID, MuFuncNode, MuFlag, MuConstNode) -> None
         self._bldr.c_new_exp_func(self._bldr, id, func, callconv, cookie)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_func_ver(self, id, func, bbs):
         # type: (MuID, MuFuncNode, [MuBBNode]) -> None
         with scoped_lst2arr(MuBBNode, bbs) as (bbs_arr, bbs_sz):
             self._bldr.c_new_func_ver(self._bldr, id, func, bbs_arr, bbs_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_bb(self, id, nor_param_ids, nor_param_types, exc_param_id, insts):
         # type: (MuID, [MuID], [MuTypeNode], MuID, [MuInstNode]) -> None
@@ -914,208 +1387,340 @@ class MuIRBuilder:
             with scoped_lst2arr(MuTypeNode, nor_param_types) as (nor_param_types_arr, nor_param_types_sz):
                 with scoped_lst2arr(MuInstNode, insts) as (insts_arr, insts_sz):
                     self._bldr.c_new_bb(self._bldr, id, nor_param_ids_arr, nor_param_types_arr, nor_param_types_sz, exc_param_id, insts_arr, insts_sz)
+                    muerrno = self._mu.get_errno()
+                    if muerrno:
+                        raise MuRuntimeError(muerrno)
 
     def new_dest_clause(self, id, dest, vars):
         # type: (MuID, MuBBNode, [MuVarNode]) -> None
         with scoped_lst2arr(MuVarNode, vars) as (vars_arr, vars_sz):
             self._bldr.c_new_dest_clause(self._bldr, id, dest, vars_arr, vars_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_exc_clause(self, id, nor, exc):
         # type: (MuID, MuDestClause, MuDestClause) -> None
         self._bldr.c_new_exc_clause(self._bldr, id, nor, exc)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_keepalive_clause(self, id, vars):
         # type: (MuID, [MuLocalVarNode]) -> None
         with scoped_lst2arr(MuLocalVarNode, vars) as (vars_arr, vars_sz):
             self._bldr.c_new_keepalive_clause(self._bldr, id, vars_arr, vars_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_csc_ret_with(self, id, rettys):
         # type: (MuID, [MuTypeNode]) -> None
         with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
             self._bldr.c_new_csc_ret_with(self._bldr, id, rettys_arr, rettys_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_csc_kill_old(self, id):
         # type: (MuID) -> None
         self._bldr.c_new_csc_kill_old(self._bldr, id)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_nsc_pass_values(self, id, tys, vars):
         # type: (MuID, [MuTypeNode], [MuVarNode]) -> None
         with scoped_lst2arr(MuTypeNode, tys) as (tys_arr, tys_sz):
             with scoped_lst2arr(MuVarNode, vars) as (vars_arr, vars_sz):
                 self._bldr.c_new_nsc_pass_values(self._bldr, id, tys_arr, vars_arr, vars_sz)
+                muerrno = self._mu.get_errno()
+                if muerrno:
+                    raise MuRuntimeError(muerrno)
 
     def new_nsc_throw_exc(self, id, exc):
         # type: (MuID, MuVarNode) -> None
         self._bldr.c_new_nsc_throw_exc(self._bldr, id, exc)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_binop(self, id, result_id, optr, ty, opnd1, opnd2, exc_clause):
         # type: (MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
         self._bldr.c_new_binop(self._bldr, id, result_id, optr, ty, opnd1, opnd2, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_cmp(self, id, result_id, optr, ty, opnd1, opnd2):
         # type: (MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode) -> None
         self._bldr.c_new_cmp(self._bldr, id, result_id, optr, ty, opnd1, opnd2)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_conv(self, id, result_id, optr, from_ty, to_ty, opnd):
         # type: (MuID, MuID, MuFlag, MuTypeNode, MuTypeNode, MuVarNode) -> None
         self._bldr.c_new_conv(self._bldr, id, result_id, optr, from_ty, to_ty, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_select(self, id, result_id, cond_ty, opnd_ty, cond, if_true, if_false):
         # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> None
         self._bldr.c_new_select(self._bldr, id, result_id, cond_ty, opnd_ty, cond, if_true, if_false)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_branch(self, id, dest):
         # type: (MuID, MuDestClause) -> None
         self._bldr.c_new_branch(self._bldr, id, dest)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_branch2(self, id, cond, if_true, if_false):
         # type: (MuID, MuVarNode, MuDestClause, MuDestClause) -> None
         self._bldr.c_new_branch2(self._bldr, id, cond, if_true, if_false)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_switch(self, id, opnd_ty, opnd, default_dest, cases, dests):
         # type: (MuID, MuTypeNode, MuVarNode, MuDestClause, [MuConstNode], [MuDestClause]) -> None
         with scoped_lst2arr(MuConstNode, cases) as (cases_arr, cases_sz):
             with scoped_lst2arr(MuDestClause, dests) as (dests_arr, dests_sz):
                 self._bldr.c_new_switch(self._bldr, id, opnd_ty, opnd, default_dest, cases_arr, dests_arr, dests_sz)
+                muerrno = self._mu.get_errno()
+                if muerrno:
+                    raise MuRuntimeError(muerrno)
 
     def new_call(self, id, result_ids, sig, callee, args, exc_clause, keepalive_clause):
         # type: (MuID, [MuID], MuFuncSigNode, MuVarNode, [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
                 self._bldr.c_new_call(self._bldr, id, result_ids_arr, result_ids_sz, sig, callee, args_arr, args_sz, exc_clause, keepalive_clause)
+                muerrno = self._mu.get_errno()
+                if muerrno:
+                    raise MuRuntimeError(muerrno)
 
     def new_tailcall(self, id, sig, callee, args):
         # type: (MuID, MuFuncSigNode, MuVarNode, [MuVarNode]) -> None
         with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
             self._bldr.c_new_tailcall(self._bldr, id, sig, callee, args_arr, args_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_ret(self, id, rvs):
         # type: (MuID, [MuVarNode]) -> None
         with scoped_lst2arr(MuVarNode, rvs) as (rvs_arr, rvs_sz):
             self._bldr.c_new_ret(self._bldr, id, rvs_arr, rvs_sz)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_throw(self, id, exc):
         # type: (MuID, MuVarNode) -> None
         self._bldr.c_new_throw(self._bldr, id, exc)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_extractvalue(self, id, result_id, strty, index, opnd):
         # type: (MuID, MuID, MuTypeNode, int, MuVarNode) -> None
         index_c = rffi.cast(rffi.INT, index)
         self._bldr.c_new_extractvalue(self._bldr, id, result_id, strty, index_c, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_insertvalue(self, id, result_id, strty, index, opnd, newval):
         # type: (MuID, MuID, MuTypeNode, int, MuVarNode, MuVarNode) -> None
         index_c = rffi.cast(rffi.INT, index)
         self._bldr.c_new_insertvalue(self._bldr, id, result_id, strty, index_c, opnd, newval)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_extractelement(self, id, result_id, seqty, indty, opnd, index):
         # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> None
         self._bldr.c_new_extractelement(self._bldr, id, result_id, seqty, indty, opnd, index)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_insertelement(self, id, result_id, seqty, indty, opnd, index, newval):
         # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> None
         self._bldr.c_new_insertelement(self._bldr, id, result_id, seqty, indty, opnd, index, newval)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_shufflevector(self, id, result_id, vecty, maskty, vec1, vec2, mask):
         # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> None
         self._bldr.c_new_shufflevector(self._bldr, id, result_id, vecty, maskty, vec1, vec2, mask)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_new(self, id, result_id, allocty, exc_clause):
         # type: (MuID, MuID, MuTypeNode, MuExcClause) -> None
         self._bldr.c_new_new(self._bldr, id, result_id, allocty, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_newhybrid(self, id, result_id, allocty, lenty, length, exc_clause):
         # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuExcClause) -> None
         self._bldr.c_new_newhybrid(self._bldr, id, result_id, allocty, lenty, length, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_alloca(self, id, result_id, allocty, exc_clause):
         # type: (MuID, MuID, MuTypeNode, MuExcClause) -> None
         self._bldr.c_new_alloca(self._bldr, id, result_id, allocty, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_allocahybrid(self, id, result_id, allocty, lenty, length, exc_clause):
         # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuExcClause) -> None
         self._bldr.c_new_allocahybrid(self._bldr, id, result_id, allocty, lenty, length, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_getiref(self, id, result_id, refty, opnd):
         # type: (MuID, MuID, MuTypeNode, MuVarNode) -> None
         self._bldr.c_new_getiref(self._bldr, id, result_id, refty, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_getfieldiref(self, id, result_id, is_ptr, refty, index, opnd):
         # type: (MuID, MuID, bool, MuTypeNode, int, MuVarNode) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         index_c = rffi.cast(rffi.INT, index)
         self._bldr.c_new_getfieldiref(self._bldr, id, result_id, is_ptr_c, refty, index_c, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_getelemiref(self, id, result_id, is_ptr, refty, indty, opnd, index):
         # type: (MuID, MuID, bool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         self._bldr.c_new_getelemiref(self._bldr, id, result_id, is_ptr_c, refty, indty, opnd, index)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_shiftiref(self, id, result_id, is_ptr, refty, offty, opnd, offset):
         # type: (MuID, MuID, bool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         self._bldr.c_new_shiftiref(self._bldr, id, result_id, is_ptr_c, refty, offty, opnd, offset)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_getvarpartiref(self, id, result_id, is_ptr, refty, opnd):
         # type: (MuID, MuID, bool, MuTypeNode, MuVarNode) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         self._bldr.c_new_getvarpartiref(self._bldr, id, result_id, is_ptr_c, refty, opnd)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_load(self, id, result_id, is_ptr, ord, refty, loc, exc_clause):
         # type: (MuID, MuID, bool, MuFlag, MuTypeNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         self._bldr.c_new_load(self._bldr, id, result_id, is_ptr_c, ord, refty, loc, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_store(self, id, is_ptr, ord, refty, loc, newval, exc_clause):
         # type: (MuID, bool, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         self._bldr.c_new_store(self._bldr, id, is_ptr_c, ord, refty, loc, newval, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_cmpxchg(self, id, value_result_id, succ_result_id, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired, exc_clause):
         # type: (MuID, MuID, MuID, bool, bool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         is_weak_c = rffi.cast(MuBool, is_weak)
         self._bldr.c_new_cmpxchg(self._bldr, id, value_result_id, succ_result_id, is_ptr_c, is_weak_c, ord_succ, ord_fail, refty, loc, expected, desired, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_atomicrmw(self, id, result_id, is_ptr, ord, optr, refTy, loc, opnd, exc_clause):
         # type: (MuID, MuID, bool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         self._bldr.c_new_atomicrmw(self._bldr, id, result_id, is_ptr_c, ord, optr, refTy, loc, opnd, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_fence(self, id, ord):
         # type: (MuID, MuFlag) -> None
         self._bldr.c_new_fence(self._bldr, id, ord)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_trap(self, id, result_ids, rettys, exc_clause, keepalive_clause):
         # type: (MuID, [MuID], [MuTypeNode], MuExcClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
                 self._bldr.c_new_trap(self._bldr, id, result_ids_arr, rettys_arr, rettys_sz, exc_clause, keepalive_clause)
+                muerrno = self._mu.get_errno()
+                if muerrno:
+                    raise MuRuntimeError(muerrno)
 
     def new_watchpoint(self, id, wpid, result_ids, rettys, dis, ena, exc, keepalive_clause):
         # type: (MuID, MuWPID, [MuID], [MuTypeNode], MuDestClause, MuDestClause, MuDestClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
                 self._bldr.c_new_watchpoint(self._bldr, id, wpid, result_ids_arr, rettys_arr, rettys_sz, dis, ena, exc, keepalive_clause)
+                muerrno = self._mu.get_errno()
+                if muerrno:
+                    raise MuRuntimeError(muerrno)
 
     def new_wpbranch(self, id, wpid, dis, ena):
         # type: (MuID, MuWPID, MuDestClause, MuDestClause) -> None
         self._bldr.c_new_wpbranch(self._bldr, id, wpid, dis, ena)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_ccall(self, id, result_ids, callconv, callee_ty, sig, callee, args, exc_clause, keepalive_clause):
         # type: (MuID, [MuID], MuFlag, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
                 self._bldr.c_new_ccall(self._bldr, id, result_ids_arr, result_ids_sz, callconv, callee_ty, sig, callee, args_arr, args_sz, exc_clause, keepalive_clause)
+                muerrno = self._mu.get_errno()
+                if muerrno:
+                    raise MuRuntimeError(muerrno)
 
     def new_newthread(self, id, result_id, stack, threadlocal, new_stack_clause, exc_clause):
         # type: (MuID, MuID, MuVarNode, MuVarNode, MuNewStackClause, MuExcClause) -> None
         self._bldr.c_new_newthread(self._bldr, id, result_id, stack, threadlocal, new_stack_clause, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
 
     def new_swapstack(self, id, result_ids, swappee, cur_stack_clause, new_stack_clause, exc_clause, keepalive_clause):
         # type: (MuID, [MuID], MuVarNode, MuCurStackClause, MuNewStackClause, MuExcClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             self._bldr.c_new_swapstack(self._bldr, id, result_ids_arr, result_ids_sz, swappee, cur_stack_clause, new_stack_clause, exc_clause, keepalive_clause)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
 
     def new_comminst(self, id, result_ids, opcode, flags, tys, sigs, args, exc_clause, keepalive_clause):
         # type: (MuID, [MuID], MuFlag, [MuFlag], [MuTypeNode], [MuFuncSigNode], [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
@@ -1125,6 +1730,9 @@ class MuIRBuilder:
                     with scoped_lst2arr(MuFuncSigNode, sigs) as (sigs_arr, sigs_sz):
                         with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
                             self._bldr.c_new_comminst(self._bldr, id, result_ids_arr, result_ids_sz, opcode, flags_arr, flags_sz, tys_arr, tys_sz, sigs_arr, sigs_sz, args_arr, args_sz, exc_clause, keepalive_clause)
+                            muerrno = self._mu.get_errno()
+                            if muerrno:
+                                raise MuRuntimeError(muerrno)
 
 
 # -------------------------------------------------------------------------------------------------------
