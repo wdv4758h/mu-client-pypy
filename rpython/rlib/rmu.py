@@ -406,6 +406,9 @@ class MuVM:
         # type: () -> int
         return int(self._mu_errno_ptr[0])
 
+    def close(self):
+        mu_close(self._mu)
+
 
 class MuCtx:
     def __init__(self, mu, rffi_ctx_ptr):
@@ -1141,7 +1144,7 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def gen_sym(self, name):
+    def gen_sym(self, name=None):
         # type: (str) -> MuID
         with rffi.scoped_str2charp(name) as name_buf:
             res = self._bldr.c_gen_sym(self._bldr, name_buf)
@@ -1445,7 +1448,7 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_binop(self, id, result_id, optr, ty, opnd1, opnd2, exc_clause):
+    def new_binop(self, id, result_id, optr, ty, opnd1, opnd2, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
         self._bldr.c_new_binop(self._bldr, id, result_id, optr, ty, opnd1, opnd2, exc_clause)
         muerrno = self._mu.get_errno()
@@ -1496,7 +1499,7 @@ class MuIRBuilder:
                 if muerrno:
                     raise MuRuntimeError(muerrno)
 
-    def new_call(self, id, result_ids, sig, callee, args, exc_clause, keepalive_clause):
+    def new_call(self, id, result_ids, sig, callee, args, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], MuFuncSigNode, MuVarNode, [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
@@ -1565,28 +1568,28 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_new(self, id, result_id, allocty, exc_clause):
+    def new_new(self, id, result_id, allocty, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, MuTypeNode, MuExcClause) -> None
         self._bldr.c_new_new(self._bldr, id, result_id, allocty, exc_clause)
         muerrno = self._mu.get_errno()
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_newhybrid(self, id, result_id, allocty, lenty, length, exc_clause):
+    def new_newhybrid(self, id, result_id, allocty, lenty, length, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuExcClause) -> None
         self._bldr.c_new_newhybrid(self._bldr, id, result_id, allocty, lenty, length, exc_clause)
         muerrno = self._mu.get_errno()
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_alloca(self, id, result_id, allocty, exc_clause):
+    def new_alloca(self, id, result_id, allocty, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, MuTypeNode, MuExcClause) -> None
         self._bldr.c_new_alloca(self._bldr, id, result_id, allocty, exc_clause)
         muerrno = self._mu.get_errno()
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_allocahybrid(self, id, result_id, allocty, lenty, length, exc_clause):
+    def new_allocahybrid(self, id, result_id, allocty, lenty, length, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuExcClause) -> None
         self._bldr.c_new_allocahybrid(self._bldr, id, result_id, allocty, lenty, length, exc_clause)
         muerrno = self._mu.get_errno()
@@ -1633,7 +1636,7 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_load(self, id, result_id, is_ptr, ord, refty, loc, exc_clause):
+    def new_load(self, id, result_id, is_ptr, ord, refty, loc, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, bool, MuFlag, MuTypeNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         self._bldr.c_new_load(self._bldr, id, result_id, is_ptr_c, ord, refty, loc, exc_clause)
@@ -1641,7 +1644,7 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_store(self, id, is_ptr, ord, refty, loc, newval, exc_clause):
+    def new_store(self, id, is_ptr, ord, refty, loc, newval, exc_clause=MuExcClause._defl()):
         # type: (MuID, bool, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         self._bldr.c_new_store(self._bldr, id, is_ptr_c, ord, refty, loc, newval, exc_clause)
@@ -1649,7 +1652,7 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_cmpxchg(self, id, value_result_id, succ_result_id, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired, exc_clause):
+    def new_cmpxchg(self, id, value_result_id, succ_result_id, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, MuID, bool, bool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         is_weak_c = rffi.cast(MuBool, is_weak)
@@ -1658,7 +1661,7 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_atomicrmw(self, id, result_id, is_ptr, ord, optr, refTy, loc, opnd, exc_clause):
+    def new_atomicrmw(self, id, result_id, is_ptr, ord, optr, refTy, loc, opnd, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, bool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
         self._bldr.c_new_atomicrmw(self._bldr, id, result_id, is_ptr_c, ord, optr, refTy, loc, opnd, exc_clause)
@@ -1673,7 +1676,7 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_trap(self, id, result_ids, rettys, exc_clause, keepalive_clause):
+    def new_trap(self, id, result_ids, rettys, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], [MuTypeNode], MuExcClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
@@ -1682,7 +1685,7 @@ class MuIRBuilder:
                 if muerrno:
                     raise MuRuntimeError(muerrno)
 
-    def new_watchpoint(self, id, wpid, result_ids, rettys, dis, ena, exc, keepalive_clause):
+    def new_watchpoint(self, id, wpid, result_ids, rettys, dis, ena, exc=MuDestClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, MuWPID, [MuID], [MuTypeNode], MuDestClause, MuDestClause, MuDestClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
@@ -1698,7 +1701,7 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_ccall(self, id, result_ids, callconv, callee_ty, sig, callee, args, exc_clause, keepalive_clause):
+    def new_ccall(self, id, result_ids, callconv, callee_ty, sig, callee, args, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], MuFlag, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
@@ -1707,14 +1710,14 @@ class MuIRBuilder:
                 if muerrno:
                     raise MuRuntimeError(muerrno)
 
-    def new_newthread(self, id, result_id, stack, threadlocal, new_stack_clause, exc_clause):
+    def new_newthread(self, id, result_id, stack, threadlocal, new_stack_clause, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, MuVarNode, MuVarNode, MuNewStackClause, MuExcClause) -> None
         self._bldr.c_new_newthread(self._bldr, id, result_id, stack, threadlocal, new_stack_clause, exc_clause)
         muerrno = self._mu.get_errno()
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_swapstack(self, id, result_ids, swappee, cur_stack_clause, new_stack_clause, exc_clause, keepalive_clause):
+    def new_swapstack(self, id, result_ids, swappee, cur_stack_clause, new_stack_clause, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], MuVarNode, MuCurStackClause, MuNewStackClause, MuExcClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             self._bldr.c_new_swapstack(self._bldr, id, result_ids_arr, result_ids_sz, swappee, cur_stack_clause, new_stack_clause, exc_clause, keepalive_clause)
@@ -1722,7 +1725,7 @@ class MuIRBuilder:
             if muerrno:
                 raise MuRuntimeError(muerrno)
 
-    def new_comminst(self, id, result_ids, opcode, flags, tys, sigs, args, exc_clause, keepalive_clause):
+    def new_comminst(self, id, result_ids, opcode, flags, tys, sigs, args, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], MuFlag, [MuFlag], [MuTypeNode], [MuFuncSigNode], [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
         with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
             with scoped_lst2arr(MuFlag, flags) as (flags_arr, flags_sz):

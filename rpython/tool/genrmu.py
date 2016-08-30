@@ -203,6 +203,16 @@ def _oogen_method(sttname, mtd, fp):
     mtd['ret_rmu_type'] = get_rmu_def(mtd['ret_ty'])
     mtd['ret_rpy_type'] = get_rpyreturn_type(mtd['ret_rmu_type'])
 
+    can_opt = True
+    for i in range(len(mtd['params']) - 1, -1, -1):
+        prm = mtd['params'][i]
+        if prm.get('is_optional', False):
+            if can_opt:
+                prm['rpy_optional'] = True
+                prm['rpy_deflval'] = 'None' if prm['rpy_type'] == "str" else '%(rmu_type)s._defl()' % prm
+        else:
+            can_opt = False
+
     # definition
     rpy_params = list(filter(lambda p: not p.get('is_sz_param', False),
                              mtd['params'][1:]))
@@ -211,7 +221,9 @@ def _oogen_method(sttname, mtd, fp):
     cur_idt = idt
     fp.write(cur_idt + 'def %(mtd_name)s(%(arg_list)s):\n' % {
         'mtd_name': mtd['name'],
-        'arg_list': ', '.join(['self'] + [p['name'] for p in rpy_params])
+        'arg_list': ', '.join(['self'] + [p['name'] if not p.get('rpy_optional', False)
+                                                    else '%(name)s=%(rpy_deflval)s' % p
+                                          for p in rpy_params])
     })
 
     cur_idt += idt
@@ -294,6 +306,11 @@ def _gen_struct_extras(stt, db, fp):
             "    def get_errno(self):\n"
             "        # type: () -> int\n"
             "        return int(self._mu_errno_ptr[0])\n"
+            "\n"
+        )
+        fp.write(
+            "    def close(self):\n"
+            "        mu_close(self._mu)\n"
             "\n"
         )
 
