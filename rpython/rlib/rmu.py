@@ -1,8 +1,9 @@
 """
 Mu API RPython binding.
-
+This file is auto-generated and then added a few minor modifications.
 Note: environment variable $MU needs to be defined to point to the reference implementation!
 """
+
 from rpython.rtyper.lltypesystem import rffi
 from rpython.rtyper.lltypesystem import lltype
 from rpython.translator.tool.cbuild import ExternalCompilationInfo
@@ -16,161 +17,459 @@ eci = ExternalCompilationInfo(includes=['refimpl2-start.h', 'muapi.h'],
 
 
 # -------------------------------------------------------------------------------------------------------
+# Type definitions
+MuValue = rffi.VOIDP
+MuValuePtr = rffi.CArrayPtr(MuValue)
+MuSeqValue = MuValue
+MuSeqValuePtr = rffi.CArrayPtr(MuSeqValue)
+MuGenRefValue = MuValue
+MuGenRefValuePtr = rffi.CArrayPtr(MuGenRefValue)
+MuIntValue = MuValue
+MuIntValuePtr = rffi.CArrayPtr(MuIntValue)
+MuFloatValue = MuValue
+MuFloatValuePtr = rffi.CArrayPtr(MuFloatValue)
+MuDoubleValue = MuValue
+MuDoubleValuePtr = rffi.CArrayPtr(MuDoubleValue)
+MuUPtrValue = MuValue
+MuUPtrValuePtr = rffi.CArrayPtr(MuUPtrValue)
+MuUFPValue = MuValue
+MuUFPValuePtr = rffi.CArrayPtr(MuUFPValue)
+MuStructValue = MuValue
+MuStructValuePtr = rffi.CArrayPtr(MuStructValue)
+MuArrayValue = MuSeqValue
+MuArrayValuePtr = rffi.CArrayPtr(MuArrayValue)
+MuVectorValue = MuSeqValue
+MuVectorValuePtr = rffi.CArrayPtr(MuVectorValue)
+MuRefValue = MuGenRefValue
+MuRefValuePtr = rffi.CArrayPtr(MuRefValue)
+MuIRefValue = MuGenRefValue
+MuIRefValuePtr = rffi.CArrayPtr(MuIRefValue)
+MuTagRef64Value = MuGenRefValue
+MuTagRef64ValuePtr = rffi.CArrayPtr(MuTagRef64Value)
+MuFuncRefValue = MuGenRefValue
+MuFuncRefValuePtr = rffi.CArrayPtr(MuFuncRefValue)
+MuThreadRefValue = MuGenRefValue
+MuThreadRefValuePtr = rffi.CArrayPtr(MuThreadRefValue)
+MuStackRefValue = MuGenRefValue
+MuStackRefValuePtr = rffi.CArrayPtr(MuStackRefValue)
+MuFCRefValue = MuGenRefValue
+MuFCRefValuePtr = rffi.CArrayPtr(MuFCRefValue)
+MuIBRefValue = MuGenRefValue
+MuIBRefValuePtr = rffi.CArrayPtr(MuIBRefValue)
+MuCString = rffi.CCHARP
+MuCStringPtr = rffi.CArrayPtr(MuCString)
+MuID = rffi.UINT
+MuIDPtr = rffi.CArrayPtr(MuID)
+MuName = MuCString
+MuNamePtr = rffi.CArrayPtr(MuName)
+MuCPtr = rffi.VOIDP
+MuCPtrPtr = rffi.CArrayPtr(MuCPtr)
+MuCFP = rffi.VOIDP
+MuCFPPtr = rffi.CArrayPtr(MuCFP)
+MuBool = rffi.INT
+MuBoolPtr = rffi.CArrayPtr(MuBool)
+MuArraySize = rffi.UINTPTR_T
+MuArraySizePtr = rffi.CArrayPtr(MuArraySize)
+MuWPID = rffi.UINT
+MuWPIDPtr = rffi.CArrayPtr(MuWPID)
+MuFlag = rffi.UINT
+MuFlagPtr = rffi.CArrayPtr(MuFlag)
+MuTrapHandlerResult = MuFlag
+MuTrapHandlerResultPtr = rffi.CArrayPtr(MuTrapHandlerResult)
+MuTypeNode = MuID
+MuTypeNodePtr = rffi.CArrayPtr(MuTypeNode)
+MuFuncSigNode = MuID
+MuFuncSigNodePtr = rffi.CArrayPtr(MuFuncSigNode)
+MuVarNode = MuID
+MuVarNodePtr = rffi.CArrayPtr(MuVarNode)
+MuGlobalVarNode = MuID
+MuGlobalVarNodePtr = rffi.CArrayPtr(MuGlobalVarNode)
+MuLocalVarNode = MuID
+MuLocalVarNodePtr = rffi.CArrayPtr(MuLocalVarNode)
+MuConstNode = MuID
+MuConstNodePtr = rffi.CArrayPtr(MuConstNode)
+MuFuncNode = MuID
+MuFuncNodePtr = rffi.CArrayPtr(MuFuncNode)
+MuFuncVerNode = MuID
+MuFuncVerNodePtr = rffi.CArrayPtr(MuFuncVerNode)
+MuBBNode = MuID
+MuBBNodePtr = rffi.CArrayPtr(MuBBNode)
+MuInstNode = MuID
+MuInstNodePtr = rffi.CArrayPtr(MuInstNode)
+MuDestClause = MuID
+MuDestClausePtr = rffi.CArrayPtr(MuDestClause)
+MuExcClause = MuID
+MuExcClausePtr = rffi.CArrayPtr(MuExcClause)
+MuKeepaliveClause = MuID
+MuKeepaliveClausePtr = rffi.CArrayPtr(MuKeepaliveClause)
+MuCurStackClause = MuID
+MuCurStackClausePtr = rffi.CArrayPtr(MuCurStackClause)
+MuNewStackClause = MuID
+MuNewStackClausePtr = rffi.CArrayPtr(MuNewStackClause)
+_MuVM = lltype.ForwardReference()
+_MuVMPtr = lltype.Ptr(_MuVM)
+_MuCtx = lltype.ForwardReference()
+_MuCtxPtr = lltype.Ptr(_MuCtx)
+_MuIRBuilder = lltype.ForwardReference()
+_MuIRBuilderPtr = lltype.Ptr(_MuIRBuilder)
+MuValuesFreer = rffi.CCallback([MuValuePtr, MuCPtr], lltype.Void)
+MuValuesFreerPtr = rffi.CArrayPtr(MuValuesFreer)
+MuTrapHandler = rffi.CCallback([
+    _MuCtxPtr, MuThreadRefValue, MuStackRefValue, MuWPID,   # input
+    MuTrapHandlerResultPtr, MuStackRefValuePtr, rffi.CArray(MuValuePtr), MuArraySizePtr,
+    MuValuesFreerPtr, MuCPtrPtr, MuRefValuePtr,             # output
+    MuCPtr  #input
+], lltype.Void)
+MuTrapHandlerPtr = rffi.CArrayPtr(MuTrapHandler)
+
+# -------------------------------------------------------------------------------------------------------
+# Flags
+class MuTrapHandlerResult:
+    THREAD_EXIT = rffi.cast(MuFlag, 0x00)
+    REBIND_PASS_VALUES = rffi.cast(MuFlag, 0x01)
+    REBIND_THROW_EXC = rffi.cast(MuFlag, 0x02)
+class MuBinOptr:
+    ADD = rffi.cast(MuFlag, 0x01)
+    SUB = rffi.cast(MuFlag, 0x02)
+    MUL = rffi.cast(MuFlag, 0x03)
+    SDIV = rffi.cast(MuFlag, 0x04)
+    SREM = rffi.cast(MuFlag, 0x05)
+    UDIV = rffi.cast(MuFlag, 0x06)
+    UREM = rffi.cast(MuFlag, 0x07)
+    SHL = rffi.cast(MuFlag, 0x08)
+    LSHR = rffi.cast(MuFlag, 0x09)
+    ASHR = rffi.cast(MuFlag, 0x0A)
+    AND = rffi.cast(MuFlag, 0x0B)
+    OR = rffi.cast(MuFlag, 0x0C)
+    XOR = rffi.cast(MuFlag, 0x0D)
+    FADD = rffi.cast(MuFlag, 0xB0)
+    FSUB = rffi.cast(MuFlag, 0xB1)
+    FMUL = rffi.cast(MuFlag, 0xB2)
+    FDIV = rffi.cast(MuFlag, 0xB3)
+    FREM = rffi.cast(MuFlag, 0xB4)
+class MuCmpOptr:
+    EQ = rffi.cast(MuFlag, 0x20)
+    NE = rffi.cast(MuFlag, 0x21)
+    SGE = rffi.cast(MuFlag, 0x22)
+    SGT = rffi.cast(MuFlag, 0x23)
+    SLE = rffi.cast(MuFlag, 0x24)
+    SLT = rffi.cast(MuFlag, 0x25)
+    UGE = rffi.cast(MuFlag, 0x26)
+    UGT = rffi.cast(MuFlag, 0x27)
+    ULE = rffi.cast(MuFlag, 0x28)
+    ULT = rffi.cast(MuFlag, 0x29)
+    FFALSE = rffi.cast(MuFlag, 0xC0)
+    FTRUE = rffi.cast(MuFlag, 0xC1)
+    FUNO = rffi.cast(MuFlag, 0xC2)
+    FUEQ = rffi.cast(MuFlag, 0xC3)
+    FUNE = rffi.cast(MuFlag, 0xC4)
+    FUGT = rffi.cast(MuFlag, 0xC5)
+    FUGE = rffi.cast(MuFlag, 0xC6)
+    FULT = rffi.cast(MuFlag, 0xC7)
+    FULE = rffi.cast(MuFlag, 0xC8)
+    FORD = rffi.cast(MuFlag, 0xC9)
+    FOEQ = rffi.cast(MuFlag, 0xCA)
+    FONE = rffi.cast(MuFlag, 0xCB)
+    FOGT = rffi.cast(MuFlag, 0xCC)
+    FOGE = rffi.cast(MuFlag, 0xCD)
+    FOLT = rffi.cast(MuFlag, 0xCE)
+    FOLE = rffi.cast(MuFlag, 0xCF)
+class MuConvOptr:
+    TRUNC = rffi.cast(MuFlag, 0x30)
+    ZEXT = rffi.cast(MuFlag, 0x31)
+    SEXT = rffi.cast(MuFlag, 0x32)
+    FPTRUNC = rffi.cast(MuFlag, 0x33)
+    FPEXT = rffi.cast(MuFlag, 0x34)
+    FPTOUI = rffi.cast(MuFlag, 0x35)
+    FPTOSI = rffi.cast(MuFlag, 0x36)
+    UITOFP = rffi.cast(MuFlag, 0x37)
+    SITOFP = rffi.cast(MuFlag, 0x38)
+    BITCAST = rffi.cast(MuFlag, 0x39)
+    REFCAST = rffi.cast(MuFlag, 0x3A)
+    PTRCAST = rffi.cast(MuFlag, 0x3B)
+class MuMemOrd:
+    NOT_ATOMIC = rffi.cast(MuFlag, 0x00)
+    RELAXED = rffi.cast(MuFlag, 0x01)
+    CONSUME = rffi.cast(MuFlag, 0x02)
+    ACQUIRE = rffi.cast(MuFlag, 0x03)
+    RELEASE = rffi.cast(MuFlag, 0x04)
+    ACQ_REL = rffi.cast(MuFlag, 0x05)
+    SEQ_CST = rffi.cast(MuFlag, 0x06)
+class MuAtomicRMWOptr:
+    XCHG = rffi.cast(MuFlag, 0x00)
+    ADD = rffi.cast(MuFlag, 0x01)
+    SUB = rffi.cast(MuFlag, 0x02)
+    AND = rffi.cast(MuFlag, 0x03)
+    NAND = rffi.cast(MuFlag, 0x04)
+    OR = rffi.cast(MuFlag, 0x05)
+    XOR = rffi.cast(MuFlag, 0x06)
+    MAX = rffi.cast(MuFlag, 0x07)
+    MIN = rffi.cast(MuFlag, 0x08)
+    UMAX = rffi.cast(MuFlag, 0x09)
+    UMIN = rffi.cast(MuFlag, 0x0A)
+class MuCallConv:
+    DEFAULT = rffi.cast(MuFlag, 0x00)
+class MuCommInst:
+    NEW_STACK = rffi.cast(MuFlag, 0x201)
+    KILL_STACK = rffi.cast(MuFlag, 0x202)
+    THREAD_EXIT = rffi.cast(MuFlag, 0x203)
+    CURRENT_STACK = rffi.cast(MuFlag, 0x204)
+    SET_THREADLOCAL = rffi.cast(MuFlag, 0x205)
+    GET_THREADLOCAL = rffi.cast(MuFlag, 0x206)
+    TR64_IS_FP = rffi.cast(MuFlag, 0x211)
+    TR64_IS_INT = rffi.cast(MuFlag, 0x212)
+    TR64_IS_REF = rffi.cast(MuFlag, 0x213)
+    TR64_FROM_FP = rffi.cast(MuFlag, 0x214)
+    TR64_FROM_INT = rffi.cast(MuFlag, 0x215)
+    TR64_FROM_REF = rffi.cast(MuFlag, 0x216)
+    TR64_TO_FP = rffi.cast(MuFlag, 0x217)
+    TR64_TO_INT = rffi.cast(MuFlag, 0x218)
+    TR64_TO_REF = rffi.cast(MuFlag, 0x219)
+    TR64_TO_TAG = rffi.cast(MuFlag, 0x21a)
+    FUTEX_WAIT = rffi.cast(MuFlag, 0x220)
+    FUTEX_WAIT_TIMEOUT = rffi.cast(MuFlag, 0x221)
+    FUTEX_WAKE = rffi.cast(MuFlag, 0x222)
+    FUTEX_CMP_REQUEUE = rffi.cast(MuFlag, 0x223)
+    KILL_DEPENDENCY = rffi.cast(MuFlag, 0x230)
+    NATIVE_PIN = rffi.cast(MuFlag, 0x240)
+    NATIVE_UNPIN = rffi.cast(MuFlag, 0x241)
+    NATIVE_EXPOSE = rffi.cast(MuFlag, 0x242)
+    NATIVE_UNEXPOSE = rffi.cast(MuFlag, 0x243)
+    NATIVE_GET_COOKIE = rffi.cast(MuFlag, 0x244)
+    META_ID_OF = rffi.cast(MuFlag, 0x250)
+    META_NAME_OF = rffi.cast(MuFlag, 0x251)
+    META_LOAD_BUNDLE = rffi.cast(MuFlag, 0x252)
+    META_LOAD_HAIL = rffi.cast(MuFlag, 0x253)
+    META_NEW_CURSOR = rffi.cast(MuFlag, 0x254)
+    META_NEXT_FRAME = rffi.cast(MuFlag, 0x255)
+    META_COPY_CURSOR = rffi.cast(MuFlag, 0x256)
+    META_CLOSE_CURSOR = rffi.cast(MuFlag, 0x257)
+    META_CUR_FUNC = rffi.cast(MuFlag, 0x258)
+    META_CUR_FUNC_VER = rffi.cast(MuFlag, 0x259)
+    META_CUR_INST = rffi.cast(MuFlag, 0x25a)
+    META_DUMP_KEEPALIVES = rffi.cast(MuFlag, 0x25b)
+    META_POP_FRAMES_TO = rffi.cast(MuFlag, 0x25c)
+    META_PUSH_FRAME = rffi.cast(MuFlag, 0x25d)
+    META_ENABLE_WATCHPOINT = rffi.cast(MuFlag, 0x25e)
+    META_DISABLE_WATCHPOINT = rffi.cast(MuFlag, 0x25f)
+    META_SET_TRAP_HANDLER = rffi.cast(MuFlag, 0x260)
+    IRBUILDER_NEW_IR_BUILDER = rffi.cast(MuFlag, 0x270)
+    IRBUILDER_LOAD = rffi.cast(MuFlag, 0x300)
+    IRBUILDER_ABORT = rffi.cast(MuFlag, 0x301)
+    IRBUILDER_GEN_SYM = rffi.cast(MuFlag, 0x302)
+    IRBUILDER_NEW_TYPE_INT = rffi.cast(MuFlag, 0x303)
+    IRBUILDER_NEW_TYPE_FLOAT = rffi.cast(MuFlag, 0x304)
+    IRBUILDER_NEW_TYPE_DOUBLE = rffi.cast(MuFlag, 0x305)
+    IRBUILDER_NEW_TYPE_UPTR = rffi.cast(MuFlag, 0x306)
+    IRBUILDER_NEW_TYPE_UFUNCPTR = rffi.cast(MuFlag, 0x307)
+    IRBUILDER_NEW_TYPE_STRUCT = rffi.cast(MuFlag, 0x308)
+    IRBUILDER_NEW_TYPE_HYBRID = rffi.cast(MuFlag, 0x309)
+    IRBUILDER_NEW_TYPE_ARRAY = rffi.cast(MuFlag, 0x30a)
+    IRBUILDER_NEW_TYPE_VECTOR = rffi.cast(MuFlag, 0x30b)
+    IRBUILDER_NEW_TYPE_VOID = rffi.cast(MuFlag, 0x30c)
+    IRBUILDER_NEW_TYPE_REF = rffi.cast(MuFlag, 0x30d)
+    IRBUILDER_NEW_TYPE_IREF = rffi.cast(MuFlag, 0x30e)
+    IRBUILDER_NEW_TYPE_WEAKREF = rffi.cast(MuFlag, 0x30f)
+    IRBUILDER_NEW_TYPE_FUNCREF = rffi.cast(MuFlag, 0x310)
+    IRBUILDER_NEW_TYPE_TAGREF64 = rffi.cast(MuFlag, 0x311)
+    IRBUILDER_NEW_TYPE_THREADREF = rffi.cast(MuFlag, 0x312)
+    IRBUILDER_NEW_TYPE_STACKREF = rffi.cast(MuFlag, 0x313)
+    IRBUILDER_NEW_TYPE_FRAMECURSORREF = rffi.cast(MuFlag, 0x314)
+    IRBUILDER_NEW_TYPE_IRBUILDERREF = rffi.cast(MuFlag, 0x315)
+    IRBUILDER_NEW_FUNCSIG = rffi.cast(MuFlag, 0x316)
+    IRBUILDER_NEW_CONST_INT = rffi.cast(MuFlag, 0x317)
+    IRBUILDER_NEW_CONST_INT_EX = rffi.cast(MuFlag, 0x318)
+    IRBUILDER_NEW_CONST_FLOAT = rffi.cast(MuFlag, 0x319)
+    IRBUILDER_NEW_CONST_DOUBLE = rffi.cast(MuFlag, 0x31a)
+    IRBUILDER_NEW_CONST_NULL = rffi.cast(MuFlag, 0x31b)
+    IRBUILDER_NEW_CONST_SEQ = rffi.cast(MuFlag, 0x31c)
+    IRBUILDER_NEW_CONST_EXTERN = rffi.cast(MuFlag, 0x31d)
+    IRBUILDER_NEW_GLOBAL_CELL = rffi.cast(MuFlag, 0x31e)
+    IRBUILDER_NEW_FUNC = rffi.cast(MuFlag, 0x31f)
+    IRBUILDER_NEW_EXP_FUNC = rffi.cast(MuFlag, 0x320)
+    IRBUILDER_NEW_FUNC_VER = rffi.cast(MuFlag, 0x321)
+    IRBUILDER_NEW_BB = rffi.cast(MuFlag, 0x322)
+    IRBUILDER_NEW_DEST_CLAUSE = rffi.cast(MuFlag, 0x323)
+    IRBUILDER_NEW_EXC_CLAUSE = rffi.cast(MuFlag, 0x324)
+    IRBUILDER_NEW_KEEPALIVE_CLAUSE = rffi.cast(MuFlag, 0x325)
+    IRBUILDER_NEW_CSC_RET_WITH = rffi.cast(MuFlag, 0x326)
+    IRBUILDER_NEW_CSC_KILL_OLD = rffi.cast(MuFlag, 0x327)
+    IRBUILDER_NEW_NSC_PASS_VALUES = rffi.cast(MuFlag, 0x328)
+    IRBUILDER_NEW_NSC_THROW_EXC = rffi.cast(MuFlag, 0x329)
+    IRBUILDER_NEW_BINOP = rffi.cast(MuFlag, 0x32a)
+    IRBUILDER_NEW_CMP = rffi.cast(MuFlag, 0x32b)
+    IRBUILDER_NEW_CONV = rffi.cast(MuFlag, 0x32c)
+    IRBUILDER_NEW_SELECT = rffi.cast(MuFlag, 0x32d)
+    IRBUILDER_NEW_BRANCH = rffi.cast(MuFlag, 0x32e)
+    IRBUILDER_NEW_BRANCH2 = rffi.cast(MuFlag, 0x32f)
+    IRBUILDER_NEW_SWITCH = rffi.cast(MuFlag, 0x330)
+    IRBUILDER_NEW_CALL = rffi.cast(MuFlag, 0x331)
+    IRBUILDER_NEW_TAILCALL = rffi.cast(MuFlag, 0x332)
+    IRBUILDER_NEW_RET = rffi.cast(MuFlag, 0x333)
+    IRBUILDER_NEW_THROW = rffi.cast(MuFlag, 0x334)
+    IRBUILDER_NEW_EXTRACTVALUE = rffi.cast(MuFlag, 0x335)
+    IRBUILDER_NEW_INSERTVALUE = rffi.cast(MuFlag, 0x336)
+    IRBUILDER_NEW_EXTRACTELEMENT = rffi.cast(MuFlag, 0x337)
+    IRBUILDER_NEW_INSERTELEMENT = rffi.cast(MuFlag, 0x338)
+    IRBUILDER_NEW_SHUFFLEVECTOR = rffi.cast(MuFlag, 0x339)
+    IRBUILDER_NEW_NEW = rffi.cast(MuFlag, 0x33a)
+    IRBUILDER_NEW_NEWHYBRID = rffi.cast(MuFlag, 0x33b)
+    IRBUILDER_NEW_ALLOCA = rffi.cast(MuFlag, 0x33c)
+    IRBUILDER_NEW_ALLOCAHYBRID = rffi.cast(MuFlag, 0x33d)
+    IRBUILDER_NEW_GETIREF = rffi.cast(MuFlag, 0x33e)
+    IRBUILDER_NEW_GETFIELDIREF = rffi.cast(MuFlag, 0x33f)
+    IRBUILDER_NEW_GETELEMIREF = rffi.cast(MuFlag, 0x340)
+    IRBUILDER_NEW_SHIFTIREF = rffi.cast(MuFlag, 0x341)
+    IRBUILDER_NEW_GETVARPARTIREF = rffi.cast(MuFlag, 0x342)
+    IRBUILDER_NEW_LOAD = rffi.cast(MuFlag, 0x343)
+    IRBUILDER_NEW_STORE = rffi.cast(MuFlag, 0x344)
+    IRBUILDER_NEW_CMPXCHG = rffi.cast(MuFlag, 0x345)
+    IRBUILDER_NEW_ATOMICRMW = rffi.cast(MuFlag, 0x346)
+    IRBUILDER_NEW_FENCE = rffi.cast(MuFlag, 0x347)
+    IRBUILDER_NEW_TRAP = rffi.cast(MuFlag, 0x348)
+    IRBUILDER_NEW_WATCHPOINT = rffi.cast(MuFlag, 0x349)
+    IRBUILDER_NEW_WPBRANCH = rffi.cast(MuFlag, 0x34a)
+    IRBUILDER_NEW_CCALL = rffi.cast(MuFlag, 0x34b)
+    IRBUILDER_NEW_NEWTHREAD = rffi.cast(MuFlag, 0x34c)
+    IRBUILDER_NEW_SWAPSTACK = rffi.cast(MuFlag, 0x34d)
+    IRBUILDER_NEW_COMMINST = rffi.cast(MuFlag, 0x34e)
+
+# -------------------------------------------------------------------------------------------------------
 # OO wrappers
-class Mu:
-    def __init__(self):
-        self._mu = mu_new()
-
-    # scope support
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
+class MuVM:
+    def __init__(self, config_str=""):
+        with rffi.scoped_str2charp(config_str) as buf:
+            self._mu = mu_new_ex(buf)
     def new_context(self):
-        # type: () -> MuContext
-        return MuContext(self._mu.c_new_context(self._mu))
-
-    def id_of(self, name):
-        # type (str) -> MuID
-        with rffi.scoped_str2charp(name) as buf:
-            return self._mu.c_id_of(self._mu, buf)
-
-    def name_of(self, id):
-        # type (MuID) -> str
-        c_charp = self._mu.c_name_of(self._mu, id)
-        return rffi.charp2str(c_charp)
-
-    def set_trap_handler(self, trap_handler, userdata):
-        # type (MuTrapHandler, MuCPtr) -> None
-        self._mu.c_set_trap_handler(self._mu, trap_handler, userdata)
-
-    def make_boot_image(self, whitelist, output_file):
-        # type ([MuID], str) -> None
-        with scoped_lst2arr(MuID, whitelist) as (arr, sz):
-            with rffi.scoped_str2charp(output_file) as buf:
-                self._mu.c_make_boot_image(self._mu, arr, sz, buf)
-
-    def execute(self):
-        # type () -> None
-        self._mu.c_execute(self._mu)
-
-    def get_mu_error_ptr(self):
-        # type () -> rffi.INTP
-        return self._mu.c_get_mu_error_ptr(self._mu)
-
-    def close(self):
-        return mu_close(self._mu)
-
-
-class MuContext:
-    def __init__(self, rffi_ctx_ptr):
-        self._ctx = rffi_ctx_ptr
-
-    # scope support
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close_context()
+        # type: () -> MuCtx
+        return MuCtx(self._mu.c_new_context(self._mu))
 
     def id_of(self, name):
         # type: (str) -> MuID
-        with rffi.scoped_str2charp(name) as buf:
-            return self._ctx.c_id_of(self._ctx, buf)
+        with rffi.scoped_str2charp(name) as name_buf:
+            return self._mu.c_id_of(self._mu, name_buf)
 
     def name_of(self, id):
         # type: (MuID) -> str
-        c_charp = self._ctx.c_name_of(self._ctx, id)
-        return rffi.charp2str(c_charp)
+        return self._mu.c_name_of(self._mu, id)
+
+    def set_trap_handler(self, trap_handler, userdata):
+        # type: (MuTrapHandler, MuCPtr) -> None
+        self._mu.c_set_trap_handler(self._mu, trap_handler, userdata)
+
+    def make_boot_image(self, whitelist, output_file):
+        # type: ([MuID], str) -> None
+        with scoped_lst2arr(MuID, whitelist) as (whitelist_arr, whitelist_sz):
+            with rffi.scoped_str2charp(output_file) as output_file_buf:
+                self._mu.c_make_boot_image(self._mu, whitelist_arr, whitelist_sz, output_file_buf)
+
+    def execute(self):
+        # type: () -> None
+        self._mu.c_execute(self._mu)
+
+    def get_mu_error_ptr(self):
+        # type: () -> rffi.INTP
+        return self._mu.c_get_mu_error_ptr(self._mu)
+
+
+class MuCtx:
+    def __init__(self, rffi_ctx_ptr):
+        self._ctx = rffi_ctx_ptr
+    def id_of(self, name):
+        # type: (str) -> MuID
+        with rffi.scoped_str2charp(name) as name_buf:
+            return self._ctx.c_id_of(self._ctx, name_buf)
+
+    def name_of(self, id):
+        # type: (MuID) -> str
+        return self._ctx.c_name_of(self._ctx, id)
 
     def close_context(self):
         # type: () -> None
         self._ctx.c_close_context(self._ctx)
 
-    def load_bundle(self, bdl):
+    def load_bundle(self, buf):
         # type: (str) -> None
-        with rffi.scoped_str2charp(bdl) as buf:
-            self._ctx.c_load_bundle(self._ctx, buf, rffi.cast(MuArraySize, len(bdl)))
+        with rffi.scoped_str2charp(buf) as buf_buf:
+            sz = rffi.cast(MuArraySize, len(buf))
+            self._ctx.c_load_bundle(self._ctx, buf_buf, sz)
 
-    def load_hail(self, hail):
+    def load_hail(self, buf):
         # type: (str) -> None
-        with rffi.scoped_str2charp(hail) as buf:
-            self._ctx.c_load_hail(self._ctx, buf, rffi.cast(MuArraySize, len(hail)))
+        with rffi.scoped_str2charp(buf) as buf_buf:
+            sz = rffi.cast(MuArraySize, len(buf))
+            self._ctx.c_load_hail(self._ctx, buf_buf, sz)
 
-    def handle_from_sint8(self, num, length):
+    def handle_from_sint8(self, num, len):
         # type: (int, int) -> MuIntValue
-        num = rffi.cast(rffi.CHAR, num)
-        length = rffi.cast(rffi.INT, length)
-        return self._ctx.c_handle_from_sint8(self._ctx, num, length)
+        num_c = rffi.cast(rffi.CHAR, num)
+        len_c = rffi.cast(rffi.INT, len)
+        return self._ctx.c_handle_from_sint8(self._ctx, num_c, len_c)
 
-    def handle_from_uint8(self, num, length):
+    def handle_from_uint8(self, num, len):
         # type: (int, int) -> MuIntValue
-        num = rffi.cast(rffi.UCHAR, num)
-        length = rffi.cast(rffi.INT, length)
-        return self._ctx.c_handle_from_uint8(self._ctx, num, length)
+        num_c = rffi.cast(rffi.UCHAR, num)
+        len_c = rffi.cast(rffi.INT, len)
+        return self._ctx.c_handle_from_uint8(self._ctx, num_c, len_c)
 
-    def handle_from_sint16(self, num, length):
+    def handle_from_sint16(self, num, len):
         # type: (int, int) -> MuIntValue
-        num = rffi.cast(rffi.SHORT, num)
-        length = rffi.cast(rffi.INT, length)
-        return self._ctx.c_handle_from_sint16(self._ctx, num, length)
+        num_c = rffi.cast(rffi.SHORT, num)
+        len_c = rffi.cast(rffi.INT, len)
+        return self._ctx.c_handle_from_sint16(self._ctx, num_c, len_c)
 
-    def handle_from_uint16(self, num, length):
+    def handle_from_uint16(self, num, len):
         # type: (int, int) -> MuIntValue
-        num = rffi.cast(rffi.USHORT, num)
-        length = rffi.cast(rffi.INT, length)
-        return self._ctx.c_handle_from_uint16(self._ctx, num, length)
+        num_c = rffi.cast(rffi.USHORT, num)
+        len_c = rffi.cast(rffi.INT, len)
+        return self._ctx.c_handle_from_uint16(self._ctx, num_c, len_c)
 
-    def handle_from_sint32(self, num, length):
+    def handle_from_sint32(self, num, len):
         # type: (int, int) -> MuIntValue
-        num = rffi.cast(rffi.INT, num)
-        length = rffi.cast(rffi.INT, length)
-        return self._ctx.c_handle_from_sint32(self._ctx, num, length)
+        num_c = rffi.cast(rffi.INT, num)
+        len_c = rffi.cast(rffi.INT, len)
+        return self._ctx.c_handle_from_sint32(self._ctx, num_c, len_c)
 
-    def handle_from_uint32(self, num, length):
+    def handle_from_uint32(self, num, len):
         # type: (int, int) -> MuIntValue
-        num = rffi.cast(rffi.UINT, num)
-        length = rffi.cast(rffi.INT, length)
-        return self._ctx.c_handle_from_uint32(self._ctx, num, length)
+        num_c = rffi.cast(rffi.UINT, num)
+        len_c = rffi.cast(rffi.INT, len)
+        return self._ctx.c_handle_from_uint32(self._ctx, num_c, len_c)
 
-    def handle_from_sint64(self, num, length):
+    def handle_from_sint64(self, num, len):
         # type: (int, int) -> MuIntValue
-        num = rffi.cast(rffi.LONG, num)
-        length = rffi.cast(rffi.INT, length)
-        return self._ctx.c_handle_from_sint64(self._ctx, num, length)
+        num_c = rffi.cast(rffi.LONG, num)
+        len_c = rffi.cast(rffi.INT, len)
+        return self._ctx.c_handle_from_sint64(self._ctx, num_c, len_c)
 
-    def handle_from_uint64(self, num, length):
+    def handle_from_uint64(self, num, len):
         # type: (int, int) -> MuIntValue
-        num = rffi.cast(rffi.ULONG, num)
-        length = rffi.cast(rffi.INT, length)
-        return self._ctx.c_handle_from_uint64(self._ctx, num, length)
+        num_c = rffi.cast(rffi.ULONG, num)
+        len_c = rffi.cast(rffi.INT, len)
+        return self._ctx.c_handle_from_uint64(self._ctx, num_c, len_c)
 
-    def handle_from_uint64s(self, nums, length):
-        # type: ([int], int) -> MuIntValue
-        with scoped_lst2arr(rffi.ULONG, nums) as (arr, sz):
-            length = rffi.cast(rffi.INT, length)
-            return self._ctx.c_handle_from_uint64s(self._ctx, arr, sz, length)
+    def handle_from_uint64s(self, nums, len):
+        # type: ([rffi.ULONG], int) -> MuIntValue
+        with scoped_lst2arr(rffi.ULONG, nums) as (nums_arr, nums_sz):
+            len_c = rffi.cast(rffi.INT, len)
+            return self._ctx.c_handle_from_uint64s(self._ctx, nums_arr, nums_sz, len_c)
 
     def handle_from_float(self, num):
         # type: (float) -> MuFloatValue
-        num = rffi.cast(rffi.FLOAT, num)
-        return self._ctx.c_handle_from_float(self._ctx, num)
+        num_c = rffi.cast(rffi.FLOAT, num)
+        return self._ctx.c_handle_from_float(self._ctx, num_c)
 
     def handle_from_double(self, num):
         # type: (float) -> MuDoubleValue
-        num = rffi.cast(rffi.DOUBLE, num)
-        return self._ctx.c_handle_from_double(self._ctx, num)
+        num_c = rffi.cast(rffi.DOUBLE, num)
+        return self._ctx.c_handle_from_double(self._ctx, num_c)
 
     def handle_from_ptr(self, mu_type, ptr):
         # type: (MuID, MuCPtr) -> MuUPtrValue
-        ptr = rffi.cast(MuCPtr, ptr)
         return self._ctx.c_handle_from_ptr(self._ctx, mu_type, ptr)
 
     def handle_from_fp(self, mu_type, fp):
         # type: (MuID, MuCFP) -> MuUFPValue
-        fp = rffi.cast(MuCFP, fp)
         return self._ctx.c_handle_from_fp(self._ctx, mu_type, fp)
 
     def handle_to_sint8(self, opnd):
@@ -239,7 +538,7 @@ class MuContext:
 
     def delete_value(self, opnd):
         # type: (MuValue) -> None
-        return self._ctx.c_delete_value(self._ctx, opnd)
+        self._ctx.c_delete_value(self._ctx, opnd)
 
     def ref_eq(self, lhs, rhs):
         # type: (MuGenRefValue, MuGenRefValue) -> bool
@@ -251,11 +550,13 @@ class MuContext:
 
     def extract_value(self, str, index):
         # type: (MuStructValue, int) -> MuValue
-        return self._ctx.c_extract_value(self._ctx, str, rffi.cast(rffi.INT, index))
+        index_c = rffi.cast(rffi.INT, index)
+        return self._ctx.c_extract_value(self._ctx, str, index_c)
 
     def insert_value(self, str, index, newval):
         # type: (MuStructValue, int, MuValue) -> MuStructValue
-        return self._ctx.c_insert_value(self._ctx, str, rffi.cast(rffi.INT, index), newval)
+        index_c = rffi.cast(rffi.INT, index)
+        return self._ctx.c_insert_value(self._ctx, str, index_c, newval)
 
     def extract_element(self, str, index):
         # type: (MuSeqValue, MuIntValue) -> MuValue
@@ -283,7 +584,8 @@ class MuContext:
 
     def get_field_iref(self, opnd, field):
         # type: (MuIRefValue, int) -> MuIRefValue
-        return self._ctx.c_get_field_iref(self._ctx, opnd, rffi.cast(rffi.INT, field))
+        field_c = rffi.cast(rffi.INT, field)
+        return self._ctx.c_get_field_iref(self._ctx, opnd, field_c)
 
     def get_elem_iref(self, opnd, index):
         # type: (MuIRefValue, MuIntValue) -> MuIRefValue
@@ -298,24 +600,24 @@ class MuContext:
         return self._ctx.c_get_var_part_iref(self._ctx, opnd)
 
     def load(self, ord, loc):
-        # type: (MuMemOrd, MuIRefValue) -> MuValue
+        # type: (MuFlag, MuIRefValue) -> MuValue
         return self._ctx.c_load(self._ctx, ord, loc)
 
     def store(self, ord, loc, newval):
-        # type: (MuMemOrd, MuIRefValue, MuValue) -> None
+        # type: (MuFlag, MuIRefValue, MuValue) -> None
         self._ctx.c_store(self._ctx, ord, loc, newval)
 
     def cmpxchg(self, ord_succ, ord_fail, weak, loc, expected, desired, is_succ):
-        # type: (MuMemOrd, MuMemOrd, bool, MuIRefValue, MuValue, MuValue, bool) -> MuValue
-        return self._ctx.c_cmpxchg(self._ctx, ord_succ, ord_fail, rffi.cast(MuBool, weak),
-                                   loc, expected, desired, rffi.cast(MuBool, is_succ))
+        # type: (MuFlag, MuFlag, bool, MuIRefValue, MuValue, MuValue, MuBoolPtr) -> MuValue
+        weak_c = rffi.cast(MuBool, weak)
+        return self._ctx.c_cmpxchg(self._ctx, ord_succ, ord_fail, weak_c, loc, expected, desired, is_succ)
 
     def atomicrmw(self, ord, op, loc, opnd):
-        # type: (MuMemOrd, MuAtomicRMWOptr, MuIRefValue, MuValue) -> MuValue
+        # type: (MuFlag, MuFlag, MuIRefValue, MuValue) -> MuValue
         return self._ctx.c_atomicrmw(self._ctx, ord, op, loc, opnd)
 
     def fence(self, ord):
-        # type: (MuMemOrd) -> None
+        # type: (MuFlag) -> None
         self._ctx.c_fence(self._ctx, ord)
 
     def new_stack(self, func):
@@ -324,8 +626,8 @@ class MuContext:
 
     def new_thread_nor(self, stack, threadlocal, vals):
         # type: (MuStackRefValue, MuRefValue, [MuValue]) -> MuThreadRefValue
-        with scoped_lst2arr(MuValue, vals) as (arr, sz):
-            return self._ctx.c_new_thread_nor(self._ctx, stack, threadlocal, arr, sz)
+        with scoped_lst2arr(MuValue, vals) as (vals_arr, vals_sz):
+            return self._ctx.c_new_thread_nor(self._ctx, stack, threadlocal, vals_arr, vals_sz)
 
     def new_thread_exc(self, stack, threadlocal, exc):
         # type: (MuStackRefValue, MuRefValue, MuRefValue) -> MuThreadRefValue
@@ -372,7 +674,7 @@ class MuContext:
         return self._ctx.c_cur_inst(self._ctx, cursor)
 
     def dump_keepalives(self, cursor, results):
-        # type: (MuFCRefValue, MuValue) -> None
+        # type: (MuFCRefValue, MuValuePtr) -> None
         self._ctx.c_dump_keepalives(self._ctx, cursor, results)
 
     def pop_frames_to(self, cursor):
@@ -440,1008 +742,584 @@ class MuContext:
         self._ctx.c_unpin(self._ctx, loc)
 
     def expose(self, func, call_conv, cookie):
-        # type: (MuFuncRefValue, MuCallConv, MuIntValue) -> MuValue
+        # type: (MuFuncRefValue, MuFlag, MuIntValue) -> MuValue
         return self._ctx.c_expose(self._ctx, func, call_conv, cookie)
 
     def unexpose(self, call_conv, value):
-        # type: (MuCallConv, MuValue) -> None
+        # type: (MuFlag, MuValue) -> None
         self._ctx.c_unexpose(self._ctx, call_conv, value)
 
-    def new_bundle(self):
-        # type: () -> MuBundleNode
-        return self._ctx.c_new_bundle(self._ctx)
-
-    def load_bundle_from_node(self, b):
-        # type: (MuBundleNode) -> None
-        self._ctx.c_load_bundle_from_node(self._ctx, b)
-
-    def abort_bundle_node(self, b):
-        # type: (MuBundleNode) -> None
-        self._ctx.c_abort_bundle_node(self._ctx, b)
-
-    def get_node(self, b, id):
-        # type: (MuBundleNode, MuID) -> MuChildNode
-        return self._ctx.c_get_node(self._ctx, b, id)
-
-    def get_id(self, b, node):
-        # type: (MuBundleNode, MuChildNode) -> MuID
-        return self._ctx.c_get_id(self._ctx, b, node)
-
-    def set_name(self, b, node, name):
-        # type: (MuBundleNode, MuChildNode, str) -> None
-        with rffi.scoped_str2charp(name) as buf:
-            return self._ctx.c_set_name(self._ctx, b, node, buf)
-
-    def new_type_int(self, b, len):
-        # type: (MuBundleNode, int) -> MuTypeNode
-        return self._ctx.c_new_type_int(self._ctx, b, rffi.cast(rffi.INT, len))
-
-    def new_type_float(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_float(self._ctx, b)
-
-    def new_type_double(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_double(self._ctx, b)
-
-    def new_type_uptr(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_uptr(self._ctx, b)
-
-    def set_type_uptr(self, uptr, ty):
-        # type: (MuTypeNode, MuTypeNode) -> None
-        self._ctx.c_set_type_uptr(self._ctx, uptr, ty)
-
-    def new_type_ufuncptr(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_ufuncptr(self._ctx, b)
-
-    def set_type_ufuncptr(self, ufuncptr, sig):
-        # type: (MuTypeNode, MuFuncSigNode) -> None
-        self._ctx.c_set_type_ufuncptr(self._ctx, ufuncptr, sig)
-
-    def new_type_struct(self, b, fieldtys):
-        # type: (MuBundleNode, [MuTypeNode]) -> MuTypeNode
-        with scoped_lst2arr(MuTypeNode, fieldtys) as (arr, sz):
-            return self._ctx.c_new_type_struct(self._ctx, b, arr, sz)
-
-    def new_type_hybrid(self, b, fixedtys, varty):
-        # type: (MuBundleNode, [MuTypeNode], MuTypeNode) -> MuTypeNode
-        with scoped_lst2arr(MuTypeNode, fixedtys) as (arr, sz):
-            return self._ctx.c_new_type_hybrid(self._ctx, b, arr, sz, varty)
-
-    def new_type_array(self, b, elemty, length):
-        # type: (MuBundleNode, MuTypeNode, int) -> MuTypeNode
-        return self._ctx.c_new_type_array(self._ctx, b, elemty, rffi.cast(rffi.INT, length))
-
-    def new_type_vector(self, b, elemty, length):
-        # type: (MuBundleNode, MuTypeNode, int) -> MuTypeNode
-        return self._ctx.c_new_type_vector(self._ctx, b, elemty, rffi.cast(rffi.INT, length))
-
-    def new_type_void(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_void(self._ctx, b)
-
-    def new_type_ref(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_ref(self._ctx, b)
-
-    def set_type_ref(self, ref, ty):
-        # type: (MuTypeNode, MuTypeNode) -> None
-        self._ctx.c_set_type_ref(self._ctx, ref, ty)
-
-    def new_type_iref(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_iref(self._ctx, b)
-
-    def set_type_iref(self, iref, ty):
-        # type: (MuTypeNode, MuTypeNode) -> None
-        self._ctx.c_set_type_iref(self._ctx, iref, ty)
-
-    def new_type_weakref(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_weakref(self._ctx, b)
-
-    def set_type_weakref(self, weakref, ty):
-        # type: (MuTypeNode, MuTypeNode) -> None
-        self._ctx.c_set_type_weakref(self._ctx, weakref, ty)
-
-    def new_type_funcref(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_funcref(self._ctx, b)
-
-    def set_type_funcref(self, funcref, sig):
-        # type: (MuTypeNode, MuFuncSigNode) -> None
-        return self._ctx.c_set_type_funcref(self._ctx, funcref, sig)
-
-    def new_type_tagref64(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_tagref64(self._ctx, b)
-
-    def new_type_threadref(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_threadref(self._ctx, b)
-
-    def new_type_stackref(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_stackref(self._ctx, b)
-
-    def new_type_framecursorref(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_framecursorref(self._ctx, b)
-
-    def new_type_irnoderef(self, b):
-        # type: (MuBundleNode) -> MuTypeNode
-        return self._ctx.c_new_type_irnoderef(self._ctx, b)
-
-    def new_funcsig(self, b, paramtys, rettys):
-        # type: (MuBundleNode, [MuTypeNode], [MuTypeNode]) -> MuFuncSigNode
-        with scoped_lst2arr(MuTypeNode, paramtys) as (prm_ts, sz_prm_ts):
-            with scoped_lst2arr(MuTypeNode, rettys) as (rtn_ts, sz_rtn_ts):
-                return self._ctx.c_new_funcsig(self._ctx, b, prm_ts, sz_prm_ts, rtn_ts, sz_rtn_ts)
-
-    def new_const_int(self, b, ty, value):
-        # type: (MuBundleNode, MuTypeNode, int) -> MuConstNode
-        return self._ctx.c_new_const_int(self._ctx, b, ty, rffi.cast(rffi.ULONG, value))
-
-    def new_const_int_ex(self, b, ty, values):
-        # type: (MuBundleNode, MuTypeNode, [int]) -> MuConstNode
-        with scoped_lst2arr(rffi.ULONG, values, need_rffi_cast=True) as (arr, sz):
-            return self._ctx.c_new_const_int_ex(self._ctx, b, ty, arr, sz)
-
-    def new_const_float(self, b, ty, value):
-        # type: (MuBundleNode, MuTypeNode, float) -> MuConstNode
-        return self._ctx.c_new_const_float(self._ctx, b, ty, rffi.cast(rffi.FLOAT, value))
-
-    def new_const_double(self, b, ty, value):
-        # type: (MuBundleNode, MuTypeNode, float) -> MuConstNode
-        return self._ctx.c_new_const_double(self._ctx, b, ty, rffi.cast(rffi.DOUBLE, value))
-
-    def new_const_null(self, b, ty):
-        # type: (MuBundleNode, MuTypeNode) -> MuConstNode
-        return self._ctx.c_new_const_null(self._ctx, b, ty)
-
-    def new_const_seq(self, b, ty, elems):
-        # type: (MuBundleNode, MuTypeNode, [MuConstNode]) -> MuConstNode
-        with scoped_lst2arr(MuConstNode, elems) as (arr, sz):
-            return self._ctx.c_new_const_seq(self._ctx, b, ty, arr, sz)
-
-    def new_const_extern(self, b, ty, symbol):
-        # type: (MuBundleNode, MuTypeNode, str) -> MuConstNode
-        with rffi.scoped_str2charp(symbol) as buf:
-            return self._ctx.c_new_const_extern(self._ctx, b, ty, buf)
-
-    def new_global_cell(self, b, ty):
-        # type: (MuBundleNode, MuTypeNode) -> MuGlobalNode
-        return self._ctx.c_new_global_cell(self._ctx, b, ty)
-
-    def new_func(self, b, sig):
-        # type: (MuBundleNode, MuFuncSigNode) -> MuFuncNode
-        return self._ctx.c_new_func(self._ctx, b, sig)
-
-    def new_func_ver(self, b, func):
-        # type: (MuBundleNode, MuFuncNode) -> MuFuncVerNode
-        return self._ctx.c_new_func_ver(self._ctx, b, func)
-
-    def new_exp_func(self, b, func, callconv, cookie):
-        # type: (MuBundleNode, MuFuncNode, MuCallConv, MuConstNode) -> MuExpFuncNode
-        return self._ctx.c_new_exp_func(self._ctx, b, func, callconv, cookie)
-
-    def new_bb(self, fv):
-        # type: (MuFuncVerNode) -> MuBBNode
-        return self._ctx.c_new_bb(self._ctx, fv)
-
-    def new_nor_param(self, bb, ty):
-        # type: (MuBBNode, MuTypeNode) -> MuNorParamNode
-        return self._ctx.c_new_nor_param(self._ctx, bb, ty)
-
-    def new_exc_param(self, bb):
-        # type: (MuBBNode) -> MuExcParamNode
-        return self._ctx.c_new_exc_param(self._ctx, bb)
-
-    def get_inst_res(self, inst, idx):
-        # type: (MuInstNode, int) -> MuInstResNode
-        return self._ctx.c_get_inst_res(self._ctx, inst, rffi.cast(rffi.INT, idx))
-
-    def get_num_inst_res(self, inst):
-        # type: (MuInstNode) -> int
-        return int(self._ctx.c_get_num_inst_res(self._ctx, inst))
-
-    def add_dest(self, inst, kind, dest, vars):
-        # type: (MuInstNode, MuDestKind, MuBBNode, [MuVarNode]) -> None
-        with scoped_lst2arr(MuVarNode, vars) as (arr, sz):
-            self._ctx.c_add_dest(self._ctx, inst, kind, dest, arr, sz)
-
-    def add_keepalives(self, inst, vars):
-        # type: (MuInstNode, [MuLocalVarNode]) -> None
-        with scoped_lst2arr(MuLocalVarNode, vars) as (arr, sz):
-            self._ctx.c_add_keepalives(self._ctx, inst, vars)
-
-    def new_binop(self, bb, optr, ty, opnd1, opnd2):
-        # type: (MuBBNode, MuBinOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_binop(self._ctx, bb, optr, ty, opnd1, opnd2)
-
-    def new_cmp(self, bb, optr, ty, opnd1, opnd2):
-        # type: (MuBBNode, MuCmpOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_cmp(self._ctx, bb, optr, ty, opnd1, opnd2)
-
-    def new_conv(self, bb, optr, from_ty, to_ty, opnd):
-        # type: (MuBBNode, MuConvOptr, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_conv(self._ctx, bb, optr, from_ty, to_ty, opnd)
-
-    def new_select(self, bb, cond_ty, opnd_ty, cond, if_true, if_false):
-        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_select(self._ctx, bb, cond_ty, opnd_ty, cond, if_true, if_false)
-
-    def new_branch(self, bb):
-        # type: (MuBBNode) -> MuInstNode
-        return self._ctx.c_new_branch(self._ctx, bb)
-
-    def new_branch_ex(self, bb, bbDest, args):
-        # type: (MuBBNode, MuBBNode, [MuVarNode]) -> MuInstNode
-        op = self.new_branch(bb)
-        self.add_dest(op, MuDestKind.NORMAL, bbDest, args)
-        return op
-
-    def new_branch2(self, bb, cond):
-        # type: (MuBBNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_branch2(self._ctx, bb, cond)
-
-    def new_branch2_ex(self, bb, cond, bbTrue, argsTrue, bbFalse, argsFalse):
-        # type: (MuBBNode, MuVarNode, MuBBNode, [MuVarNode], MuBBNode, [MuVarNode]) -> MuInstNode
-        op = self.new_branch2(bb, cond)
-        self.add_dest(op, MuDestKind.TRUE, bbTrue, argsTrue)
-        self.add_dest(op, MuDestKind.FALSE, bbFalse, argsFalse)
-        return op
-
-    def new_switch(self, bb, opnd_ty, opnd):
-        # type: (MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_switch(self._ctx, bb, opnd_ty, opnd)
-
-    def add_switch_dest(self, sw, key, dest, vars):
-        # type: (MuInstNode, MuConstNode, MuBBNode, [MuVarNode]) -> None
-        with scoped_lst2arr(MuVarNode, vars) as (arr, sz):
-            self._ctx.c_add_switch_dest(self._ctx, sw, key, dest, arr, sz)
-
-    def new_call(self, bb, sig, callee, args):
-        # type: (MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
-        with scoped_lst2arr(MuVarNode, args) as (arr, sz):
-            return self._ctx.c_new_call(self._ctx, bb, sig, callee, arr, sz)
-
-    def new_tailcall(self, bb, sig, callee, args):
-        # type: (MuBBNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
-        with scoped_lst2arr(MuVarNode, args) as (arr, sz):
-            return self._ctx.c_new_tailcall(self._ctx, bb, sig, callee, arr, sz)
-
-    def new_ret(self, bb, rvs):
-        # type: (MuBBNode, [MuVarNode]) -> MuInstNode
-        with scoped_lst2arr(MuVarNode, rvs) as (arr, sz):
-            return self._ctx.c_new_ret(self._ctx, bb, arr, sz)
-
-    def new_throw(self, bb, exc):
-        # type: (MuBBNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_throw(self._ctx, bb, exc)
-
-    def new_extractvalue(self, bb, strty, index, opnd):
-        # type: (MuBBNode, MuTypeNode, int, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_extractvalue(self._ctx, bb, strty, rffi.cast(rffi.INT, index), opnd)
-
-    def new_insertvalue(self, bb, strty, index, opnd, newval):
-        # type: (MuBBNode, MuTypeNode, int, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_insertvalue(self._ctx, bb, strty, rffi.cast(rffi.INT, index), opnd, newval)
-
-    def new_extractelement(self, bb, seqty, indty, opnd, index):
-        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_extractelement(self._ctx, bb, seqty, indty, opnd, index)
-
-    def new_insertelement(self, bb, seqty, indty, opnd, index, newval):
-        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_insertelement(self._ctx, bb, seqty, indty, opnd, index, newval)
-
-    def new_shufflevector(self, bb, vecty, maskty, vec1, vec2, mask):
-        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_shufflevector(self._ctx, bb, vecty, maskty, vec1, vec2, mask)
-
-    def new_new(self, bb, allocty):
-        # type: (MuBBNode, MuTypeNode) -> MuInstNode
-        return self._ctx.c_new_new(self._ctx, bb, allocty)
-
-    def new_newhybrid(self, bb, allocty, lenty, length):
-        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_newhybrid(self._ctx, bb, allocty, lenty, length)
-
-    def new_alloca(self, bb, allocty):
-        # type: (MuBBNode, MuTypeNode) -> MuInstNode
-        return self._ctx.c_new_alloca(self._ctx, bb, allocty)
-
-    def new_allocahybrid(self, bb, allocty, lenty, length):
-        # type: (MuBBNode, MuTypeNode, MuTypeNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_allocahybrid(self._ctx, bb, allocty, lenty, length)
-
-    def new_getiref(self, bb, refty, opnd):
-        # type: (MuBBNode, MuTypeNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_getiref(self._ctx, bb, refty, opnd)
-
-    def new_getfieldiref(self, bb, is_ptr, refty, index, opnd):
-        # type: (MuBBNode, bool, MuTypeNode, int, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_getfieldiref(self._ctx, bb, rffi.cast(MuBool, is_ptr),
-                                            refty, rffi.cast(rffi.INT, index), opnd)
-
-    def new_getelemiref(self, bb, is_ptr, refty, indty, opnd, index):
-        # type: (MuBBNode, bool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_getelemiref(self._ctx, bb, rffi.cast(MuBool, is_ptr), refty, indty, opnd, index)
-
-    def new_shiftiref(self, bb, is_ptr, refty, offty, opnd, offset):
-        # type: (MuBBNode, bool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_shiftiref(self._ctx, bb, rffi.cast(MuBool, is_ptr), refty, offty, opnd, offset)
-
-    def new_getvarpartiref(self, bb, is_ptr, refty, opnd):
-        # type: (MuBBNode, bool, MuTypeNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_getvarpartiref(self._ctx, bb, rffi.cast(MuBool, is_ptr), refty, opnd)
-
-    def new_load(self, bb, is_ptr, ord, refty, loc):
-        # type: (MuBBNode, bool, MuMemOrd, MuTypeNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_load(self._ctx, bb, rffi.cast(MuBool, is_ptr), ord, refty, loc)
-
-    def new_store(self, bb, is_ptr, ord, refty, loc, newval):
-        # type: (MuBBNode, bool, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_store(self._ctx, bb, rffi.cast(MuBool, is_ptr), ord, refty, loc, newval)
-
-    def new_cmpxchg(self, bb, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired):
-        # type: (MuBBNode, bool, bool, MuMemOrd, MuMemOrd, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_cmpxchg(self._ctx, bb, rffi.cast(MuBool, is_ptr), rffi.cast(MuBool, is_weak),
-                                       ord_succ, ord_fail, refty, loc, expected, desired)
-
-    def new_atomicrmw(self, bb, is_ptr, ord, optr, refTy, loc, opnd):
-        # type: (MuBBNode, bool, MuMemOrd, MuAtomicRMWOptr, MuTypeNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_atomicrmw(self._ctx, bb, rffi.cast(MuBool, is_ptr), ord, optr, refTy, loc, opnd)
-
-    def new_fence(self, bb, ord):
-        # type: (MuBBNode, MuMemOrd) -> MuInstNode
-        return self._ctx.c_new_fence(self._ctx, bb, ord)
-
-    def new_trap(self, bb, rettys):
-        # type: (MuBBNode, [MuTypeNode]) -> MuInstNode
-        with scoped_lst2arr(MuTypeNode, rettys) as (arr, sz):
-            return self._ctx.c_new_trap(self._ctx, bb, arr, sz)
-
-    def new_watchpoint(self, bb, wpid, rettys):
-        # type: (MuBBNode, MuWPID, [MuTypeNode]) -> MuInstNode
-        with scoped_lst2arr(MuTypeNode, rettys) as (arr, sz):
-            return self._ctx.c_new_watchpoint(self._ctx, bb, wpid, arr, sz)
-
-    def new_wpbranch(self, bb, wpid):
-        # type: (MuBBNode, MuWPID) -> MuInstNode
-        return self._ctx.c_new_wpbranch(self._ctx, bb, wpid)
-
-    def new_wpbranch_ex(self, bb, wpid, bbDisable, argsDisable, bbEnable, argsEnable):
-        # type: (MuBBNode, MuWPID, MuBBNode, [MuVarNode], MuBBNode, [MuVarNode]) -> MuInstNode
-        op = self.new_wpbranch(bb, wpid)
-        self.add_dest(op, MuDestKind.DISABLED, bbDisable, argsDisable)
-        self.add_dest(op, MuDestKind.ENABLED, bbEnable, argsEnable)
-        return op
-
-    def new_ccall(self, bb, callconv, callee_ty, sig, callee, args):
-        # type: (MuBBNode, MuCallConv, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode]) -> MuInstNode
-        with scoped_lst2arr(MuVarNode, args) as (arr, sz):
-            return self._ctx.c_new_ccall(self._ctx, bb, callconv, callee_ty, sig, callee, arr, sz)
-
-    def new_newthread(self, bb, stack, threadlocal):
-        # type: (MuBBNode, MuVarNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_newthread(self._ctx, bb, stack, threadlocal)
-
-    def new_swapstack_ret(self, bb, swappee, ret_tys):
-        # type: (MuBBNode, MuVarNode, [MuTypeNode]) -> MuInstNode
-        with scoped_lst2arr(MuTypeNode, ret_tys) as (arr, sz):
-            return self._ctx.c_new_swapstack_ret(self._ctx, bb, swappee, arr, sz)
-
-    def new_swapstack_kill(self, bb, swappee):
-        # type: (MuBBNode, MuVarNode) -> MuInstNode
-        return self._ctx.c_new_swapstack_kill(self._ctx, bb, swappee)
-
-    def set_newstack_pass_values(self, inst, tys, vars):
-        # type: (MuInstNode, [MuTypeNode], [MuVarNode]) -> None
-        with scoped_lst2arr(MuTypeNode, tys) as (arr_tys, sz_tys):
-            with scoped_lst2arr(MuVarNode, vars) as (arr_vars, sz_vars):
-                return self._ctx.c_set_newstack_pass_values(self._ctx, inst, arr_tys, arr_vars, sz_tys)
-
-    def set_newstack_throw_exc(self, inst, exc):
-        # type: (MuInstNode, MuVarNode) -> None
-        return self._ctx.c_set_newstack_throw_exc(self._ctx, inst, exc)
-
-    def new_comminst(self, bb, opcode, flags, tys, sigs, args):
-        # type: (MuBBNode, MuCommInst, [MuFlag], [MuTypeNode], [MuFuncSigNode], [MuVarNode]) -> MuInstNode
-        with scoped_lst2arr(MuFlag, flags) as (arr_flags, sz_flags):
-            with scoped_lst2arr(MuTypeNode, tys) as (arr_tys, sz_tys):
-                with scoped_lst2arr(MuFuncSigNode, sigs) as (arr_sigs, sz_sigs):
-                    with scoped_lst2arr(MuVarNode, args) as (arr_args, sz_args):
-                        return self._ctx.c_new_comminst(self._ctx, bb, opcode,
-                                                        arr_flags, sz_flags,
-                                                        arr_tys, sz_tys,
-                                                        arr_sigs, sz_sigs,
-                                                        arr_args, sz_args)
-
-# --------------------------------
-# Flags
-class _MuFlagWrapper:
-    _lltype = rffi.UINT     # MuFlag type
-    def __init__(self, **value_dic):
-        for key, val in value_dic.items():
-            setattr(self, key, rffi.cast(_MuFlagWrapper._lltype, val))
-
-
-MuTrapHandlerResult = _MuFlagWrapper(
-    THREAD_EXIT = 0x00,
-    REBIND_PASS_VALUES = 0x01,
-    REBIND_THROW_EXC = 0x02,
-)
-
-MuDestKind = _MuFlagWrapper(
-    NORMAL= 0x01,
-    EXCEPT = 0x02,
-    TRUE = 0x03,
-    FALSE = 0x04,
-    DEFAULT = 0x05,
-    DISABLED = 0x06,
-    ENABLED = 0x07,
-)
-
-MuBinOptr = _MuFlagWrapper(
-    ADD = 0x01,
-    SUB = 0x02,
-    MUL = 0x03,
-    SDIV = 0x04,
-    SREM = 0x05,
-    UDIV = 0x06,
-    UREM = 0x07,
-    SHL = 0x08,
-    LSHR = 0x09,
-    ASHR = 0x0A,
-    AND = 0x0B,
-    OR = 0x0C,
-    XOR = 0x0D,
-    FADD = 0xB0,
-    FSUB = 0xB1,
-    FMUL = 0xB2,
-    FDIV = 0xB3,
-    FREM = 0xB4,
-)
-
-MuCmpOptr = _MuFlagWrapper(
-    EQ = 0x20,
-    NE = 0x21,
-    SGE = 0x22,
-    SGT = 0x23,
-    SLE = 0x24,
-    SLT = 0x25,
-    UGE = 0x26,
-    UGT = 0x27,
-    ULE = 0x28,
-    ULT = 0x29,
-    FFALSE = 0xC0,
-    FTRUE = 0xC1,
-    FUNO = 0xC2,
-    FUEQ = 0xC3,
-    FUNE = 0xC4,
-    FUGT = 0xC5,
-    FUGE = 0xC6,
-    FULT = 0xC7,
-    FULE = 0xC8,
-    FORD = 0xC9,
-    FOEQ = 0xCA,
-    FONE = 0xCB,
-    FOGT = 0xCC,
-    FOGE = 0xCD,
-    FOLT = 0xCE,
-    FOLE = 0xCF,
-)
-
-MuConvOptr = _MuFlagWrapper(
-    TRUNC = 0x30,
-    ZEXT = 0x31,
-    SEXT = 0x32,
-    FPTRUNC = 0x33,
-    FPEXT = 0x34,
-    FPTOUI = 0x35,
-    FPTOSI = 0x36,
-    UITOFP = 0x37,
-    SITOFP = 0x38,
-    BITCAST = 0x39,
-    REFCAST = 0x3A,
-    PTRCAST = 0x3B,
-)
-
-MuMemOrd = _MuFlagWrapper(
-    NOT_ATOMIC = 0x00,
-    RELAXED = 0x01,
-    CONSUME = 0x02,
-    ACQUIRE = 0x03,
-    RELEASE = 0x04,
-    ACQ_REL = 0x05,
-    SEQ_CST = 0x06,
-)
-
-MuAtomicRMWOptr = _MuFlagWrapper(
-    XCHG = 0x00,
-    ADD = 0x01,
-    SUB = 0x02,
-    AND = 0x03,
-    NAND = 0x04,
-    OR = 0x05,
-    XOR = 0x06,
-    MAX = 0x07,
-    MIN = 0x08,
-    UMAX = 0x09,
-    UMIN = 0x0A,
-)
-
-MuCallConv = _MuFlagWrapper(DEFAULT = 0x00)
-
-MuCommInst = _MuFlagWrapper(
-    UVM_NEW_STACK = 0x201,
-    UVM_KILL_STACK = 0x202,
-    UVM_THREAD_EXIT = 0x203,
-    UVM_CURRENT_STACK = 0x204,
-    UVM_SET_THREADLOCAL = 0x205,
-    UVM_GET_THREADLOCAL = 0x206,
-    UVM_TR64_IS_FP = 0x211,
-    UVM_TR64_IS_INT = 0x212,
-    UVM_TR64_IS_REF = 0x213,
-    UVM_TR64_FROM_FP = 0x214,
-    UVM_TR64_FROM_INT = 0x215,
-    UVM_TR64_FROM_REF = 0x216,
-    UVM_TR64_TO_FP = 0x217,
-    UVM_TR64_TO_INT = 0x218,
-    UVM_TR64_TO_REF = 0x219,
-    UVM_TR64_TO_TAG = 0x21a,
-    UVM_FUTEX_WAIT = 0x220,
-    UVM_FUTEX_WAIT_TIMEOUT = 0x221,
-    UVM_FUTEX_WAKE = 0x222,
-    UVM_FUTEX_CMP_REQUEUE = 0x223,
-    UVM_KILL_DEPENDENCY = 0x230,
-    UVM_NATIVE_PIN = 0x240,
-    UVM_NATIVE_UNPIN = 0x241,
-    UVM_NATIVE_EXPOSE = 0x242,
-    UVM_NATIVE_UNEXPOSE = 0x243,
-    UVM_NATIVE_GET_COOKIE = 0x244,
-    UVM_META_ID_OF = 0x250,
-    UVM_META_NAME_OF = 0x251,
-    UVM_META_LOAD_BUNDLE = 0x252,
-    UVM_META_LOAD_HAIL = 0x253,
-    UVM_META_NEW_CURSOR = 0x254,
-    UVM_META_NEXT_FRAME = 0x255,
-    UVM_META_COPY_CURSOR = 0x256,
-    UVM_META_CLOSE_CURSOR = 0x257,
-    UVM_META_CUR_FUNC = 0x258,
-    UVM_META_CUR_FUNC_VER = 0x259,
-    UVM_META_CUR_INST = 0x25a,
-    UVM_META_DUMP_KEEPALIVES = 0x25b,
-    UVM_META_POP_FRAMES_TO = 0x25c,
-    UVM_META_PUSH_FRAME = 0x25d,
-    UVM_META_ENABLE_WATCHPOINT = 0x25e,
-    UVM_META_DISABLE_WATCHPOINT = 0x25f,
-    UVM_META_SET_TRAP_HANDLER = 0x260,
-    UVM_IRBUILDER_NEW_BUNDLE = 0x300,
-    UVM_IRBUILDER_LOAD_BUNDLE_FROM_NODE = 0x301,
-    UVM_IRBUILDER_ABORT_BUNDLE_NODE = 0x302,
-    UVM_IRBUILDER_GET_NODE = 0x303,
-    UVM_IRBUILDER_GET_ID = 0x304,
-    UVM_IRBUILDER_SET_NAME = 0x305,
-    UVM_IRBUILDER_NEW_TYPE_INT = 0x306,
-    UVM_IRBUILDER_NEW_TYPE_FLOAT = 0x307,
-    UVM_IRBUILDER_NEW_TYPE_DOUBLE = 0x308,
-    UVM_IRBUILDER_NEW_TYPE_UPTR = 0x309,
-    UVM_IRBUILDER_SET_TYPE_UPTR = 0x30a,
-    UVM_IRBUILDER_NEW_TYPE_UFUNCPTR = 0x30b,
-    UVM_IRBUILDER_SET_TYPE_UFUNCPTR = 0x30c,
-    UVM_IRBUILDER_NEW_TYPE_STRUCT = 0x30d,
-    UVM_IRBUILDER_NEW_TYPE_HYBRID = 0x30e,
-    UVM_IRBUILDER_NEW_TYPE_ARRAY = 0x30f,
-    UVM_IRBUILDER_NEW_TYPE_VECTOR = 0x310,
-    UVM_IRBUILDER_NEW_TYPE_VOID = 0x311,
-    UVM_IRBUILDER_NEW_TYPE_REF = 0x312,
-    UVM_IRBUILDER_SET_TYPE_REF = 0x313,
-    UVM_IRBUILDER_NEW_TYPE_IREF = 0x314,
-    UVM_IRBUILDER_SET_TYPE_IREF = 0x315,
-    UVM_IRBUILDER_NEW_TYPE_WEAKREF = 0x316,
-    UVM_IRBUILDER_SET_TYPE_WEAKREF = 0x317,
-    UVM_IRBUILDER_NEW_TYPE_FUNCREF = 0x318,
-    UVM_IRBUILDER_SET_TYPE_FUNCREF = 0x319,
-    UVM_IRBUILDER_NEW_TYPE_TAGREF64 = 0x31a,
-    UVM_IRBUILDER_NEW_TYPE_THREADREF = 0x31b,
-    UVM_IRBUILDER_NEW_TYPE_STACKREF = 0x31c,
-    UVM_IRBUILDER_NEW_TYPE_FRAMECURSORREF = 0x31d,
-    UVM_IRBUILDER_NEW_TYPE_IRNODEREF = 0x31e,
-    UVM_IRBUILDER_NEW_FUNCSIG = 0x31f,
-    UVM_IRBUILDER_NEW_CONST_INT = 0x320,
-    UVM_IRBUILDER_NEW_CONST_INT_EX = 0x321,
-    UVM_IRBUILDER_NEW_CONST_FLOAT = 0x322,
-    UVM_IRBUILDER_NEW_CONST_DOUBLE = 0x323,
-    UVM_IRBUILDER_NEW_CONST_NULL = 0x324,
-    UVM_IRBUILDER_NEW_CONST_SEQ = 0x325,
-    UVM_IRBUILDER_NEW_GLOBAL_CELL = 0x326,
-    UVM_IRBUILDER_NEW_FUNC = 0x327,
-    UVM_IRBUILDER_NEW_FUNC_VER = 0x328,
-    UVM_IRBUILDER_NEW_EXP_FUNC = 0x329,
-    UVM_IRBUILDER_NEW_BB = 0x32a,
-    UVM_IRBUILDER_NEW_NOR_PARAM = 0x32b,
-    UVM_IRBUILDER_NEW_EXC_PARAM = 0x32c,
-    UVM_IRBUILDER_NEW_INST_RES = 0x32d,
-    UVM_IRBUILDER_ADD_DEST = 0x32e,
-    UVM_IRBUILDER_ADD_KEEPALIVES = 0x32f,
-    UVM_IRBUILDER_NEW_BINOP = 0x330,
-    UVM_IRBUILDER_NEW_CMP = 0x331,
-    UVM_IRBUILDER_NEW_CONV = 0x332,
-    UVM_IRBUILDER_NEW_SELECT = 0x333,
-    UVM_IRBUILDER_NEW_BRANCH = 0x334,
-    UVM_IRBUILDER_NEW_BRANCH2 = 0x335,
-    UVM_IRBUILDER_NEW_SWITCH = 0x336,
-    UVM_IRBUILDER_ADD_SWITCH_DEST = 0x337,
-    UVM_IRBUILDER_NEW_CALL = 0x338,
-    UVM_IRBUILDER_NEW_TAILCALL = 0x339,
-    UVM_IRBUILDER_NEW_RET = 0x33a,
-    UVM_IRBUILDER_NEW_THROW = 0x33b,
-    UVM_IRBUILDER_NEW_EXTRACTVALUE = 0x33c,
-    UVM_IRBUILDER_NEW_INSERTVALUE = 0x33d,
-    UVM_IRBUILDER_NEW_EXTRACTELEMENT = 0x33e,
-    UVM_IRBUILDER_NEW_INSERTELEMENT = 0x33f,
-    UVM_IRBUILDER_NEW_SHUFFLEVECTOR = 0x340,
-    UVM_IRBUILDER_NEW_NEW = 0x341,
-    UVM_IRBUILDER_NEW_NEWHYBRID = 0x342,
-    UVM_IRBUILDER_NEW_ALLOCA = 0x343,
-    UVM_IRBUILDER_NEW_ALLOCAHYBRID = 0x344,
-    UVM_IRBUILDER_NEW_GETIREF = 0x345,
-    UVM_IRBUILDER_NEW_GETFIELDIREF = 0x346,
-    UVM_IRBUILDER_NEW_GETELEMIREF = 0x347,
-    UVM_IRBUILDER_NEW_SHIFTIREF = 0x348,
-    UVM_IRBUILDER_NEW_GETVARPARTIREF = 0x349,
-    UVM_IRBUILDER_NEW_LOAD = 0x34a,
-    UVM_IRBUILDER_NEW_STORE = 0x34b,
-    UVM_IRBUILDER_NEW_CMPXCHG = 0x34c,
-    UVM_IRBUILDER_NEW_ATOMICRMW = 0x34d,
-    UVM_IRBUILDER_NEW_FENCE = 0x34e,
-    UVM_IRBUILDER_NEW_TRAP = 0x34f,
-    UVM_IRBUILDER_NEW_WATCHPOINT = 0x350,
-    UVM_IRBUILDER_NEW_WPBRANCH = 0x351,
-    UVM_IRBUILDER_NEW_CCALL = 0x352,
-    UVM_IRBUILDER_NEW_NEWTHREAD = 0x353,
-    UVM_IRBUILDER_NEW_SWAPSTACK_RET = 0x354,
-    UVM_IRBUILDER_NEW_SWAPSTACK_KILL = 0x355,
-    UVM_IRBUILDER_SET_NEWSTACK_PASS_VALUES = 0x356,
-    UVM_IRBUILDER_SET_NEWSTACK_THROW_EXC = 0x357,
-    UVM_IRBUILDER_NEW_COMMINST = 0x358,
-)
+    def new_ir_builder(self):
+        # type: () -> MuIRBuilder
+        return MuIRBuilder(self._ctx.c_new_ir_builder(self._ctx))
+
+
+class MuIRBuilder:
+    def __init__(self, rffi_bldr_ptr):
+        self._bldr = rffi_bldr_ptr
+    def load(self):
+        # type: () -> None
+        self._bldr.c_load(self._bldr)
+
+    def abort(self):
+        # type: () -> None
+        self._bldr.c_abort(self._bldr)
+
+    def gen_sym(self, name):
+        # type: (str) -> MuID
+        with rffi.scoped_str2charp(name) as name_buf:
+            return self._bldr.c_gen_sym(self._bldr, name_buf)
+
+    def new_type_int(self, id, len):
+        # type: (MuID, int) -> None
+        len_c = rffi.cast(rffi.INT, len)
+        self._bldr.c_new_type_int(self._bldr, id, len_c)
+
+    def new_type_float(self, id):
+        # type: (MuID) -> None
+        self._bldr.c_new_type_float(self._bldr, id)
+
+    def new_type_double(self, id):
+        # type: (MuID) -> None
+        self._bldr.c_new_type_double(self._bldr, id)
+
+    def new_type_uptr(self, id, ty):
+        # type: (MuID, MuTypeNode) -> None
+        self._bldr.c_new_type_uptr(self._bldr, id, ty)
+
+    def new_type_ufuncptr(self, id, sig):
+        # type: (MuID, MuFuncSigNode) -> None
+        self._bldr.c_new_type_ufuncptr(self._bldr, id, sig)
+
+    def new_type_struct(self, id, fieldtys):
+        # type: (MuID, [MuTypeNode]) -> None
+        with scoped_lst2arr(MuTypeNode, fieldtys) as (fieldtys_arr, fieldtys_sz):
+            self._bldr.c_new_type_struct(self._bldr, id, fieldtys_arr, fieldtys_sz)
+
+    def new_type_hybrid(self, id, fixedtys, varty):
+        # type: (MuID, [MuTypeNode], MuTypeNode) -> None
+        with scoped_lst2arr(MuTypeNode, fixedtys) as (fixedtys_arr, fixedtys_sz):
+            self._bldr.c_new_type_hybrid(self._bldr, id, fixedtys_arr, fixedtys_sz, varty)
+
+    def new_type_array(self, id, elemty, len):
+        # type: (MuID, MuTypeNode, int) -> None
+        len_c = rffi.cast(rffi.ULONG, len)
+        self._bldr.c_new_type_array(self._bldr, id, elemty, len_c)
+
+    def new_type_vector(self, id, elemty, len):
+        # type: (MuID, MuTypeNode, int) -> None
+        len_c = rffi.cast(rffi.ULONG, len)
+        self._bldr.c_new_type_vector(self._bldr, id, elemty, len_c)
+
+    def new_type_void(self, id):
+        # type: (MuID) -> None
+        self._bldr.c_new_type_void(self._bldr, id)
+
+    def new_type_ref(self, id, ty):
+        # type: (MuID, MuTypeNode) -> None
+        self._bldr.c_new_type_ref(self._bldr, id, ty)
+
+    def new_type_iref(self, id, ty):
+        # type: (MuID, MuTypeNode) -> None
+        self._bldr.c_new_type_iref(self._bldr, id, ty)
+
+    def new_type_weakref(self, id, ty):
+        # type: (MuID, MuTypeNode) -> None
+        self._bldr.c_new_type_weakref(self._bldr, id, ty)
+
+    def new_type_funcref(self, id, sig):
+        # type: (MuID, MuFuncSigNode) -> None
+        self._bldr.c_new_type_funcref(self._bldr, id, sig)
+
+    def new_type_tagref64(self, id):
+        # type: (MuID) -> None
+        self._bldr.c_new_type_tagref64(self._bldr, id)
+
+    def new_type_threadref(self, id):
+        # type: (MuID) -> None
+        self._bldr.c_new_type_threadref(self._bldr, id)
+
+    def new_type_stackref(self, id):
+        # type: (MuID) -> None
+        self._bldr.c_new_type_stackref(self._bldr, id)
+
+    def new_type_framecursorref(self, id):
+        # type: (MuID) -> None
+        self._bldr.c_new_type_framecursorref(self._bldr, id)
+
+    def new_type_irbuilderref(self, id):
+        # type: (MuID) -> None
+        self._bldr.c_new_type_irbuilderref(self._bldr, id)
+
+    def new_funcsig(self, id, paramtys, rettys):
+        # type: (MuID, [MuTypeNode], [MuTypeNode]) -> None
+        with scoped_lst2arr(MuTypeNode, paramtys) as (paramtys_arr, paramtys_sz):
+            with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
+                self._bldr.c_new_funcsig(self._bldr, id, paramtys_arr, paramtys_sz, rettys_arr, rettys_sz)
+
+    def new_const_int(self, id, ty, value):
+        # type: (MuID, MuTypeNode, int) -> None
+        value_c = rffi.cast(rffi.ULONG, value)
+        self._bldr.c_new_const_int(self._bldr, id, ty, value_c)
+
+    def new_const_int_ex(self, id, ty, values):
+        # type: (MuID, MuTypeNode, [rffi.ULONG]) -> None
+        with scoped_lst2arr(rffi.ULONG, values) as (values_arr, values_sz):
+            self._bldr.c_new_const_int_ex(self._bldr, id, ty, values_arr, values_sz)
+
+    def new_const_float(self, id, ty, value):
+        # type: (MuID, MuTypeNode, float) -> None
+        value_c = rffi.cast(rffi.FLOAT, value)
+        self._bldr.c_new_const_float(self._bldr, id, ty, value_c)
+
+    def new_const_double(self, id, ty, value):
+        # type: (MuID, MuTypeNode, float) -> None
+        value_c = rffi.cast(rffi.DOUBLE, value)
+        self._bldr.c_new_const_double(self._bldr, id, ty, value_c)
+
+    def new_const_null(self, id, ty):
+        # type: (MuID, MuTypeNode) -> None
+        self._bldr.c_new_const_null(self._bldr, id, ty)
+
+    def new_const_seq(self, id, ty, elems):
+        # type: (MuID, MuTypeNode, [MuGlobalVarNode]) -> None
+        with scoped_lst2arr(MuGlobalVarNode, elems) as (elems_arr, elems_sz):
+            self._bldr.c_new_const_seq(self._bldr, id, ty, elems_arr, elems_sz)
+
+    def new_const_extern(self, id, ty, symbol):
+        # type: (MuID, MuTypeNode, str) -> None
+        with rffi.scoped_str2charp(symbol) as symbol_buf:
+            self._bldr.c_new_const_extern(self._bldr, id, ty, symbol_buf)
+
+    def new_global_cell(self, id, ty):
+        # type: (MuID, MuTypeNode) -> None
+        self._bldr.c_new_global_cell(self._bldr, id, ty)
+
+    def new_func(self, id, sig):
+        # type: (MuID, MuFuncSigNode) -> None
+        self._bldr.c_new_func(self._bldr, id, sig)
+
+    def new_exp_func(self, id, func, callconv, cookie):
+        # type: (MuID, MuFuncNode, MuFlag, MuConstNode) -> None
+        self._bldr.c_new_exp_func(self._bldr, id, func, callconv, cookie)
+
+    def new_func_ver(self, id, func, bbs):
+        # type: (MuID, MuFuncNode, [MuBBNode]) -> None
+        with scoped_lst2arr(MuBBNode, bbs) as (bbs_arr, bbs_sz):
+            self._bldr.c_new_func_ver(self._bldr, id, func, bbs_arr, bbs_sz)
+
+    def new_bb(self, id, nor_param_ids, nor_param_types, exc_param_id, insts):
+        # type: (MuID, [MuID], [MuTypeNode], MuID, [MuInstNode]) -> None
+        with scoped_lst2arr(MuID, nor_param_ids) as (nor_param_ids_arr, nor_param_ids_sz):
+            with scoped_lst2arr(MuTypeNode, nor_param_types) as (nor_param_types_arr, nor_param_types_sz):
+                with scoped_lst2arr(MuInstNode, insts) as (insts_arr, insts_sz):
+                    self._bldr.c_new_bb(self._bldr, id, nor_param_ids_arr, nor_param_types_arr, nor_param_types_sz, exc_param_id, insts_arr, insts_sz)
+
+    def new_dest_clause(self, id, dest, vars):
+        # type: (MuID, MuBBNode, [MuVarNode]) -> None
+        with scoped_lst2arr(MuVarNode, vars) as (vars_arr, vars_sz):
+            self._bldr.c_new_dest_clause(self._bldr, id, dest, vars_arr, vars_sz)
+
+    def new_exc_clause(self, id, nor, exc):
+        # type: (MuID, MuDestClause, MuDestClause) -> None
+        self._bldr.c_new_exc_clause(self._bldr, id, nor, exc)
+
+    def new_keepalive_clause(self, id, vars):
+        # type: (MuID, [MuLocalVarNode]) -> None
+        with scoped_lst2arr(MuLocalVarNode, vars) as (vars_arr, vars_sz):
+            self._bldr.c_new_keepalive_clause(self._bldr, id, vars_arr, vars_sz)
+
+    def new_csc_ret_with(self, id, rettys):
+        # type: (MuID, [MuTypeNode]) -> None
+        with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
+            self._bldr.c_new_csc_ret_with(self._bldr, id, rettys_arr, rettys_sz)
+
+    def new_csc_kill_old(self, id):
+        # type: (MuID) -> None
+        self._bldr.c_new_csc_kill_old(self._bldr, id)
+
+    def new_nsc_pass_values(self, id, tys, vars):
+        # type: (MuID, [MuTypeNode], [MuVarNode]) -> None
+        with scoped_lst2arr(MuTypeNode, tys) as (tys_arr, tys_sz):
+            with scoped_lst2arr(MuVarNode, vars) as (vars_arr, vars_sz):
+                self._bldr.c_new_nsc_pass_values(self._bldr, id, tys_arr, vars_arr, vars_sz)
+
+    def new_nsc_throw_exc(self, id, exc):
+        # type: (MuID, MuVarNode) -> None
+        self._bldr.c_new_nsc_throw_exc(self._bldr, id, exc)
+
+    def new_binop(self, id, result_id, optr, ty, opnd1, opnd2, exc_clause):
+        # type: (MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
+        self._bldr.c_new_binop(self._bldr, id, result_id, optr, ty, opnd1, opnd2, exc_clause)
+
+    def new_cmp(self, id, result_id, optr, ty, opnd1, opnd2):
+        # type: (MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode) -> None
+        self._bldr.c_new_cmp(self._bldr, id, result_id, optr, ty, opnd1, opnd2)
+
+    def new_conv(self, id, result_id, optr, from_ty, to_ty, opnd):
+        # type: (MuID, MuID, MuFlag, MuTypeNode, MuTypeNode, MuVarNode) -> None
+        self._bldr.c_new_conv(self._bldr, id, result_id, optr, from_ty, to_ty, opnd)
+
+    def new_select(self, id, result_id, cond_ty, opnd_ty, cond, if_true, if_false):
+        # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> None
+        self._bldr.c_new_select(self._bldr, id, result_id, cond_ty, opnd_ty, cond, if_true, if_false)
+
+    def new_branch(self, id, dest):
+        # type: (MuID, MuDestClause) -> None
+        self._bldr.c_new_branch(self._bldr, id, dest)
+
+    def new_branch2(self, id, cond, if_true, if_false):
+        # type: (MuID, MuVarNode, MuDestClause, MuDestClause) -> None
+        self._bldr.c_new_branch2(self._bldr, id, cond, if_true, if_false)
+
+    def new_switch(self, id, opnd_ty, opnd, default_dest, cases, dests):
+        # type: (MuID, MuTypeNode, MuVarNode, MuDestClause, [MuConstNode], [MuDestClause]) -> None
+        with scoped_lst2arr(MuConstNode, cases) as (cases_arr, cases_sz):
+            with scoped_lst2arr(MuDestClause, dests) as (dests_arr, dests_sz):
+                self._bldr.c_new_switch(self._bldr, id, opnd_ty, opnd, default_dest, cases_arr, dests_arr, dests_sz)
+
+    def new_call(self, id, result_ids, sig, callee, args, exc_clause, keepalive_clause):
+        # type: (MuID, [MuID], MuFuncSigNode, MuVarNode, [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
+        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
+            with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
+                self._bldr.c_new_call(self._bldr, id, result_ids_arr, result_ids_sz, sig, callee, args_arr, args_sz, exc_clause, keepalive_clause)
+
+    def new_tailcall(self, id, sig, callee, args):
+        # type: (MuID, MuFuncSigNode, MuVarNode, [MuVarNode]) -> None
+        with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
+            self._bldr.c_new_tailcall(self._bldr, id, sig, callee, args_arr, args_sz)
+
+    def new_ret(self, id, rvs):
+        # type: (MuID, [MuVarNode]) -> None
+        with scoped_lst2arr(MuVarNode, rvs) as (rvs_arr, rvs_sz):
+            self._bldr.c_new_ret(self._bldr, id, rvs_arr, rvs_sz)
+
+    def new_throw(self, id, exc):
+        # type: (MuID, MuVarNode) -> None
+        self._bldr.c_new_throw(self._bldr, id, exc)
+
+    def new_extractvalue(self, id, result_id, strty, index, opnd):
+        # type: (MuID, MuID, MuTypeNode, int, MuVarNode) -> None
+        index_c = rffi.cast(rffi.INT, index)
+        self._bldr.c_new_extractvalue(self._bldr, id, result_id, strty, index_c, opnd)
+
+    def new_insertvalue(self, id, result_id, strty, index, opnd, newval):
+        # type: (MuID, MuID, MuTypeNode, int, MuVarNode, MuVarNode) -> None
+        index_c = rffi.cast(rffi.INT, index)
+        self._bldr.c_new_insertvalue(self._bldr, id, result_id, strty, index_c, opnd, newval)
+
+    def new_extractelement(self, id, result_id, seqty, indty, opnd, index):
+        # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> None
+        self._bldr.c_new_extractelement(self._bldr, id, result_id, seqty, indty, opnd, index)
+
+    def new_insertelement(self, id, result_id, seqty, indty, opnd, index, newval):
+        # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> None
+        self._bldr.c_new_insertelement(self._bldr, id, result_id, seqty, indty, opnd, index, newval)
+
+    def new_shufflevector(self, id, result_id, vecty, maskty, vec1, vec2, mask):
+        # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode) -> None
+        self._bldr.c_new_shufflevector(self._bldr, id, result_id, vecty, maskty, vec1, vec2, mask)
+
+    def new_new(self, id, result_id, allocty, exc_clause):
+        # type: (MuID, MuID, MuTypeNode, MuExcClause) -> None
+        self._bldr.c_new_new(self._bldr, id, result_id, allocty, exc_clause)
+
+    def new_newhybrid(self, id, result_id, allocty, lenty, length, exc_clause):
+        # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuExcClause) -> None
+        self._bldr.c_new_newhybrid(self._bldr, id, result_id, allocty, lenty, length, exc_clause)
+
+    def new_alloca(self, id, result_id, allocty, exc_clause):
+        # type: (MuID, MuID, MuTypeNode, MuExcClause) -> None
+        self._bldr.c_new_alloca(self._bldr, id, result_id, allocty, exc_clause)
+
+    def new_allocahybrid(self, id, result_id, allocty, lenty, length, exc_clause):
+        # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuExcClause) -> None
+        self._bldr.c_new_allocahybrid(self._bldr, id, result_id, allocty, lenty, length, exc_clause)
+
+    def new_getiref(self, id, result_id, refty, opnd):
+        # type: (MuID, MuID, MuTypeNode, MuVarNode) -> None
+        self._bldr.c_new_getiref(self._bldr, id, result_id, refty, opnd)
+
+    def new_getfieldiref(self, id, result_id, is_ptr, refty, index, opnd):
+        # type: (MuID, MuID, bool, MuTypeNode, int, MuVarNode) -> None
+        is_ptr_c = rffi.cast(MuBool, is_ptr)
+        index_c = rffi.cast(rffi.INT, index)
+        self._bldr.c_new_getfieldiref(self._bldr, id, result_id, is_ptr_c, refty, index_c, opnd)
+
+    def new_getelemiref(self, id, result_id, is_ptr, refty, indty, opnd, index):
+        # type: (MuID, MuID, bool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> None
+        is_ptr_c = rffi.cast(MuBool, is_ptr)
+        self._bldr.c_new_getelemiref(self._bldr, id, result_id, is_ptr_c, refty, indty, opnd, index)
+
+    def new_shiftiref(self, id, result_id, is_ptr, refty, offty, opnd, offset):
+        # type: (MuID, MuID, bool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> None
+        is_ptr_c = rffi.cast(MuBool, is_ptr)
+        self._bldr.c_new_shiftiref(self._bldr, id, result_id, is_ptr_c, refty, offty, opnd, offset)
+
+    def new_getvarpartiref(self, id, result_id, is_ptr, refty, opnd):
+        # type: (MuID, MuID, bool, MuTypeNode, MuVarNode) -> None
+        is_ptr_c = rffi.cast(MuBool, is_ptr)
+        self._bldr.c_new_getvarpartiref(self._bldr, id, result_id, is_ptr_c, refty, opnd)
+
+    def new_load(self, id, result_id, is_ptr, ord, refty, loc, exc_clause):
+        # type: (MuID, MuID, bool, MuFlag, MuTypeNode, MuVarNode, MuExcClause) -> None
+        is_ptr_c = rffi.cast(MuBool, is_ptr)
+        self._bldr.c_new_load(self._bldr, id, result_id, is_ptr_c, ord, refty, loc, exc_clause)
+
+    def new_store(self, id, is_ptr, ord, refty, loc, newval, exc_clause):
+        # type: (MuID, bool, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
+        is_ptr_c = rffi.cast(MuBool, is_ptr)
+        self._bldr.c_new_store(self._bldr, id, is_ptr_c, ord, refty, loc, newval, exc_clause)
+
+    def new_cmpxchg(self, id, value_result_id, succ_result_id, is_ptr, is_weak, ord_succ, ord_fail, refty, loc, expected, desired, exc_clause):
+        # type: (MuID, MuID, MuID, bool, bool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuVarNode, MuExcClause) -> None
+        is_ptr_c = rffi.cast(MuBool, is_ptr)
+        is_weak_c = rffi.cast(MuBool, is_weak)
+        self._bldr.c_new_cmpxchg(self._bldr, id, value_result_id, succ_result_id, is_ptr_c, is_weak_c, ord_succ, ord_fail, refty, loc, expected, desired, exc_clause)
+
+    def new_atomicrmw(self, id, result_id, is_ptr, ord, optr, refTy, loc, opnd, exc_clause):
+        # type: (MuID, MuID, bool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
+        is_ptr_c = rffi.cast(MuBool, is_ptr)
+        self._bldr.c_new_atomicrmw(self._bldr, id, result_id, is_ptr_c, ord, optr, refTy, loc, opnd, exc_clause)
+
+    def new_fence(self, id, ord):
+        # type: (MuID, MuFlag) -> None
+        self._bldr.c_new_fence(self._bldr, id, ord)
+
+    def new_trap(self, id, result_ids, rettys, exc_clause, keepalive_clause):
+        # type: (MuID, [MuID], [MuTypeNode], MuExcClause, MuKeepaliveClause) -> None
+        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
+            with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
+                self._bldr.c_new_trap(self._bldr, id, result_ids_arr, rettys_arr, rettys_sz, exc_clause, keepalive_clause)
+
+    def new_watchpoint(self, id, wpid, result_ids, rettys, dis, ena, exc, keepalive_clause):
+        # type: (MuID, MuWPID, [MuID], [MuTypeNode], MuDestClause, MuDestClause, MuDestClause, MuKeepaliveClause) -> None
+        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
+            with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
+                self._bldr.c_new_watchpoint(self._bldr, id, wpid, result_ids_arr, rettys_arr, rettys_sz, dis, ena, exc, keepalive_clause)
+
+    def new_wpbranch(self, id, wpid, dis, ena):
+        # type: (MuID, MuWPID, MuDestClause, MuDestClause) -> None
+        self._bldr.c_new_wpbranch(self._bldr, id, wpid, dis, ena)
+
+    def new_ccall(self, id, result_ids, callconv, callee_ty, sig, callee, args, exc_clause, keepalive_clause):
+        # type: (MuID, [MuID], MuFlag, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
+        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
+            with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
+                self._bldr.c_new_ccall(self._bldr, id, result_ids_arr, result_ids_sz, callconv, callee_ty, sig, callee, args_arr, args_sz, exc_clause, keepalive_clause)
+
+    def new_newthread(self, id, result_id, stack, threadlocal, new_stack_clause, exc_clause):
+        # type: (MuID, MuID, MuVarNode, MuVarNode, MuNewStackClause, MuExcClause) -> None
+        self._bldr.c_new_newthread(self._bldr, id, result_id, stack, threadlocal, new_stack_clause, exc_clause)
+
+    def new_swapstack(self, id, result_ids, swappee, cur_stack_clause, new_stack_clause, exc_clause, keepalive_clause):
+        # type: (MuID, [MuID], MuVarNode, MuCurStackClause, MuNewStackClause, MuExcClause, MuKeepaliveClause) -> None
+        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
+            self._bldr.c_new_swapstack(self._bldr, id, result_ids_arr, result_ids_sz, swappee, cur_stack_clause, new_stack_clause, exc_clause, keepalive_clause)
+
+    def new_comminst(self, id, result_ids, opcode, flags, tys, sigs, args, exc_clause, keepalive_clause):
+        # type: (MuID, [MuID], MuFlag, [MuFlag], [MuTypeNode], [MuFuncSigNode], [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
+        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
+            with scoped_lst2arr(MuFlag, flags) as (flags_arr, flags_sz):
+                with scoped_lst2arr(MuTypeNode, tys) as (tys_arr, tys_sz):
+                    with scoped_lst2arr(MuFuncSigNode, sigs) as (sigs_arr, sigs_sz):
+                        with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
+                            self._bldr.c_new_comminst(self._bldr, id, result_ids_arr, result_ids_sz, opcode, flags_arr, flags_sz, tys_arr, tys_sz, sigs_arr, sigs_sz, args_arr, args_sz, exc_clause, keepalive_clause)
 
 
 # -------------------------------------------------------------------------------------------------------
-# Types
-_fnp = rffi.CCallback
-
-MuValue = rffi.VOIDP
-MuValuePtr = rffi.VOIDPP
-MuID = rffi.UINT        # uint32_t
-MuIDPtr = rffi.UINTP
-MuName = rffi.CCHARP
-MuNamePtr = rffi.CCHARPP
-MuCPtr = rffi.VOIDP
-MuCPtrPtr = rffi.VOIDPP
-# MuCFP = _fnp([], lltype.Void)
-MuCFP = rffi.VOIDP
-MuCFPPtr = rffi.CArrayPtr(MuCFP)
-MuBool = rffi.INT
-MuBoolPtr = rffi.INTP
-MuArraySize = rffi.UINTPTR_T
-MuArraySizePtr = rffi.UINTPTR_TP
-MuWPID = rffi.UINT
-MuWPIDPtr = rffi.UINTP
-MuFlag = rffi.UINT
-MuFlagPtr = rffi.UINTP
-MuValuesFreer = _fnp([MuValuePtr, MuCPtr], lltype.Void)
-
-MuSeqValue = MuValue
-MuGenRefValue = MuValue
-
-MuIntValue = MuValue
-MuFloatValue = MuValue
-MuDoubleValue = MuValue
-MuUPtrValue = MuValue
-MuUFPValue = MuValue
-
-MuStructValue = MuSeqValue
-MuArrayValue = MuSeqValue
-MuVectorValue = MuSeqValue
-
-MuRefValue = MuGenRefValue
-MuIRefValue = MuGenRefValue
-MuTagRef64Value = MuGenRefValue
-MuFuncRefValue = MuGenRefValue
-MuThreadRefValue = MuGenRefValue
-MuStackRefValue = MuGenRefValue
-MuFCRefValue = MuGenRefValue
-MuIRNodeRefValue = MuGenRefValue
-
-
-MuIRNode = MuIRNodeRefValue
-MuBundleNode = MuIRNode
-MuChildNode = MuIRNode
-MuTypeNode = MuChildNode
-MuFuncSigNode = MuChildNode
-MuVarNode = MuChildNode
-MuGlobalVarNode = MuVarNode
-MuConstNode = MuGlobalVarNode
-MuGlobalNode = MuGlobalVarNode 
-MuFuncNode = MuGlobalVarNode
-MuExpFuncNode = MuGlobalVarNode
-MuLocalVarNode = MuVarNode
-MuNorParamNode = MuLocalVarNode
-MuExcParamNode = MuLocalVarNode
-MuInstResNode = MuLocalVarNode 
-MuFuncVerNode = MuChildNode
-MuBBNode = MuChildNode
-MuInstNode = MuChildNode
-
-MuIRNodePtr = rffi.CArrayPtr(MuIRNode)
-MuBundleNodePtr = rffi.CArrayPtr(MuBundleNode)
-MuChildNodePtr = rffi.CArrayPtr(MuChildNode)
-MuTypeNodePtr = rffi.CArrayPtr(MuTypeNode)
-MuFuncSigNodePtr = rffi.CArrayPtr(MuFuncSigNode)
-MuVarNodePtr = rffi.CArrayPtr(MuVarNode)
-MuGlobalVarNodePtr = rffi.CArrayPtr(MuGlobalVarNode)
-MuConstNodePtr = rffi.CArrayPtr(MuConstNode)
-MuGlobalNodePtr = rffi.CArrayPtr(MuGlobalNode)
-MuFuncNodePtr = rffi.CArrayPtr(MuFuncNode)
-MuExpFuncNodePtr = rffi.CArrayPtr(MuExpFuncNode)
-MuLocalVarNodePtr = rffi.CArrayPtr(MuLocalVarNode)
-MuNorParamNodePtr = rffi.CArrayPtr(MuNorParamNode)
-MuExcParamNodePtr = rffi.CArrayPtr(MuExcParamNode)
-MuInstResNodePtr = rffi.CArrayPtr(MuInstResNode)
-MuFuncVerNodePtr = rffi.CArrayPtr(MuFuncVerNode)
-MuBBNodePtr = rffi.CArrayPtr(MuBBNode)
-MuInstNodePtr = rffi.CArrayPtr(MuInstNode)
-
-MuTrapHandlerResultPtr = rffi.CArrayPtr(MuFlag)
-MuStackRefValuePtr = rffi.CArrayPtr(MuStackRefValue)
-MuValuesFreerPtr = rffi.CArrayPtr(MuValuesFreer)
-MuRefValuePtr = rffi.CArrayPtr(MuRefValue)
-
-
-MuVM = lltype.ForwardReference()
-MuCtx = lltype.ForwardReference()
-MuVMPtr = lltype.Ptr(MuVM)
-MuCtxPtr = lltype.Ptr(MuCtx)
-
-MuTrapHandler = _fnp([
-    MuCtxPtr, MuThreadRefValue, MuStackRefValue, MuWPID,   # input
-    MuTrapHandlerResultPtr, MuStackRefValuePtr, rffi.CArray(MuValuePtr), MuArraySizePtr, 
-    MuValuesFreerPtr, MuCPtrPtr, MuRefValuePtr,             # output
-    MuCPtr  #input
-], lltype.Void)
-
-MuVM.become(rffi.CStruct(
+# Structs
+_MuVM.become(rffi.CStruct(
     'MuVM',
     ('header', rffi.VOIDP),
-    ('new_context', _fnp([MuVMPtr], MuCtxPtr)),
-    ('id_of', _fnp([MuVMPtr, MuName], MuID)),
-    ('name_of', _fnp([MuVMPtr, MuID], MuName)),
-    ('set_trap_handler', _fnp([MuVMPtr, MuTrapHandler, MuCPtr], lltype.Void)),
-    ('make_boot_image', _fnp([MuVMPtr, MuIDPtr, MuArraySize, rffi.CCHARP], lltype.Void)),
-    ('execute', _fnp([MuVMPtr], lltype.Void)),
-    ('get_mu_error_ptr', _fnp([MuVMPtr], rffi.INTP))
+    ('new_context', rffi.CCallback([_MuVMPtr], _MuCtxPtr)),
+    ('id_of', rffi.CCallback([_MuVMPtr, MuName], MuID)),
+    ('name_of', rffi.CCallback([_MuVMPtr, MuID], MuName)),
+    ('set_trap_handler', rffi.CCallback([_MuVMPtr, MuTrapHandler, MuCPtr], lltype.Void)),
+    ('make_boot_image', rffi.CCallback([_MuVMPtr, MuIDPtr, MuArraySize, MuCString], lltype.Void)),
+    ('execute', rffi.CCallback([_MuVMPtr], lltype.Void)),
+    ('get_mu_error_ptr', rffi.CCallback([_MuVMPtr], rffi.INTP)),
 ))
-
-MuCtx.become(rffi.CStruct(
+_MuCtx.become(rffi.CStruct(
     'MuCtx',
     ('header', rffi.VOIDP),
-    ('id_of', rffi.CCallback([MuCtxPtr, MuName], MuID)),
-    ('name_of', rffi.CCallback([MuCtxPtr, MuID], MuName)),
-    ('close_context', rffi.CCallback([MuCtxPtr], lltype.Void)),
-    ('load_bundle', rffi.CCallback([MuCtxPtr, rffi.CCHARP, MuArraySize], lltype.Void)),
-    ('load_hail', rffi.CCallback([MuCtxPtr, rffi.CCHARP, MuArraySize], lltype.Void)),
-    ('handle_from_sint8', rffi.CCallback([MuCtxPtr, rffi.CHAR, rffi.INT], MuIntValue)),
-    ('handle_from_uint8', rffi.CCallback([MuCtxPtr, rffi.UCHAR, rffi.INT], MuIntValue)),
-    ('handle_from_sint16', rffi.CCallback([MuCtxPtr, rffi.SHORT, rffi.INT], MuIntValue)),
-    ('handle_from_uint16', rffi.CCallback([MuCtxPtr, rffi.USHORT, rffi.INT], MuIntValue)),
-    ('handle_from_sint32', rffi.CCallback([MuCtxPtr, rffi.INT, rffi.INT], MuIntValue)),
-    ('handle_from_uint32', rffi.CCallback([MuCtxPtr, rffi.UINT, rffi.INT], MuIntValue)),
-    ('handle_from_sint64', rffi.CCallback([MuCtxPtr, rffi.LONG, rffi.INT], MuIntValue)),
-    ('handle_from_uint64', rffi.CCallback([MuCtxPtr, rffi.ULONG, rffi.INT], MuIntValue)),
-    ('handle_from_uint64s', rffi.CCallback([MuCtxPtr, rffi.ULONGP, MuArraySize, rffi.INT], MuIntValue)),
-    ('handle_from_float', rffi.CCallback([MuCtxPtr, rffi.FLOAT], MuFloatValue)),
-    ('handle_from_double', rffi.CCallback([MuCtxPtr, rffi.DOUBLE], MuDoubleValue)),
-    ('handle_from_ptr', rffi.CCallback([MuCtxPtr, MuID, MuCPtr], MuUPtrValue)),
-    ('handle_from_fp', rffi.CCallback([MuCtxPtr, MuID, MuCFP], MuUFPValue)),
-    ('handle_to_sint8', rffi.CCallback([MuCtxPtr, MuIntValue], rffi.CHAR)),
-    ('handle_to_uint8', rffi.CCallback([MuCtxPtr, MuIntValue], rffi.UCHAR)),
-    ('handle_to_sint16', rffi.CCallback([MuCtxPtr, MuIntValue], rffi.SHORT)),
-    ('handle_to_uint16', rffi.CCallback([MuCtxPtr, MuIntValue], rffi.USHORT)),
-    ('handle_to_sint32', rffi.CCallback([MuCtxPtr, MuIntValue], rffi.INT)),
-    ('handle_to_uint32', rffi.CCallback([MuCtxPtr, MuIntValue], rffi.UINT)),
-    ('handle_to_sint64', rffi.CCallback([MuCtxPtr, MuIntValue], rffi.LONG)),
-    ('handle_to_uint64', rffi.CCallback([MuCtxPtr, MuIntValue], rffi.ULONG)),
-    ('handle_to_float', rffi.CCallback([MuCtxPtr, MuFloatValue], rffi.FLOAT)),
-    ('handle_to_double', rffi.CCallback([MuCtxPtr, MuDoubleValue], rffi.DOUBLE)),
-    ('handle_to_ptr', rffi.CCallback([MuCtxPtr, MuUPtrValue], MuCPtr)),
-    ('handle_to_fp', rffi.CCallback([MuCtxPtr, MuUFPValue], MuCFP)),
-    ('handle_from_const', rffi.CCallback([MuCtxPtr, MuID], MuValue)),
-    ('handle_from_global', rffi.CCallback([MuCtxPtr, MuID], MuIRefValue)),
-    ('handle_from_func', rffi.CCallback([MuCtxPtr, MuID], MuFuncRefValue)),
-    ('handle_from_expose', rffi.CCallback([MuCtxPtr, MuID], MuValue)),
-    ('delete_value', rffi.CCallback([MuCtxPtr, MuValue], lltype.Void)),
-    ('ref_eq', rffi.CCallback([MuCtxPtr, MuGenRefValue, MuGenRefValue], MuBool)),
-    ('ref_ult', rffi.CCallback([MuCtxPtr, MuIRefValue, MuIRefValue], MuBool)),
-    ('extract_value', rffi.CCallback([MuCtxPtr, MuStructValue, rffi.INT], MuValue)),
-    ('insert_value', rffi.CCallback([MuCtxPtr, MuStructValue, rffi.INT, MuValue], MuStructValue)),
-    ('extract_element', rffi.CCallback([MuCtxPtr, MuSeqValue, MuIntValue], MuValue)),
-    ('insert_element', rffi.CCallback([MuCtxPtr, MuSeqValue, MuIntValue, MuValue], MuSeqValue)),
-    ('new_fixed', rffi.CCallback([MuCtxPtr, MuID], MuRefValue)),
-    ('new_hybrid', rffi.CCallback([MuCtxPtr, MuID, MuIntValue], MuRefValue)),
-    ('refcast', rffi.CCallback([MuCtxPtr, MuGenRefValue, MuID], MuGenRefValue)),
-    ('get_iref', rffi.CCallback([MuCtxPtr, MuRefValue], MuIRefValue)),
-    ('get_field_iref', rffi.CCallback([MuCtxPtr, MuIRefValue, rffi.INT], MuIRefValue)),
-    ('get_elem_iref', rffi.CCallback([MuCtxPtr, MuIRefValue, MuIntValue], MuIRefValue)),
-    ('shift_iref', rffi.CCallback([MuCtxPtr, MuIRefValue, MuIntValue], MuIRefValue)),
-    ('get_var_part_iref', rffi.CCallback([MuCtxPtr, MuIRefValue], MuIRefValue)),
-    ('load', rffi.CCallback([MuCtxPtr, MuMemOrd._lltype, MuIRefValue], MuValue)),
-    ('store', rffi.CCallback([MuCtxPtr, MuMemOrd._lltype, MuIRefValue, MuValue], lltype.Void)),
-    ('cmpxchg',
-     rffi.CCallback([MuCtxPtr, MuMemOrd._lltype, MuMemOrd._lltype, MuBool, MuIRefValue, MuValue, MuValue, MuBoolPtr],
-                    MuValue)),
-    (
-    'atomicrmw', rffi.CCallback([MuCtxPtr, MuMemOrd._lltype, MuAtomicRMWOptr._lltype, MuIRefValue, MuValue], MuValue)),
-    ('fence', rffi.CCallback([MuCtxPtr, MuMemOrd._lltype], lltype.Void)),
-    ('new_stack', rffi.CCallback([MuCtxPtr, MuFuncRefValue], MuStackRefValue)),
-    ('new_thread_nor',
-     rffi.CCallback([MuCtxPtr, MuStackRefValue, MuRefValue, MuValuePtr, MuArraySize], MuThreadRefValue)),
-    ('new_thread_exc', rffi.CCallback([MuCtxPtr, MuStackRefValue, MuRefValue, MuRefValue], MuThreadRefValue)),
-    ('kill_stack', rffi.CCallback([MuCtxPtr, MuStackRefValue], lltype.Void)),
-    ('set_threadlocal', rffi.CCallback([MuCtxPtr, MuThreadRefValue, MuRefValue], lltype.Void)),
-    ('get_threadlocal', rffi.CCallback([MuCtxPtr, MuThreadRefValue], MuRefValue)),
-    ('new_cursor', rffi.CCallback([MuCtxPtr, MuStackRefValue], MuFCRefValue)),
-    ('next_frame', rffi.CCallback([MuCtxPtr, MuFCRefValue], lltype.Void)),
-    ('copy_cursor', rffi.CCallback([MuCtxPtr, MuFCRefValue], MuFCRefValue)),
-    ('close_cursor', rffi.CCallback([MuCtxPtr, MuFCRefValue], lltype.Void)),
-    ('cur_func', rffi.CCallback([MuCtxPtr, MuFCRefValue], MuID)),
-    ('cur_func_ver', rffi.CCallback([MuCtxPtr, MuFCRefValue], MuID)),
-    ('cur_inst', rffi.CCallback([MuCtxPtr, MuFCRefValue], MuID)),
-    ('dump_keepalives', rffi.CCallback([MuCtxPtr, MuFCRefValue, MuValuePtr], lltype.Void)),
-    ('pop_frames_to', rffi.CCallback([MuCtxPtr, MuFCRefValue], lltype.Void)),
-    ('push_frame', rffi.CCallback([MuCtxPtr, MuStackRefValue, MuFuncRefValue], lltype.Void)),
-    ('tr64_is_fp', rffi.CCallback([MuCtxPtr, MuTagRef64Value], MuBool)),
-    ('tr64_is_int', rffi.CCallback([MuCtxPtr, MuTagRef64Value], MuBool)),
-    ('tr64_is_ref', rffi.CCallback([MuCtxPtr, MuTagRef64Value], MuBool)),
-    ('tr64_to_fp', rffi.CCallback([MuCtxPtr, MuTagRef64Value], MuDoubleValue)),
-    ('tr64_to_int', rffi.CCallback([MuCtxPtr, MuTagRef64Value], MuIntValue)),
-    ('tr64_to_ref', rffi.CCallback([MuCtxPtr, MuTagRef64Value], MuRefValue)),
-    ('tr64_to_tag', rffi.CCallback([MuCtxPtr, MuTagRef64Value], MuIntValue)),
-    ('tr64_from_fp', rffi.CCallback([MuCtxPtr, MuDoubleValue], MuTagRef64Value)),
-    ('tr64_from_int', rffi.CCallback([MuCtxPtr, MuIntValue], MuTagRef64Value)),
-    ('tr64_from_ref', rffi.CCallback([MuCtxPtr, MuRefValue, MuIntValue], MuTagRef64Value)),
-    ('enable_watchpoint', rffi.CCallback([MuCtxPtr, MuWPID], lltype.Void)),
-    ('disable_watchpoint', rffi.CCallback([MuCtxPtr, MuWPID], lltype.Void)),
-    ('pin', rffi.CCallback([MuCtxPtr, MuValue], MuUPtrValue)),
-    ('unpin', rffi.CCallback([MuCtxPtr, MuValue], lltype.Void)),
-    ('expose', rffi.CCallback([MuCtxPtr, MuFuncRefValue, MuCallConv._lltype, MuIntValue], MuValue)),
-    ('unexpose', rffi.CCallback([MuCtxPtr, MuCallConv._lltype, MuValue], lltype.Void)),
-    ('new_bundle', rffi.CCallback([MuCtxPtr], MuBundleNode)),
-    ('load_bundle_from_node', rffi.CCallback([MuCtxPtr, MuBundleNode], lltype.Void)),
-    ('abort_bundle_node', rffi.CCallback([MuCtxPtr, MuBundleNode], lltype.Void)),
-    ('get_node', rffi.CCallback([MuCtxPtr, MuBundleNode, MuID], MuChildNode)),
-    ('get_id', rffi.CCallback([MuCtxPtr, MuBundleNode, MuChildNode], MuID)),
-    ('set_name', rffi.CCallback([MuCtxPtr, MuBundleNode, MuChildNode, MuName], lltype.Void)),
-    ('new_type_int', rffi.CCallback([MuCtxPtr, MuBundleNode, rffi.INT], MuTypeNode)),
-    ('new_type_float', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('new_type_double', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('new_type_uptr', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('set_type_uptr', rffi.CCallback([MuCtxPtr, MuTypeNode, MuTypeNode], lltype.Void)),
-    ('new_type_ufuncptr', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('set_type_ufuncptr', rffi.CCallback([MuCtxPtr, MuTypeNode, MuFuncSigNode], lltype.Void)),
-    ('new_type_struct', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNodePtr, MuArraySize], MuTypeNode)),
-    ('new_type_hybrid', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNodePtr, MuArraySize, MuTypeNode], MuTypeNode)),
-    ('new_type_array', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, rffi.ULONG], MuTypeNode)),
-    ('new_type_vector', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, rffi.ULONG], MuTypeNode)),
-    ('new_type_void', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('new_type_ref', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('set_type_ref', rffi.CCallback([MuCtxPtr, MuTypeNode, MuTypeNode], lltype.Void)),
-    ('new_type_iref', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('set_type_iref', rffi.CCallback([MuCtxPtr, MuTypeNode, MuTypeNode], lltype.Void)),
-    ('new_type_weakref', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('set_type_weakref', rffi.CCallback([MuCtxPtr, MuTypeNode, MuTypeNode], lltype.Void)),
-    ('new_type_funcref', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('set_type_funcref', rffi.CCallback([MuCtxPtr, MuTypeNode, MuFuncSigNode], lltype.Void)),
-    ('new_type_tagref64', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('new_type_threadref', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('new_type_stackref', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('new_type_framecursorref', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('new_type_irnoderef', rffi.CCallback([MuCtxPtr, MuBundleNode], MuTypeNode)),
-    ('new_funcsig',
-     rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNodePtr, MuArraySize, MuTypeNodePtr, MuArraySize], MuFuncSigNode)),
-    ('new_const_int', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, rffi.ULONG], MuConstNode)),
-    ('new_const_int_ex', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, rffi.ULONGP, MuArraySize], MuConstNode)),
-    ('new_const_float', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, rffi.FLOAT], MuConstNode)),
-    ('new_const_double', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, rffi.DOUBLE], MuConstNode)),
-    ('new_const_null', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode], MuConstNode)),
-    ('new_const_seq', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, MuConstNodePtr, MuArraySize], MuConstNode)),
-    ('new_const_extern', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode, rffi.CCHARP], MuConstNode)),
-    ('new_global_cell', rffi.CCallback([MuCtxPtr, MuBundleNode, MuTypeNode], MuGlobalNode)),
-    ('new_func', rffi.CCallback([MuCtxPtr, MuBundleNode, MuFuncSigNode], MuFuncNode)),
-    ('new_func_ver', rffi.CCallback([MuCtxPtr, MuBundleNode, MuFuncNode], MuFuncVerNode)),
-    ('new_exp_func',
-     rffi.CCallback([MuCtxPtr, MuBundleNode, MuFuncNode, MuCallConv._lltype, MuConstNode], MuExpFuncNode)),
-    ('new_bb', rffi.CCallback([MuCtxPtr, MuFuncVerNode], MuBBNode)),
-    ('new_nor_param', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode], MuNorParamNode)),
-    ('new_exc_param', rffi.CCallback([MuCtxPtr, MuBBNode], MuExcParamNode)),
-    ('get_inst_res', rffi.CCallback([MuCtxPtr, MuInstNode, rffi.INT], MuInstResNode)),
-    ('get_num_inst_res', rffi.CCallback([MuCtxPtr, MuInstNode], rffi.INT)),
-    ('add_dest',
-     rffi.CCallback([MuCtxPtr, MuInstNode, MuDestKind._lltype, MuBBNode, MuVarNodePtr, MuArraySize], lltype.Void)),
-    ('add_keepalives', rffi.CCallback([MuCtxPtr, MuInstNode, MuLocalVarNodePtr, MuArraySize], lltype.Void)),
-    ('new_binop',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuBinOptr._lltype, MuTypeNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_cmp', rffi.CCallback([MuCtxPtr, MuBBNode, MuCmpOptr._lltype, MuTypeNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_conv',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuConvOptr._lltype, MuTypeNode, MuTypeNode, MuVarNode], MuInstNode)),
-    ('new_select',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_branch', rffi.CCallback([MuCtxPtr, MuBBNode], MuInstNode)),
-    ('new_branch2', rffi.CCallback([MuCtxPtr, MuBBNode, MuVarNode], MuInstNode)),
-    ('new_switch', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, MuVarNode], MuInstNode)),
-    ('add_switch_dest',
-     rffi.CCallback([MuCtxPtr, MuInstNode, MuConstNode, MuBBNode, MuVarNodePtr, MuArraySize], lltype.Void)),
-    (
-    'new_call', rffi.CCallback([MuCtxPtr, MuBBNode, MuFuncSigNode, MuVarNode, MuVarNodePtr, MuArraySize], MuInstNode)),
-    ('new_tailcall',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuFuncSigNode, MuVarNode, MuVarNodePtr, MuArraySize], MuInstNode)),
-    ('new_ret', rffi.CCallback([MuCtxPtr, MuBBNode, MuVarNodePtr, MuArraySize], MuInstNode)),
-    ('new_throw', rffi.CCallback([MuCtxPtr, MuBBNode, MuVarNode], MuInstNode)),
-    ('new_extractvalue', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, rffi.INT, MuVarNode], MuInstNode)),
-    ('new_insertvalue', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, rffi.INT, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_extractelement',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_insertelement',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_shufflevector',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_new', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode], MuInstNode)),
-    ('new_newhybrid', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode], MuInstNode)),
-    ('new_alloca', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode], MuInstNode)),
-    ('new_allocahybrid', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, MuTypeNode, MuVarNode], MuInstNode)),
-    ('new_getiref', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNode, MuVarNode], MuInstNode)),
-    ('new_getfieldiref', rffi.CCallback([MuCtxPtr, MuBBNode, MuBool, MuTypeNode, rffi.INT, MuVarNode], MuInstNode)),
-    ('new_getelemiref',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuBool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_shiftiref',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuBool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_getvarpartiref', rffi.CCallback([MuCtxPtr, MuBBNode, MuBool, MuTypeNode, MuVarNode], MuInstNode)),
-    ('new_load', rffi.CCallback([MuCtxPtr, MuBBNode, MuBool, MuMemOrd._lltype, MuTypeNode, MuVarNode], MuInstNode)),
-    ('new_store',
-     rffi.CCallback([MuCtxPtr, MuBBNode, MuBool, MuMemOrd._lltype, MuTypeNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_cmpxchg', rffi.CCallback(
-        [MuCtxPtr, MuBBNode, MuBool, MuBool, MuMemOrd._lltype, MuMemOrd._lltype, MuTypeNode, MuVarNode, MuVarNode,
-         MuVarNode], MuInstNode)),
-    ('new_atomicrmw', rffi.CCallback(
-        [MuCtxPtr, MuBBNode, MuBool, MuMemOrd._lltype, MuAtomicRMWOptr._lltype, MuTypeNode, MuVarNode, MuVarNode],
-        MuInstNode)),
-    ('new_fence', rffi.CCallback([MuCtxPtr, MuBBNode, MuMemOrd._lltype], MuInstNode)),
-    ('new_trap', rffi.CCallback([MuCtxPtr, MuBBNode, MuTypeNodePtr, MuArraySize], MuInstNode)),
-    ('new_watchpoint', rffi.CCallback([MuCtxPtr, MuBBNode, MuWPID, MuTypeNodePtr, MuArraySize], MuInstNode)),
-    ('new_wpbranch', rffi.CCallback([MuCtxPtr, MuBBNode, MuWPID], MuInstNode)),
-    ('new_ccall', rffi.CCallback(
-        [MuCtxPtr, MuBBNode, MuCallConv._lltype, MuTypeNode, MuFuncSigNode, MuVarNode, MuVarNodePtr, MuArraySize],
-        MuInstNode)),
-    ('new_newthread', rffi.CCallback([MuCtxPtr, MuBBNode, MuVarNode, MuVarNode], MuInstNode)),
-    ('new_swapstack_ret', rffi.CCallback([MuCtxPtr, MuBBNode, MuVarNode, MuTypeNodePtr, MuArraySize], MuInstNode)),
-    ('new_swapstack_kill', rffi.CCallback([MuCtxPtr, MuBBNode, MuVarNode], MuInstNode)),
-    ('set_newstack_pass_values',
-     rffi.CCallback([MuCtxPtr, MuInstNode, MuTypeNodePtr, MuVarNodePtr, MuArraySize], lltype.Void)),
-    ('set_newstack_throw_exc', rffi.CCallback([MuCtxPtr, MuInstNode, MuVarNode], lltype.Void)),
-    ('new_comminst', rffi.CCallback(
-        [MuCtxPtr, MuBBNode, MuCommInst._lltype, MuFlagPtr, MuArraySize, MuTypeNodePtr, MuArraySize, MuFuncSigNodePtr,
-         MuArraySize, MuVarNodePtr, MuArraySize], MuInstNode)),
+    ('id_of', rffi.CCallback([_MuCtxPtr, MuName], MuID)),
+    ('name_of', rffi.CCallback([_MuCtxPtr, MuID], MuName)),
+    ('close_context', rffi.CCallback([_MuCtxPtr], lltype.Void)),
+    ('load_bundle', rffi.CCallback([_MuCtxPtr, rffi.CCHARP, MuArraySize], lltype.Void)),
+    ('load_hail', rffi.CCallback([_MuCtxPtr, rffi.CCHARP, MuArraySize], lltype.Void)),
+    ('handle_from_sint8', rffi.CCallback([_MuCtxPtr, rffi.CHAR, rffi.INT], MuIntValue)),
+    ('handle_from_uint8', rffi.CCallback([_MuCtxPtr, rffi.UCHAR, rffi.INT], MuIntValue)),
+    ('handle_from_sint16', rffi.CCallback([_MuCtxPtr, rffi.SHORT, rffi.INT], MuIntValue)),
+    ('handle_from_uint16', rffi.CCallback([_MuCtxPtr, rffi.USHORT, rffi.INT], MuIntValue)),
+    ('handle_from_sint32', rffi.CCallback([_MuCtxPtr, rffi.INT, rffi.INT], MuIntValue)),
+    ('handle_from_uint32', rffi.CCallback([_MuCtxPtr, rffi.UINT, rffi.INT], MuIntValue)),
+    ('handle_from_sint64', rffi.CCallback([_MuCtxPtr, rffi.LONG, rffi.INT], MuIntValue)),
+    ('handle_from_uint64', rffi.CCallback([_MuCtxPtr, rffi.ULONG, rffi.INT], MuIntValue)),
+    ('handle_from_uint64s', rffi.CCallback([_MuCtxPtr, rffi.ULONGP, MuArraySize, rffi.INT], MuIntValue)),
+    ('handle_from_float', rffi.CCallback([_MuCtxPtr, rffi.FLOAT], MuFloatValue)),
+    ('handle_from_double', rffi.CCallback([_MuCtxPtr, rffi.DOUBLE], MuDoubleValue)),
+    ('handle_from_ptr', rffi.CCallback([_MuCtxPtr, MuID, MuCPtr], MuUPtrValue)),
+    ('handle_from_fp', rffi.CCallback([_MuCtxPtr, MuID, MuCFP], MuUFPValue)),
+    ('handle_to_sint8', rffi.CCallback([_MuCtxPtr, MuIntValue], rffi.CHAR)),
+    ('handle_to_uint8', rffi.CCallback([_MuCtxPtr, MuIntValue], rffi.UCHAR)),
+    ('handle_to_sint16', rffi.CCallback([_MuCtxPtr, MuIntValue], rffi.SHORT)),
+    ('handle_to_uint16', rffi.CCallback([_MuCtxPtr, MuIntValue], rffi.USHORT)),
+    ('handle_to_sint32', rffi.CCallback([_MuCtxPtr, MuIntValue], rffi.INT)),
+    ('handle_to_uint32', rffi.CCallback([_MuCtxPtr, MuIntValue], rffi.UINT)),
+    ('handle_to_sint64', rffi.CCallback([_MuCtxPtr, MuIntValue], rffi.LONG)),
+    ('handle_to_uint64', rffi.CCallback([_MuCtxPtr, MuIntValue], rffi.ULONG)),
+    ('handle_to_float', rffi.CCallback([_MuCtxPtr, MuFloatValue], rffi.FLOAT)),
+    ('handle_to_double', rffi.CCallback([_MuCtxPtr, MuDoubleValue], rffi.DOUBLE)),
+    ('handle_to_ptr', rffi.CCallback([_MuCtxPtr, MuUPtrValue], MuCPtr)),
+    ('handle_to_fp', rffi.CCallback([_MuCtxPtr, MuUFPValue], MuCFP)),
+    ('handle_from_const', rffi.CCallback([_MuCtxPtr, MuID], MuValue)),
+    ('handle_from_global', rffi.CCallback([_MuCtxPtr, MuID], MuIRefValue)),
+    ('handle_from_func', rffi.CCallback([_MuCtxPtr, MuID], MuFuncRefValue)),
+    ('handle_from_expose', rffi.CCallback([_MuCtxPtr, MuID], MuValue)),
+    ('delete_value', rffi.CCallback([_MuCtxPtr, MuValue], lltype.Void)),
+    ('ref_eq', rffi.CCallback([_MuCtxPtr, MuGenRefValue, MuGenRefValue], MuBool)),
+    ('ref_ult', rffi.CCallback([_MuCtxPtr, MuIRefValue, MuIRefValue], MuBool)),
+    ('extract_value', rffi.CCallback([_MuCtxPtr, MuStructValue, rffi.INT], MuValue)),
+    ('insert_value', rffi.CCallback([_MuCtxPtr, MuStructValue, rffi.INT, MuValue], MuStructValue)),
+    ('extract_element', rffi.CCallback([_MuCtxPtr, MuSeqValue, MuIntValue], MuValue)),
+    ('insert_element', rffi.CCallback([_MuCtxPtr, MuSeqValue, MuIntValue, MuValue], MuSeqValue)),
+    ('new_fixed', rffi.CCallback([_MuCtxPtr, MuID], MuRefValue)),
+    ('new_hybrid', rffi.CCallback([_MuCtxPtr, MuID, MuIntValue], MuRefValue)),
+    ('refcast', rffi.CCallback([_MuCtxPtr, MuGenRefValue, MuID], MuGenRefValue)),
+    ('get_iref', rffi.CCallback([_MuCtxPtr, MuRefValue], MuIRefValue)),
+    ('get_field_iref', rffi.CCallback([_MuCtxPtr, MuIRefValue, rffi.INT], MuIRefValue)),
+    ('get_elem_iref', rffi.CCallback([_MuCtxPtr, MuIRefValue, MuIntValue], MuIRefValue)),
+    ('shift_iref', rffi.CCallback([_MuCtxPtr, MuIRefValue, MuIntValue], MuIRefValue)),
+    ('get_var_part_iref', rffi.CCallback([_MuCtxPtr, MuIRefValue], MuIRefValue)),
+    ('load', rffi.CCallback([_MuCtxPtr, MuFlag, MuIRefValue], MuValue)),
+    ('store', rffi.CCallback([_MuCtxPtr, MuFlag, MuIRefValue, MuValue], lltype.Void)),
+    ('cmpxchg', rffi.CCallback([_MuCtxPtr, MuFlag, MuFlag, MuBool, MuIRefValue, MuValue, MuValue, MuBoolPtr], MuValue)),
+    ('atomicrmw', rffi.CCallback([_MuCtxPtr, MuFlag, MuFlag, MuIRefValue, MuValue], MuValue)),
+    ('fence', rffi.CCallback([_MuCtxPtr, MuFlag], lltype.Void)),
+    ('new_stack', rffi.CCallback([_MuCtxPtr, MuFuncRefValue], MuStackRefValue)),
+    ('new_thread_nor', rffi.CCallback([_MuCtxPtr, MuStackRefValue, MuRefValue, MuValuePtr, MuArraySize], MuThreadRefValue)),
+    ('new_thread_exc', rffi.CCallback([_MuCtxPtr, MuStackRefValue, MuRefValue, MuRefValue], MuThreadRefValue)),
+    ('kill_stack', rffi.CCallback([_MuCtxPtr, MuStackRefValue], lltype.Void)),
+    ('set_threadlocal', rffi.CCallback([_MuCtxPtr, MuThreadRefValue, MuRefValue], lltype.Void)),
+    ('get_threadlocal', rffi.CCallback([_MuCtxPtr, MuThreadRefValue], MuRefValue)),
+    ('new_cursor', rffi.CCallback([_MuCtxPtr, MuStackRefValue], MuFCRefValue)),
+    ('next_frame', rffi.CCallback([_MuCtxPtr, MuFCRefValue], lltype.Void)),
+    ('copy_cursor', rffi.CCallback([_MuCtxPtr, MuFCRefValue], MuFCRefValue)),
+    ('close_cursor', rffi.CCallback([_MuCtxPtr, MuFCRefValue], lltype.Void)),
+    ('cur_func', rffi.CCallback([_MuCtxPtr, MuFCRefValue], MuID)),
+    ('cur_func_ver', rffi.CCallback([_MuCtxPtr, MuFCRefValue], MuID)),
+    ('cur_inst', rffi.CCallback([_MuCtxPtr, MuFCRefValue], MuID)),
+    ('dump_keepalives', rffi.CCallback([_MuCtxPtr, MuFCRefValue, MuValuePtr], lltype.Void)),
+    ('pop_frames_to', rffi.CCallback([_MuCtxPtr, MuFCRefValue], lltype.Void)),
+    ('push_frame', rffi.CCallback([_MuCtxPtr, MuStackRefValue, MuFuncRefValue], lltype.Void)),
+    ('tr64_is_fp', rffi.CCallback([_MuCtxPtr, MuTagRef64Value], MuBool)),
+    ('tr64_is_int', rffi.CCallback([_MuCtxPtr, MuTagRef64Value], MuBool)),
+    ('tr64_is_ref', rffi.CCallback([_MuCtxPtr, MuTagRef64Value], MuBool)),
+    ('tr64_to_fp', rffi.CCallback([_MuCtxPtr, MuTagRef64Value], MuDoubleValue)),
+    ('tr64_to_int', rffi.CCallback([_MuCtxPtr, MuTagRef64Value], MuIntValue)),
+    ('tr64_to_ref', rffi.CCallback([_MuCtxPtr, MuTagRef64Value], MuRefValue)),
+    ('tr64_to_tag', rffi.CCallback([_MuCtxPtr, MuTagRef64Value], MuIntValue)),
+    ('tr64_from_fp', rffi.CCallback([_MuCtxPtr, MuDoubleValue], MuTagRef64Value)),
+    ('tr64_from_int', rffi.CCallback([_MuCtxPtr, MuIntValue], MuTagRef64Value)),
+    ('tr64_from_ref', rffi.CCallback([_MuCtxPtr, MuRefValue, MuIntValue], MuTagRef64Value)),
+    ('enable_watchpoint', rffi.CCallback([_MuCtxPtr, MuWPID], lltype.Void)),
+    ('disable_watchpoint', rffi.CCallback([_MuCtxPtr, MuWPID], lltype.Void)),
+    ('pin', rffi.CCallback([_MuCtxPtr, MuValue], MuUPtrValue)),
+    ('unpin', rffi.CCallback([_MuCtxPtr, MuValue], lltype.Void)),
+    ('expose', rffi.CCallback([_MuCtxPtr, MuFuncRefValue, MuFlag, MuIntValue], MuValue)),
+    ('unexpose', rffi.CCallback([_MuCtxPtr, MuFlag, MuValue], lltype.Void)),
+    ('new_ir_builder', rffi.CCallback([_MuCtxPtr], _MuIRBuilderPtr)),
+))
+_MuIRBuilder.become(rffi.CStruct(
+    'MuIRBuilder',
+    ('header', rffi.VOIDP),
+    ('load', rffi.CCallback([_MuIRBuilderPtr], lltype.Void)),
+    ('abort', rffi.CCallback([_MuIRBuilderPtr], lltype.Void)),
+    ('gen_sym', rffi.CCallback([_MuIRBuilderPtr, MuCString], MuID)),
+    ('new_type_int', rffi.CCallback([_MuIRBuilderPtr, MuID, rffi.INT], lltype.Void)),
+    ('new_type_float', rffi.CCallback([_MuIRBuilderPtr, MuID], lltype.Void)),
+    ('new_type_double', rffi.CCallback([_MuIRBuilderPtr, MuID], lltype.Void)),
+    ('new_type_uptr', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode], lltype.Void)),
+    ('new_type_ufuncptr', rffi.CCallback([_MuIRBuilderPtr, MuID, MuFuncSigNode], lltype.Void)),
+    ('new_type_struct', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNodePtr, MuArraySize], lltype.Void)),
+    ('new_type_hybrid', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNodePtr, MuArraySize, MuTypeNode], lltype.Void)),
+    ('new_type_array', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode, rffi.ULONG], lltype.Void)),
+    ('new_type_vector', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode, rffi.ULONG], lltype.Void)),
+    ('new_type_void', rffi.CCallback([_MuIRBuilderPtr, MuID], lltype.Void)),
+    ('new_type_ref', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode], lltype.Void)),
+    ('new_type_iref', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode], lltype.Void)),
+    ('new_type_weakref', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode], lltype.Void)),
+    ('new_type_funcref', rffi.CCallback([_MuIRBuilderPtr, MuID, MuFuncSigNode], lltype.Void)),
+    ('new_type_tagref64', rffi.CCallback([_MuIRBuilderPtr, MuID], lltype.Void)),
+    ('new_type_threadref', rffi.CCallback([_MuIRBuilderPtr, MuID], lltype.Void)),
+    ('new_type_stackref', rffi.CCallback([_MuIRBuilderPtr, MuID], lltype.Void)),
+    ('new_type_framecursorref', rffi.CCallback([_MuIRBuilderPtr, MuID], lltype.Void)),
+    ('new_type_irbuilderref', rffi.CCallback([_MuIRBuilderPtr, MuID], lltype.Void)),
+    ('new_funcsig', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNodePtr, MuArraySize, MuTypeNodePtr, MuArraySize], lltype.Void)),
+    ('new_const_int', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode, rffi.ULONG], lltype.Void)),
+    ('new_const_int_ex', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode, rffi.ULONGP, MuArraySize], lltype.Void)),
+    ('new_const_float', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode, rffi.FLOAT], lltype.Void)),
+    ('new_const_double', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode, rffi.DOUBLE], lltype.Void)),
+    ('new_const_null', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode], lltype.Void)),
+    ('new_const_seq', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode, MuGlobalVarNodePtr, MuArraySize], lltype.Void)),
+    ('new_const_extern', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode, MuCString], lltype.Void)),
+    ('new_global_cell', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode], lltype.Void)),
+    ('new_func', rffi.CCallback([_MuIRBuilderPtr, MuID, MuFuncSigNode], lltype.Void)),
+    ('new_exp_func', rffi.CCallback([_MuIRBuilderPtr, MuID, MuFuncNode, MuFlag, MuConstNode], lltype.Void)),
+    ('new_func_ver', rffi.CCallback([_MuIRBuilderPtr, MuID, MuFuncNode, MuBBNodePtr, MuArraySize], lltype.Void)),
+    ('new_bb', rffi.CCallback([_MuIRBuilderPtr, MuID, MuIDPtr, MuTypeNodePtr, MuArraySize, MuID, MuInstNodePtr, MuArraySize], lltype.Void)),
+    ('new_dest_clause', rffi.CCallback([_MuIRBuilderPtr, MuID, MuBBNode, MuVarNodePtr, MuArraySize], lltype.Void)),
+    ('new_exc_clause', rffi.CCallback([_MuIRBuilderPtr, MuID, MuDestClause, MuDestClause], lltype.Void)),
+    ('new_keepalive_clause', rffi.CCallback([_MuIRBuilderPtr, MuID, MuLocalVarNodePtr, MuArraySize], lltype.Void)),
+    ('new_csc_ret_with', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNodePtr, MuArraySize], lltype.Void)),
+    ('new_csc_kill_old', rffi.CCallback([_MuIRBuilderPtr, MuID], lltype.Void)),
+    ('new_nsc_pass_values', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNodePtr, MuVarNodePtr, MuArraySize], lltype.Void)),
+    ('new_nsc_throw_exc', rffi.CCallback([_MuIRBuilderPtr, MuID, MuVarNode], lltype.Void)),
+    ('new_binop', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause], lltype.Void)),
+    ('new_cmp', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode], lltype.Void)),
+    ('new_conv', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuFlag, MuTypeNode, MuTypeNode, MuVarNode], lltype.Void)),
+    ('new_select', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode], lltype.Void)),
+    ('new_branch', rffi.CCallback([_MuIRBuilderPtr, MuID, MuDestClause], lltype.Void)),
+    ('new_branch2', rffi.CCallback([_MuIRBuilderPtr, MuID, MuVarNode, MuDestClause, MuDestClause], lltype.Void)),
+    ('new_switch', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNode, MuVarNode, MuDestClause, MuConstNodePtr, MuDestClausePtr, MuArraySize], lltype.Void)),
+    ('new_call', rffi.CCallback([_MuIRBuilderPtr, MuID, MuIDPtr, MuArraySize, MuFuncSigNode, MuVarNode, MuVarNodePtr, MuArraySize, MuExcClause, MuKeepaliveClause], lltype.Void)),
+    ('new_tailcall', rffi.CCallback([_MuIRBuilderPtr, MuID, MuFuncSigNode, MuVarNode, MuVarNodePtr, MuArraySize], lltype.Void)),
+    ('new_ret', rffi.CCallback([_MuIRBuilderPtr, MuID, MuVarNodePtr, MuArraySize], lltype.Void)),
+    ('new_throw', rffi.CCallback([_MuIRBuilderPtr, MuID, MuVarNode], lltype.Void)),
+    ('new_extractvalue', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, rffi.INT, MuVarNode], lltype.Void)),
+    ('new_insertvalue', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, rffi.INT, MuVarNode, MuVarNode], lltype.Void)),
+    ('new_extractelement', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode], lltype.Void)),
+    ('new_insertelement', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode], lltype.Void)),
+    ('new_shufflevector', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode], lltype.Void)),
+    ('new_new', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuExcClause], lltype.Void)),
+    ('new_newhybrid', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuExcClause], lltype.Void)),
+    ('new_alloca', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuExcClause], lltype.Void)),
+    ('new_allocahybrid', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuExcClause], lltype.Void)),
+    ('new_getiref', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuVarNode], lltype.Void)),
+    ('new_getfieldiref', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuBool, MuTypeNode, rffi.INT, MuVarNode], lltype.Void)),
+    ('new_getelemiref', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuBool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode], lltype.Void)),
+    ('new_shiftiref', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuBool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode], lltype.Void)),
+    ('new_getvarpartiref', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuBool, MuTypeNode, MuVarNode], lltype.Void)),
+    ('new_load', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuBool, MuFlag, MuTypeNode, MuVarNode, MuExcClause], lltype.Void)),
+    ('new_store', rffi.CCallback([_MuIRBuilderPtr, MuID, MuBool, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause], lltype.Void)),
+    ('new_cmpxchg', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuID, MuBool, MuBool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuVarNode, MuExcClause], lltype.Void)),
+    ('new_atomicrmw', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuBool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause], lltype.Void)),
+    ('new_fence', rffi.CCallback([_MuIRBuilderPtr, MuID, MuFlag], lltype.Void)),
+    ('new_trap', rffi.CCallback([_MuIRBuilderPtr, MuID, MuIDPtr, MuTypeNodePtr, MuArraySize, MuExcClause, MuKeepaliveClause], lltype.Void)),
+    ('new_watchpoint', rffi.CCallback([_MuIRBuilderPtr, MuID, MuWPID, MuIDPtr, MuTypeNodePtr, MuArraySize, MuDestClause, MuDestClause, MuDestClause, MuKeepaliveClause], lltype.Void)),
+    ('new_wpbranch', rffi.CCallback([_MuIRBuilderPtr, MuID, MuWPID, MuDestClause, MuDestClause], lltype.Void)),
+    ('new_ccall', rffi.CCallback([_MuIRBuilderPtr, MuID, MuIDPtr, MuArraySize, MuFlag, MuTypeNode, MuFuncSigNode, MuVarNode, MuVarNodePtr, MuArraySize, MuExcClause, MuKeepaliveClause], lltype.Void)),
+    ('new_newthread', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuVarNode, MuVarNode, MuNewStackClause, MuExcClause], lltype.Void)),
+    ('new_swapstack', rffi.CCallback([_MuIRBuilderPtr, MuID, MuIDPtr, MuArraySize, MuVarNode, MuCurStackClause, MuNewStackClause, MuExcClause, MuKeepaliveClause], lltype.Void)),
+    ('new_comminst', rffi.CCallback([_MuIRBuilderPtr, MuID, MuIDPtr, MuArraySize, MuFlag, MuFlagPtr, MuArraySize, MuTypeNodePtr, MuArraySize, MuFuncSigNodePtr, MuArraySize, MuVarNodePtr, MuArraySize, MuExcClause, MuKeepaliveClause], lltype.Void)),
 ))
 
-mu_new = rffi.llexternal('mu_refimpl2_new', [], MuVMPtr, compilation_info=eci)
-mu_close = rffi.llexternal('mu_refimpl2_close', [MuVMPtr], lltype.Void, compilation_info=eci)
-
+# -------------------------------------------------------------------------------------------------------
+# Mu reference implementation functions
+mu_new = rffi.llexternal('mu_refimpl2_new', [], _MuVMPtr, compilation_info=eci)
+mu_new_ex = rffi.llexternal('mu_refimpl2_new_ex', [rffi.CCHARP], _MuVMPtr, compilation_info=eci)
+mu_close = rffi.llexternal('mu_refimpl2_close', [_MuVMPtr], lltype.Void, compilation_info=eci)
 
 # -------------------------------------------------------------------------------------------------------
 # Helpers
@@ -1452,17 +1330,22 @@ class scoped_lst2arr:
         self.need_cast = need_rffi_cast
 
     def __enter__(self):
-        buf = lltype.malloc(rffi.CArray(self.ELM_T), len(self.lst), flavor='raw')
-        if self.need_cast:
-            for i, e in enumerate(self.lst):
-                buf[i] = rffi.cast(self.ELM_T, e)
-        else:
-            for i, e in enumerate(self.lst):
-                buf[i] = e
         sz = rffi.cast(MuArraySize, len(self.lst))
-        self.buf = buf
-        return buf, sz
+
+        if len(self.lst) == 0:
+            self.buf = lltype.nullptr(rffi.CArray(self.ELM_T))
+        else:
+            self.buf = lltype.malloc(rffi.CArray(self.ELM_T), len(self.lst), flavor='raw')
+            if self.need_cast:
+                for i, e in enumerate(self.lst):
+                    self.buf[i] = rffi.cast(self.ELM_T, e)
+            else:
+                for i, e in enumerate(self.lst):
+                    self.buf[i] = e
+
+        return self.buf, sz
 
     def __exit__(self, *args):
         if self.buf:
             lltype.free(self.buf, flavor='raw')
+
