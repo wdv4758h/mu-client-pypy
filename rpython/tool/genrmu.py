@@ -118,6 +118,9 @@ def gen_enums(db, fp):
 
             fp.write(idt + '%(defname)s = rffi.cast(MuFlag, %(value)s)\n' % locals())
 
+
+    fp.write('\n')
+    fp.write("MU_NO_ID = rffi.cast(MuID, 0)\n")
     fp.write('\n')
 
 

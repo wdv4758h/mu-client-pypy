@@ -334,6 +334,8 @@ class MuCommInst:
     IRBUILDER_NEW_SWAPSTACK = rffi.cast(MuFlag, 0x34d)
     IRBUILDER_NEW_COMMINST = rffi.cast(MuFlag, 0x34e)
 
+MU_NO_ID = rffi.cast(MuID, 0)
+
 # -------------------------------------------------------------------------------------------------------
 # OO wrappers
 class MuRuntimeError(Exception):
