@@ -339,16 +339,9 @@ MU_NO_ID = rffi.cast(MuID, 0)
 
 # -------------------------------------------------------------------------------------------------------
 # OO wrappers
-<<<<<<< HEAD
-class Mu:
-    def __init__(self, config_str=""):
-        with rffi.scoped_str2charp(config_str) as buf:
-            self._mu = mu_new_ex(buf)
-=======
 class MuRuntimeError(Exception):
     def __init__(self, muerrno):
         self.muerrno = muerrno
->>>>>>> rpylibmu
 
     def __str__(self):
         return 'Error thrown in Mu: %d' % self.muerrno 
@@ -392,12 +385,6 @@ class MuVM:
             raise MuRuntimeError(muerrno)
 
     def make_boot_image(self, whitelist, output_file):
-<<<<<<< HEAD
-        # type ([MuID], str) -> None
-        with scoped_lst2arr(MuID, whitelist, need_rffi_cast=True) as (arr, sz):
-            with rffi.scoped_str2charp(output_file) as buf:
-                self._mu.c_make_boot_image(self._mu, arr, sz, buf)
-=======
         # type: ([MuID], str) -> None
         whitelist_arr, whitelist_sz = lst2arr(MuID, whitelist)
         with rffi.scoped_str2charp(output_file) as output_file_buf:
@@ -407,7 +394,6 @@ class MuVM:
                 raise MuRuntimeError(muerrno)
             if whitelist_arr:
                 lltype.free(whitelist_arr, flavor='raw')
->>>>>>> rpylibmu
 
     def execute(self):
         # type: () -> None
