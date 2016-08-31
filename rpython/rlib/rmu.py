@@ -7,6 +7,7 @@ Note: environment variable $MU needs to be defined to point to the reference imp
 from rpython.rtyper.lltypesystem import rffi
 from rpython.rtyper.lltypesystem import lltype
 from rpython.translator.tool.cbuild import ExternalCompilationInfo
+from rpython.rlib.objectmodel import specialize
 import os
 
 mu_dir = os.path.join(os.getenv('MU'), 'cbinding')
@@ -385,12 +386,14 @@ class MuVM:
 
     def make_boot_image(self, whitelist, output_file):
         # type: ([MuID], str) -> None
-        with scoped_lst2arr(MuID, whitelist) as (whitelist_arr, whitelist_sz):
-            with rffi.scoped_str2charp(output_file) as output_file_buf:
-                self._mu.c_make_boot_image(self._mu, whitelist_arr, whitelist_sz, output_file_buf)
-                muerrno = self.get_errno()
-                if muerrno:
-                    raise MuRuntimeError(muerrno)
+        whitelist_arr, whitelist_sz = lst2arr(MuID, whitelist)
+        with rffi.scoped_str2charp(output_file) as output_file_buf:
+            self._mu.c_make_boot_image(self._mu, whitelist_arr, whitelist_sz, output_file_buf)
+            muerrno = self.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
+            if whitelist_arr:
+                lltype.free(whitelist_arr, flavor='raw')
 
     def execute(self):
         # type: () -> None
@@ -541,13 +544,15 @@ class MuCtx:
 
     def handle_from_uint64s(self, nums, len):
         # type: ([rffi.ULONG], int) -> MuIntValue
-        with scoped_lst2arr(rffi.ULONG, nums) as (nums_arr, nums_sz):
-            len_c = rffi.cast(rffi.INT, len)
-            res = self._ctx.c_handle_from_uint64s(self._ctx, nums_arr, nums_sz, len_c)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
-            return res
+        nums_arr, nums_sz = lst2arr(rffi.ULONG, nums)
+        len_c = rffi.cast(rffi.INT, len)
+        res = self._ctx.c_handle_from_uint64s(self._ctx, nums_arr, nums_sz, len_c)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if nums_arr:
+            lltype.free(nums_arr, flavor='raw')
+        return res
 
     def handle_from_float(self, num):
         # type: (float) -> MuFloatValue
@@ -882,12 +887,14 @@ class MuCtx:
 
     def new_thread_nor(self, stack, threadlocal, vals):
         # type: (MuStackRefValue, MuRefValue, [MuValue]) -> MuThreadRefValue
-        with scoped_lst2arr(MuValue, vals) as (vals_arr, vals_sz):
-            res = self._ctx.c_new_thread_nor(self._ctx, stack, threadlocal, vals_arr, vals_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
-            return res
+        vals_arr, vals_sz = lst2arr(MuValue, vals)
+        res = self._ctx.c_new_thread_nor(self._ctx, stack, threadlocal, vals_arr, vals_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if vals_arr:
+            lltype.free(vals_arr, flavor='raw')
+        return res
 
     def new_thread_exc(self, stack, threadlocal, exc):
         # type: (MuStackRefValue, MuRefValue, MuRefValue) -> MuThreadRefValue
@@ -1193,19 +1200,23 @@ class MuIRBuilder:
 
     def new_type_struct(self, id, fieldtys):
         # type: (MuID, [MuTypeNode]) -> None
-        with scoped_lst2arr(MuTypeNode, fieldtys) as (fieldtys_arr, fieldtys_sz):
-            self._bldr.c_new_type_struct(self._bldr, id, fieldtys_arr, fieldtys_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        fieldtys_arr, fieldtys_sz = lst2arr(MuTypeNode, fieldtys)
+        self._bldr.c_new_type_struct(self._bldr, id, fieldtys_arr, fieldtys_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if fieldtys_arr:
+            lltype.free(fieldtys_arr, flavor='raw')
 
     def new_type_hybrid(self, id, fixedtys, varty):
         # type: (MuID, [MuTypeNode], MuTypeNode) -> None
-        with scoped_lst2arr(MuTypeNode, fixedtys) as (fixedtys_arr, fixedtys_sz):
-            self._bldr.c_new_type_hybrid(self._bldr, id, fixedtys_arr, fixedtys_sz, varty)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        fixedtys_arr, fixedtys_sz = lst2arr(MuTypeNode, fixedtys)
+        self._bldr.c_new_type_hybrid(self._bldr, id, fixedtys_arr, fixedtys_sz, varty)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if fixedtys_arr:
+            lltype.free(fixedtys_arr, flavor='raw')
 
     def new_type_array(self, id, elemty, len):
         # type: (MuID, MuTypeNode, int) -> None
@@ -1295,12 +1306,16 @@ class MuIRBuilder:
 
     def new_funcsig(self, id, paramtys, rettys):
         # type: (MuID, [MuTypeNode], [MuTypeNode]) -> None
-        with scoped_lst2arr(MuTypeNode, paramtys) as (paramtys_arr, paramtys_sz):
-            with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
-                self._bldr.c_new_funcsig(self._bldr, id, paramtys_arr, paramtys_sz, rettys_arr, rettys_sz)
-                muerrno = self._mu.get_errno()
-                if muerrno:
-                    raise MuRuntimeError(muerrno)
+        paramtys_arr, paramtys_sz = lst2arr(MuTypeNode, paramtys)
+        rettys_arr, rettys_sz = lst2arr(MuTypeNode, rettys)
+        self._bldr.c_new_funcsig(self._bldr, id, paramtys_arr, paramtys_sz, rettys_arr, rettys_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if paramtys_arr:
+            lltype.free(paramtys_arr, flavor='raw')
+        if rettys_arr:
+            lltype.free(rettys_arr, flavor='raw')
 
     def new_const_int(self, id, ty, value):
         # type: (MuID, MuTypeNode, int) -> None
@@ -1312,11 +1327,13 @@ class MuIRBuilder:
 
     def new_const_int_ex(self, id, ty, values):
         # type: (MuID, MuTypeNode, [rffi.ULONG]) -> None
-        with scoped_lst2arr(rffi.ULONG, values) as (values_arr, values_sz):
-            self._bldr.c_new_const_int_ex(self._bldr, id, ty, values_arr, values_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        values_arr, values_sz = lst2arr(rffi.ULONG, values)
+        self._bldr.c_new_const_int_ex(self._bldr, id, ty, values_arr, values_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if values_arr:
+            lltype.free(values_arr, flavor='raw')
 
     def new_const_float(self, id, ty, value):
         # type: (MuID, MuTypeNode, float) -> None
@@ -1343,11 +1360,13 @@ class MuIRBuilder:
 
     def new_const_seq(self, id, ty, elems):
         # type: (MuID, MuTypeNode, [MuGlobalVarNode]) -> None
-        with scoped_lst2arr(MuGlobalVarNode, elems) as (elems_arr, elems_sz):
-            self._bldr.c_new_const_seq(self._bldr, id, ty, elems_arr, elems_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        elems_arr, elems_sz = lst2arr(MuGlobalVarNode, elems)
+        self._bldr.c_new_const_seq(self._bldr, id, ty, elems_arr, elems_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if elems_arr:
+            lltype.free(elems_arr, flavor='raw')
 
     def new_const_extern(self, id, ty, symbol):
         # type: (MuID, MuTypeNode, str) -> None
@@ -1380,29 +1399,39 @@ class MuIRBuilder:
 
     def new_func_ver(self, id, func, bbs):
         # type: (MuID, MuFuncNode, [MuBBNode]) -> None
-        with scoped_lst2arr(MuBBNode, bbs) as (bbs_arr, bbs_sz):
-            self._bldr.c_new_func_ver(self._bldr, id, func, bbs_arr, bbs_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        bbs_arr, bbs_sz = lst2arr(MuBBNode, bbs)
+        self._bldr.c_new_func_ver(self._bldr, id, func, bbs_arr, bbs_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if bbs_arr:
+            lltype.free(bbs_arr, flavor='raw')
 
     def new_bb(self, id, nor_param_ids, nor_param_types, exc_param_id, insts):
         # type: (MuID, [MuID], [MuTypeNode], MuID, [MuInstNode]) -> None
-        with scoped_lst2arr(MuID, nor_param_ids) as (nor_param_ids_arr, nor_param_ids_sz):
-            with scoped_lst2arr(MuTypeNode, nor_param_types) as (nor_param_types_arr, nor_param_types_sz):
-                with scoped_lst2arr(MuInstNode, insts) as (insts_arr, insts_sz):
-                    self._bldr.c_new_bb(self._bldr, id, nor_param_ids_arr, nor_param_types_arr, nor_param_types_sz, exc_param_id, insts_arr, insts_sz)
-                    muerrno = self._mu.get_errno()
-                    if muerrno:
-                        raise MuRuntimeError(muerrno)
+        nor_param_ids_arr, nor_param_ids_sz = lst2arr(MuID, nor_param_ids)
+        nor_param_types_arr, nor_param_types_sz = lst2arr(MuTypeNode, nor_param_types)
+        insts_arr, insts_sz = lst2arr(MuInstNode, insts)
+        self._bldr.c_new_bb(self._bldr, id, nor_param_ids_arr, nor_param_types_arr, nor_param_types_sz, exc_param_id, insts_arr, insts_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if nor_param_ids_arr:
+            lltype.free(nor_param_ids_arr, flavor='raw')
+        if nor_param_types_arr:
+            lltype.free(nor_param_types_arr, flavor='raw')
+        if insts_arr:
+            lltype.free(insts_arr, flavor='raw')
 
     def new_dest_clause(self, id, dest, vars):
         # type: (MuID, MuBBNode, [MuVarNode]) -> None
-        with scoped_lst2arr(MuVarNode, vars) as (vars_arr, vars_sz):
-            self._bldr.c_new_dest_clause(self._bldr, id, dest, vars_arr, vars_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        vars_arr, vars_sz = lst2arr(MuVarNode, vars)
+        self._bldr.c_new_dest_clause(self._bldr, id, dest, vars_arr, vars_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if vars_arr:
+            lltype.free(vars_arr, flavor='raw')
 
     def new_exc_clause(self, id, nor, exc):
         # type: (MuID, MuDestClause, MuDestClause) -> None
@@ -1413,19 +1442,23 @@ class MuIRBuilder:
 
     def new_keepalive_clause(self, id, vars):
         # type: (MuID, [MuLocalVarNode]) -> None
-        with scoped_lst2arr(MuLocalVarNode, vars) as (vars_arr, vars_sz):
-            self._bldr.c_new_keepalive_clause(self._bldr, id, vars_arr, vars_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        vars_arr, vars_sz = lst2arr(MuLocalVarNode, vars)
+        self._bldr.c_new_keepalive_clause(self._bldr, id, vars_arr, vars_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if vars_arr:
+            lltype.free(vars_arr, flavor='raw')
 
     def new_csc_ret_with(self, id, rettys):
         # type: (MuID, [MuTypeNode]) -> None
-        with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
-            self._bldr.c_new_csc_ret_with(self._bldr, id, rettys_arr, rettys_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        rettys_arr, rettys_sz = lst2arr(MuTypeNode, rettys)
+        self._bldr.c_new_csc_ret_with(self._bldr, id, rettys_arr, rettys_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if rettys_arr:
+            lltype.free(rettys_arr, flavor='raw')
 
     def new_csc_kill_old(self, id):
         # type: (MuID) -> None
@@ -1436,12 +1469,16 @@ class MuIRBuilder:
 
     def new_nsc_pass_values(self, id, tys, vars):
         # type: (MuID, [MuTypeNode], [MuVarNode]) -> None
-        with scoped_lst2arr(MuTypeNode, tys) as (tys_arr, tys_sz):
-            with scoped_lst2arr(MuVarNode, vars) as (vars_arr, vars_sz):
-                self._bldr.c_new_nsc_pass_values(self._bldr, id, tys_arr, vars_arr, vars_sz)
-                muerrno = self._mu.get_errno()
-                if muerrno:
-                    raise MuRuntimeError(muerrno)
+        tys_arr, tys_sz = lst2arr(MuTypeNode, tys)
+        vars_arr, vars_sz = lst2arr(MuVarNode, vars)
+        self._bldr.c_new_nsc_pass_values(self._bldr, id, tys_arr, vars_arr, vars_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if tys_arr:
+            lltype.free(tys_arr, flavor='raw')
+        if vars_arr:
+            lltype.free(vars_arr, flavor='raw')
 
     def new_nsc_throw_exc(self, id, exc):
         # type: (MuID, MuVarNode) -> None
@@ -1494,37 +1531,49 @@ class MuIRBuilder:
 
     def new_switch(self, id, opnd_ty, opnd, default_dest, cases, dests):
         # type: (MuID, MuTypeNode, MuVarNode, MuDestClause, [MuConstNode], [MuDestClause]) -> None
-        with scoped_lst2arr(MuConstNode, cases) as (cases_arr, cases_sz):
-            with scoped_lst2arr(MuDestClause, dests) as (dests_arr, dests_sz):
-                self._bldr.c_new_switch(self._bldr, id, opnd_ty, opnd, default_dest, cases_arr, dests_arr, dests_sz)
-                muerrno = self._mu.get_errno()
-                if muerrno:
-                    raise MuRuntimeError(muerrno)
+        cases_arr, cases_sz = lst2arr(MuConstNode, cases)
+        dests_arr, dests_sz = lst2arr(MuDestClause, dests)
+        self._bldr.c_new_switch(self._bldr, id, opnd_ty, opnd, default_dest, cases_arr, dests_arr, dests_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if cases_arr:
+            lltype.free(cases_arr, flavor='raw')
+        if dests_arr:
+            lltype.free(dests_arr, flavor='raw')
 
     def new_call(self, id, result_ids, sig, callee, args, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], MuFuncSigNode, MuVarNode, [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
-        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
-            with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
-                self._bldr.c_new_call(self._bldr, id, result_ids_arr, result_ids_sz, sig, callee, args_arr, args_sz, exc_clause, keepalive_clause)
-                muerrno = self._mu.get_errno()
-                if muerrno:
-                    raise MuRuntimeError(muerrno)
+        result_ids_arr, result_ids_sz = lst2arr(MuID, result_ids)
+        args_arr, args_sz = lst2arr(MuVarNode, args)
+        self._bldr.c_new_call(self._bldr, id, result_ids_arr, result_ids_sz, sig, callee, args_arr, args_sz, exc_clause, keepalive_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if result_ids_arr:
+            lltype.free(result_ids_arr, flavor='raw')
+        if args_arr:
+            lltype.free(args_arr, flavor='raw')
 
     def new_tailcall(self, id, sig, callee, args):
         # type: (MuID, MuFuncSigNode, MuVarNode, [MuVarNode]) -> None
-        with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
-            self._bldr.c_new_tailcall(self._bldr, id, sig, callee, args_arr, args_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        args_arr, args_sz = lst2arr(MuVarNode, args)
+        self._bldr.c_new_tailcall(self._bldr, id, sig, callee, args_arr, args_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if args_arr:
+            lltype.free(args_arr, flavor='raw')
 
     def new_ret(self, id, rvs):
         # type: (MuID, [MuVarNode]) -> None
-        with scoped_lst2arr(MuVarNode, rvs) as (rvs_arr, rvs_sz):
-            self._bldr.c_new_ret(self._bldr, id, rvs_arr, rvs_sz)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        rvs_arr, rvs_sz = lst2arr(MuVarNode, rvs)
+        self._bldr.c_new_ret(self._bldr, id, rvs_arr, rvs_sz)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if rvs_arr:
+            lltype.free(rvs_arr, flavor='raw')
 
     def new_throw(self, id, exc):
         # type: (MuID, MuVarNode) -> None
@@ -1680,21 +1729,29 @@ class MuIRBuilder:
 
     def new_trap(self, id, result_ids, rettys, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], [MuTypeNode], MuExcClause, MuKeepaliveClause) -> None
-        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
-            with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
-                self._bldr.c_new_trap(self._bldr, id, result_ids_arr, rettys_arr, rettys_sz, exc_clause, keepalive_clause)
-                muerrno = self._mu.get_errno()
-                if muerrno:
-                    raise MuRuntimeError(muerrno)
+        result_ids_arr, result_ids_sz = lst2arr(MuID, result_ids)
+        rettys_arr, rettys_sz = lst2arr(MuTypeNode, rettys)
+        self._bldr.c_new_trap(self._bldr, id, result_ids_arr, rettys_arr, rettys_sz, exc_clause, keepalive_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if result_ids_arr:
+            lltype.free(result_ids_arr, flavor='raw')
+        if rettys_arr:
+            lltype.free(rettys_arr, flavor='raw')
 
     def new_watchpoint(self, id, wpid, result_ids, rettys, dis, ena, exc=MuDestClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, MuWPID, [MuID], [MuTypeNode], MuDestClause, MuDestClause, MuDestClause, MuKeepaliveClause) -> None
-        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
-            with scoped_lst2arr(MuTypeNode, rettys) as (rettys_arr, rettys_sz):
-                self._bldr.c_new_watchpoint(self._bldr, id, wpid, result_ids_arr, rettys_arr, rettys_sz, dis, ena, exc, keepalive_clause)
-                muerrno = self._mu.get_errno()
-                if muerrno:
-                    raise MuRuntimeError(muerrno)
+        result_ids_arr, result_ids_sz = lst2arr(MuID, result_ids)
+        rettys_arr, rettys_sz = lst2arr(MuTypeNode, rettys)
+        self._bldr.c_new_watchpoint(self._bldr, id, wpid, result_ids_arr, rettys_arr, rettys_sz, dis, ena, exc, keepalive_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if result_ids_arr:
+            lltype.free(result_ids_arr, flavor='raw')
+        if rettys_arr:
+            lltype.free(rettys_arr, flavor='raw')
 
     def new_wpbranch(self, id, wpid, dis, ena):
         # type: (MuID, MuWPID, MuDestClause, MuDestClause) -> None
@@ -1705,12 +1762,16 @@ class MuIRBuilder:
 
     def new_ccall(self, id, result_ids, callconv, callee_ty, sig, callee, args, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], MuFlag, MuTypeNode, MuFuncSigNode, MuVarNode, [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
-        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
-            with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
-                self._bldr.c_new_ccall(self._bldr, id, result_ids_arr, result_ids_sz, callconv, callee_ty, sig, callee, args_arr, args_sz, exc_clause, keepalive_clause)
-                muerrno = self._mu.get_errno()
-                if muerrno:
-                    raise MuRuntimeError(muerrno)
+        result_ids_arr, result_ids_sz = lst2arr(MuID, result_ids)
+        args_arr, args_sz = lst2arr(MuVarNode, args)
+        self._bldr.c_new_ccall(self._bldr, id, result_ids_arr, result_ids_sz, callconv, callee_ty, sig, callee, args_arr, args_sz, exc_clause, keepalive_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if result_ids_arr:
+            lltype.free(result_ids_arr, flavor='raw')
+        if args_arr:
+            lltype.free(args_arr, flavor='raw')
 
     def new_newthread(self, id, result_id, stack, threadlocal, new_stack_clause, exc_clause=MuExcClause._defl()):
         # type: (MuID, MuID, MuVarNode, MuVarNode, MuNewStackClause, MuExcClause) -> None
@@ -1721,23 +1782,35 @@ class MuIRBuilder:
 
     def new_swapstack(self, id, result_ids, swappee, cur_stack_clause, new_stack_clause, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], MuVarNode, MuCurStackClause, MuNewStackClause, MuExcClause, MuKeepaliveClause) -> None
-        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
-            self._bldr.c_new_swapstack(self._bldr, id, result_ids_arr, result_ids_sz, swappee, cur_stack_clause, new_stack_clause, exc_clause, keepalive_clause)
-            muerrno = self._mu.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
+        result_ids_arr, result_ids_sz = lst2arr(MuID, result_ids)
+        self._bldr.c_new_swapstack(self._bldr, id, result_ids_arr, result_ids_sz, swappee, cur_stack_clause, new_stack_clause, exc_clause, keepalive_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if result_ids_arr:
+            lltype.free(result_ids_arr, flavor='raw')
 
     def new_comminst(self, id, result_ids, opcode, flags, tys, sigs, args, exc_clause=MuExcClause._defl(), keepalive_clause=MuKeepaliveClause._defl()):
         # type: (MuID, [MuID], MuFlag, [MuFlag], [MuTypeNode], [MuFuncSigNode], [MuVarNode], MuExcClause, MuKeepaliveClause) -> None
-        with scoped_lst2arr(MuID, result_ids) as (result_ids_arr, result_ids_sz):
-            with scoped_lst2arr(MuFlag, flags) as (flags_arr, flags_sz):
-                with scoped_lst2arr(MuTypeNode, tys) as (tys_arr, tys_sz):
-                    with scoped_lst2arr(MuFuncSigNode, sigs) as (sigs_arr, sigs_sz):
-                        with scoped_lst2arr(MuVarNode, args) as (args_arr, args_sz):
-                            self._bldr.c_new_comminst(self._bldr, id, result_ids_arr, result_ids_sz, opcode, flags_arr, flags_sz, tys_arr, tys_sz, sigs_arr, sigs_sz, args_arr, args_sz, exc_clause, keepalive_clause)
-                            muerrno = self._mu.get_errno()
-                            if muerrno:
-                                raise MuRuntimeError(muerrno)
+        result_ids_arr, result_ids_sz = lst2arr(MuID, result_ids)
+        flags_arr, flags_sz = lst2arr(MuFlag, flags)
+        tys_arr, tys_sz = lst2arr(MuTypeNode, tys)
+        sigs_arr, sigs_sz = lst2arr(MuFuncSigNode, sigs)
+        args_arr, args_sz = lst2arr(MuVarNode, args)
+        self._bldr.c_new_comminst(self._bldr, id, result_ids_arr, result_ids_sz, opcode, flags_arr, flags_sz, tys_arr, tys_sz, sigs_arr, sigs_sz, args_arr, args_sz, exc_clause, keepalive_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if result_ids_arr:
+            lltype.free(result_ids_arr, flavor='raw')
+        if flags_arr:
+            lltype.free(flags_arr, flavor='raw')
+        if tys_arr:
+            lltype.free(tys_arr, flavor='raw')
+        if sigs_arr:
+            lltype.free(sigs_arr, flavor='raw')
+        if args_arr:
+            lltype.free(args_arr, flavor='raw')
 
 
 # -------------------------------------------------------------------------------------------------------
@@ -1936,29 +2009,20 @@ mu_close = rffi.llexternal('mu_refimpl2_close', [_MuVMPtr], lltype.Void, compila
 
 # -------------------------------------------------------------------------------------------------------
 # Helpers
-class scoped_lst2arr:
-    def __init__(self, ELM_T, lst, need_rffi_cast=False):
-        self.lst = lst
-        self.ELM_T = ELM_T
-        self.need_cast = need_rffi_cast
+@specialize.ll()
+def lst2arr(ELM_T, lst, need_rffi_cast=False):
+    sz = rffi.cast(MuArraySize, len(lst))
 
-    def __enter__(self):
-        sz = rffi.cast(MuArraySize, len(self.lst))
-
-        if len(self.lst) == 0:
-            self.buf = lltype.nullptr(rffi.CArray(self.ELM_T))
+    if len(lst) == 0:
+        buf = lltype.nullptr(rffi.CArray(ELM_T))
+    else:
+        buf = lltype.malloc(rffi.CArray(ELM_T), len(lst), flavor='raw')
+        if need_rffi_cast:
+            for i, e in enumerate(lst):
+                buf[i] = rffi.cast(ELM_T, e)
         else:
-            self.buf = lltype.malloc(rffi.CArray(self.ELM_T), len(self.lst), flavor='raw')
-            if self.need_cast:
-                for i, e in enumerate(self.lst):
-                    self.buf[i] = rffi.cast(self.ELM_T, e)
-            else:
-                for i, e in enumerate(self.lst):
-                    self.buf[i] = e
+            for i, e in enumerate(lst):
+                buf[i] = e
 
-        return self.buf, sz
-
-    def __exit__(self, *args):
-        if self.buf:
-            lltype.free(self.buf, flavor='raw')
+    return buf, sz
 

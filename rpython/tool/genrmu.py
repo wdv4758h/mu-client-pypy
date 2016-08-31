@@ -241,7 +241,7 @@ def _oogen_method(sttname, mtd, fp):
         c2rpy_param_map[prm['name']] = prm['name']
     c2rpy_param_map[c_params[0]['name']] = 'self.%(attr)s' % \
                                            {'attr': struct_attr[sttname]}
-
+    arrs = []
     for prm in rpy_params:
         if prm['rpy_type'] == 'str':
             fp.write(cur_idt +
@@ -259,13 +259,13 @@ def _oogen_method(sttname, mtd, fp):
                 c2rpy_param_map[sz_param_name] = sz_param_name
         elif prm['rpy_type'].startswith('['):
             fp.write(cur_idt +
-                     'with scoped_lst2arr(%(elm_t)s, %(prm_name)s) as (%(prm_name)s_arr, %(prm_name)s_sz):\n' % {
+                     '%(prm_name)s_arr, %(prm_name)s_sz = lst2arr(%(elm_t)s, %(prm_name)s)\n' % {
                          'elm_t': prm['rpy_type'][1:-1],
                          'prm_name': prm['name']
                      })
-            cur_idt += idt
             c2rpy_param_map[prm['name']] = prm['name'] + '_arr'
             c2rpy_param_map[prm['array_sz_param']] = prm['name'] + '_sz'
+            arrs.append(prm['name'] + '_arr')
         elif prm['rpy_type'] in ('int', 'float', 'bool'):
             fp.write(cur_idt +
                      '%(name)s_c = rffi.cast(%(rmu_type)s, %(name)s)\n' % prm)
@@ -296,6 +296,10 @@ def _oogen_method(sttname, mtd, fp):
         })
         fp.write(cur_idt + 'if muerrno:\n')
         fp.write(cur_idt + idt + 'raise MuRuntimeError(muerrno)\n')
+
+    for arr in arrs:
+        fp.write(cur_idt + 'if %(arr)s:\n' % locals())
+        fp.write(cur_idt + idt + 'lltype.free(%(arr)s, flavor=\'raw\')\n' % locals())
 
     if mtd['ret_rpy_type'] != 'None':
         fp.write(cur_idt + 'return res\n')
@@ -372,31 +376,22 @@ mu_close = rffi.llexternal('mu_refimpl2_close', [_MuVMPtr], lltype.Void, compila
 """\
 # -------------------------------------------------------------------------------------------------------
 # Helpers
-class scoped_lst2arr:
-    def __init__(self, ELM_T, lst, need_rffi_cast=False):
-        self.lst = lst
-        self.ELM_T = ELM_T
-        self.need_cast = need_rffi_cast
+@specialize.ll()
+def lst2arr(ELM_T, lst, need_rffi_cast=False):
+    sz = rffi.cast(MuArraySize, len(lst))
 
-    def __enter__(self):
-        sz = rffi.cast(MuArraySize, len(self.lst))
-
-        if len(self.lst) == 0:
-            self.buf = lltype.nullptr(rffi.CArray(self.ELM_T))
+    if len(lst) == 0:
+        buf = lltype.nullptr(rffi.CArray(ELM_T))
+    else:
+        buf = lltype.malloc(rffi.CArray(ELM_T), len(lst), flavor='raw')
+        if need_rffi_cast:
+            for i, e in enumerate(lst):
+                buf[i] = rffi.cast(ELM_T, e)
         else:
-            self.buf = lltype.malloc(rffi.CArray(self.ELM_T), len(self.lst), flavor='raw')
-            if self.need_cast:
-                for i, e in enumerate(self.lst):
-                    self.buf[i] = rffi.cast(self.ELM_T, e)
-            else:
-                for i, e in enumerate(self.lst):
-                    self.buf[i] = e
+            for i, e in enumerate(lst):
+                buf[i] = e
 
-        return self.buf, sz
-
-    def __exit__(self, *args):
-        if self.buf:
-            lltype.free(self.buf, flavor='raw')
+    return buf, sz
 """
 
     )
@@ -417,6 +412,7 @@ Note: environment variable $MU needs to be defined to point to the reference imp
 from rpython.rtyper.lltypesystem import rffi
 from rpython.rtyper.lltypesystem import lltype
 from rpython.translator.tool.cbuild import ExternalCompilationInfo
+from rpython.rlib.objectmodel import specialize
 import os
 
 mu_dir = os.path.join(os.getenv('MU'), 'cbinding')
