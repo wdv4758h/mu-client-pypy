@@ -212,7 +212,7 @@ def _oogen_method(sttname, mtd, fp):
         if prm.get('is_optional', False):
             if can_opt:
                 prm['rpy_optional'] = True
-                prm['rpy_deflval'] = 'None' if prm['rpy_type'] == "str" else '%(rmu_type)s._defl()' % prm
+                prm['rpy_deflval'] = 'None' if prm['rpy_type'] == "str" else 'MU_NO_ID' % prm
         else:
             can_opt = False
 
