@@ -47,10 +47,9 @@ class MuName(object):
         return "@%s.%s" % (prefix, self._name)
 
     def __str__(self):
-        # if self.is_global():
-        #     return "@%s" % self._name
-        # return "%%%s" % self._name
-        return self.global_id()
+        if self.is_global():
+            return "@%s" % self._name
+        return "%%%s" % self._name
 
     def __repr__(self):
         if self.is_global():
