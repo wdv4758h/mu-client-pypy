@@ -8,8 +8,9 @@ from rpython.tool.ansi_print import AnsiLogger
 from rpython.mutyper.muts import mutype, muops
 from rpython.mutyper.tools.textgraph import print_graph
 from rpython.rlib.rmu import (
-    Mu, MuDestKind, MuBinOptr, MuCmpOptr, 
-    MuConvOptr, MuMemOrd, MuCallConv, MuCommInst)
+    MuVM, MuBinOptr, MuCmpOptr,
+    MuConvOptr, MuMemOrd, MuCallConv, MuCommInst,
+    MU_NO_ID)
 from rpython.translator.mu.hail import HAILGenerator
 from StringIO import StringIO
 import zipfile
@@ -142,38 +143,39 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             libconfig.append("extraLibs=" + ":".join(extlibs))
 
             # dumpBundle
-            libconfig.append("dumpBundle=%s" % False)
+            libconfig.append("dumpBundle=%s" % True)
 
+            # silent
+            libconfig.append("vmLog=ERROR")
             return "\n".join(libconfig)
 
         MuBundleGenerator.__init__(self, db)
-        self.gblnode_map = {}
-        self.mu = Mu(get_config_str())
+        self.idmap = {}
+        self.mu = MuVM(get_config_str())
         self.ctx = self.mu.new_context()
-        self.bdl = None
+        self.bdr = None
         self._objhdl_map = {}   # used in heap initialisation; NOTE: referent -> handle (not reference)
 
     def bundlegen(self, bdlpath):
         self.log.bundlegen("API Bundle generator")
 
-        self.bdl = self.ctx.new_bundle()
+        self.bdr = self.ctx.new_ir_builder()
 
         self.gen_types()
         self.gen_consts()
         self.gen_gcells()
         self.gen_graphs()
 
-        wlst = map(lambda nd: self.ctx.get_id(self.bdl, nd),self.gblnode_map.values())
         self.log.bundlegen("load bundle into Mu")
-        self.ctx.load_bundle_from_node(self.bdl)
+        self.bdr.load()
 
         self.log.bundlegen("start initialise heap objects")
         self.init_heap()
 
         self.log.bundlegen("start making boot image")
-        self.log.bundlegen("%d top level nodes" % len(self.gblnode_map))
+        self.log.bundlegen("%d top level nodes" % len(self.idmap))
 
-        self.mu.make_boot_image(wlst, str(bdlpath))
+        self.mu.make_boot_image(self.idmap.values(), str(bdlpath))
 
 
         mu_meta_set(str(bdlpath),
@@ -182,273 +184,309 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
     def gen_types(self):
         self.log.gen_types("start generating types.")
-        bdl = self.bdl
-        ctx = self.ctx
+        bdr = self.bdr
         ref_nodes = []  # 2 pass declaration, need to call set_
-        gblndmap = self.gblnode_map
-        gblndmap.update(
-            {
-                mutype.int1_t: ctx.new_type_int(bdl, 1),
-                mutype.int8_t: ctx.new_type_int(bdl, 8),
-                mutype.int16_t: ctx.new_type_int(bdl, 16),
-                mutype.int32_t: ctx.new_type_int(bdl, 32),
-                mutype.int64_t: ctx.new_type_int(bdl, 64),
-                mutype.int128_t: ctx.new_type_int(bdl, 128),
-                mutype.float_t: ctx.new_type_float(bdl),
-                mutype.double_t: ctx.new_type_double(bdl),
-                mutype.void_t: ctx.new_type_void(bdl),
-            }
-        )
-        for k, v in gblndmap.items():
-            ctx.set_name(bdl, v, str(k.mu_name))
+        idmap = self.idmap
+
+        # primitive types
+        prelude = (
+            ".typedef {int1_t.mu_name} = int<1>\n"
+            ".typedef {int8_t.mu_name} = int<8>\n"
+            ".typedef {int16_t.mu_name} = int<16>\n"
+            ".typedef {int32_t.mu_name} = int<32>\n"
+            ".typedef {int64_t.mu_name} = int<64>\n"
+            ".typedef {int128_t.mu_name} = int<128>\n"
+            ".typedef {float_t.mu_name} = float\n"
+            ".typedef {double_t.mu_name} = double\n"
+            ".typedef {void_t.mu_name} = void\n"
+        ).format(**mutype.__dict__)
+        self.ctx.load_bundle(prelude)
+        for t in (
+                mutype.int1_t,
+                mutype.int8_t,
+                mutype.int16_t,
+                mutype.int32_t,
+                mutype.int64_t,
+                mutype.int128_t,
+                mutype.float_t,
+                mutype.double_t,
+                mutype.void_t):
+            idmap[t] = self.ctx.id_of(str(t.mu_name))
 
         def _gen_type(t):
             try:
-                return gblndmap[t]
+                return idmap[t]
             except KeyError:
+                _id = bdr.gen_sym(str(t.mu_name))
                 if isinstance(t, mutype.MuStruct):
-                    nd = ctx.new_type_struct(bdl, 
-                                             map(_gen_type, [t._flds[n] for n in t._names]))
+                    bdr.new_type_struct(_id, map(_gen_type, [t._flds[n] for n in t._names]))
                 elif isinstance(t, mutype.MuHybrid):
-                    nd = ctx.new_type_hybrid(bdl,
-                                             map(_gen_type, [t._flds[n] for n in t._names[:-1]]),
-                                             _gen_type(t._flds[t._varfld]))
+                    bdr.new_type_hybrid(_id, map(_gen_type, [t._flds[n] for n in t._names[:-1]]),
+                                        _gen_type(t._flds[t._varfld]))
                 elif isinstance(t, mutype.MuArray):
-                    nd = ctx.new_type_array(bdl, _gen_type(t.OF), t.length)
+                    bdr.new_type_array(_id, _gen_type(t.OF), t.length)
                 elif isinstance(t, mutype.MuRefType):
-                    fn = getattr(ctx, "new_type_" + t.__class__.type_constr_name)
-                    nd = fn(bdl)
-                    ref_nodes.append((t, nd))
+                    ref_nodes.append((t, _id))
                 elif isinstance(t, mutype.MuFuncSig):
-                    nd = ctx.new_funcsig(bdl, map(_gen_type, t.ARGS), map(_gen_type, t.RTNS))
+                    bdr.new_funcsig(_id, map(_gen_type, t.ARGS), map(_gen_type, t.RTNS))
                 else:
                     raise TypeError("Unknown type: %s" % t)
-                ctx.set_name(bdl, nd, str(t.mu_name))
-                gblndmap[t] = nd
-                return nd
+                idmap[t] = _id
+                return _id
 
         for cls in self.db.gbltypes:
             self.log.gen_types("Generate types under class: %s" % cls)
             for ty in self.db.gbltypes[cls]:
                 _gen_type(ty)
 
-        for ref_t, nd in ref_nodes:
-            fn = getattr(ctx, "set_type_" + ref_t.__class__.type_constr_name)
-            fn(nd, _gen_type(ref_t.Sig if isinstance(ref_t, mutype.MuFuncRef) else ref_t.TO))
+        for ref_t, _id in ref_nodes:
+            fn = getattr(bdr, "new_type_" + ref_t.__class__.type_constr_name)
+            fn(_id, _gen_type(ref_t.Sig if isinstance(ref_t, mutype.MuFuncRef) else ref_t.TO))
 
     def gen_consts(self):
         self.log.gen_consts("start generating constants")
         self.log.gen_consts("%d constants" % len(self.db.gblcnsts))
-        bdl = self.bdl
-        ctx = self.ctx
-        gblndmap = self.gblnode_map
+        bdr = self.bdr
+        idmap = self.idmap
         for cst in self.db.gblcnsts:
             self.log.gen_consts("generating constant: %s (%s)" % (cst, cst.mu_type))
             assert isinstance(cst.value, (mutype._muprimitive, mutype._munullref))
+            _id = bdr.gen_sym(str(cst.mu_name))
+
             if isinstance(cst.mu_type, mutype.MuInt):
                 ty = cst.mu_type
                 if ty.bits <= 64:
-                    nd = ctx.new_const_int(bdl, gblndmap[ty], cst.value.val)
+                    bdr.new_const_int(_id, idmap[ty], cst.value.val)
                 else:
                     val = cst.value.val
                     words = []
                     while val != 0:
                         words.append(val & 0xFFFFFFFFFFFFFFFF)
                         val >>= 64
-                    nd = ctx.new_const_int_ex(bdl, gblndmap[ty], words)
+                    bdr.new_const_int_ex(_id, idmap[ty], words)
             elif cst.mu_type == mutype.float_t:
-                nd = ctx.new_const_float(bdl, gblndmap[cst.mu_type], cst.value.val)
+                bdr.new_const_float(_id, idmap[cst.mu_type], cst.value.val)
             elif cst.mu_type == mutype.double_t:
-                nd = ctx.new_const_double(bdl, gblndmap[cst.mu_type], cst.value.val)
+                bdr.new_const_double(_id, idmap[cst.mu_type], cst.value.val)
             elif isinstance(cst.value, mutype._munullref):
                 if isinstance(cst.mu_type, mutype.MuUPtr):
-                    nd = ctx.new_const_int(bdl, gblndmap[cst.mu_type], 0)
+                    bdr.new_const_int(_id, idmap[cst.mu_type], 0)
                 else:
-                    nd = ctx.new_const_null(bdl, gblndmap[cst.mu_type])
+                    bdr.new_const_null(_id, idmap[cst.mu_type])
 
-            ctx.set_name(bdl, nd, str(cst.mu_name))
-            gblndmap[cst] = nd
+            idmap[cst] = _id
 
         for extfn in self.db.externfncs:
             self.log.gen_consts("generating extern function constant: %s" % extfn)
-            nd = ctx.new_const_extern(bdl, gblndmap[extfn._TYPE], extfn.c_symname)
-            ctx.set_name(bdl, nd, str(extfn.mu_name))
-            gblndmap[extfn] = nd
+            _id = bdr.gen_sym(str(extfn.mu_name))
+            bdr.new_const_extern(_id, idmap[extfn._TYPE], extfn.c_symname)
+            idmap[extfn] = _id
 
     def gen_graphs(self):
         self.log.gen_graphs("start generating functions")
-        bdl = self.bdl
-        ctx = self.ctx
-        gblndmap = self.gblnode_map
+        bdr = self.bdr
+        idmap = self.idmap
 
         # declare all functions first
         for g in self.db.graphs:
-            nd = ctx.new_func(bdl, gblndmap[g.mu_type.Sig])
-            ctx.set_name(bdl, nd, str(g.mu_name))
-            gblndmap[g] = nd
+            _id = bdr.gen_sym(str(g.mu_name))
+            bdr.new_func(_id, idmap[g.mu_type.Sig])
+            idmap[g] = _id
 
         for g in self.db.graphs:
             self.log.gen_graphs("generating function %s" % g)
-            fn = ctx.new_func_ver(bdl, gblndmap[g])
-            blkmap = {}     # block node map per graph
+            fn = bdr.gen_sym(str(g.mu_name) + '_v1')
+
+            blkmap = {}  # block node map per graph
             # create all block nodes first
+            blks = []
             for blk in g.iterblocks():
-                bb = ctx.new_bb(fn)
-                ctx.set_name(bdl, bb, repr(blk.mu_name))
+                bb = bdr.gen_sym(repr(blk.mu_name))
                 blkmap[blk] = bb
+                blks.append(bb)
+            bdr.new_func_ver(fn, idmap[g], blks)
                 
             for blk in g.iterblocks():
                 bb = blkmap[blk]
-                varmap = gblndmap.copy()     # local variable nodes map
+                varmap = idmap.copy()     # local variable nodes map
+
+                nor_prms = []
+                nor_prm_ts = []
                 for prm in blk.mu_inputargs:
-                    nd = ctx.new_nor_param(bb, gblndmap[prm.mu_type])
-                    ctx.set_name(bdl, nd, repr(prm.mu_name))
-                    varmap[prm] = nd
+                    _id = bdr.gen_sym(repr(prm.mu_name))
+                    nor_prms.append(_id)
+                    nor_prm_ts.append(idmap[prm.mu_type])
+                    varmap[prm] = _id
                 if hasattr(blk, 'mu_excparam'):
-                    nd = ctx.new_exc_param(bb)
-                    ctx.set_name(bdl, nd, repr(blk.mu_excparam.mu_name))
-                    varmap[blk.mu_excparam] = nd
+                    exc_prm_id = bdr.gen_sym(repr(blk.mu_excparam.mu_name))
+                    varmap[blk.mu_excparam] = exc_prm_id
+                else:
+                    exc_prm_id = MU_NO_ID
                 
                 # generate operations
+                op_ids = []
                 for op in blk.mu_operations:
+                    _id = bdr.gen_sym()
+                    op_ids.append(_id)
+
+                    res = bdr.gen_sym(repr(op.result.mu_name)) if not op.result.mu_type is mutype.void_t else MU_NO_ID
+                    varmap[op.result] = res
+
+                    if op.exc.nor and op.exc.exc:
+                        _nor = bdr.gen_sym()
+                        _exc = bdr.gen_sym()
+                        exc = bdr.gen_sym()
+                        bdr.new_dest_clause(_nor, blkmap[op.exc.nor.blk], map(varmap.get, op.exc.nor.args))
+                        bdr.new_dest_clause(_exc, blkmap[op.exc.exc.blk], map(varmap.get, op.exc.exc.args))
+                        bdr.new_exc_clause(exc, _nor, _exc)
+                    else:
+                        exc = MU_NO_ID
+
                     if op.opname in muops.BINOPS:
-                        nd = ctx.new_binop(bb, getattr(MuBinOptr, op.opname), gblndmap[op.op1.mu_type], 
-                                           varmap[op.op1], varmap[op.op2])
+                        bdr.new_binop(_id, res, getattr(MuBinOptr, op.opname), idmap[op.op1.mu_type],
+                                           varmap[op.op1], varmap[op.op2], exc)
                     elif op.opname in muops.CMPOPS:
-                        nd = ctx.new_cmp(bb, getattr(MuCmpOptr, op.opname), gblndmap[op.op1.mu_type],
+                        bdr.new_cmp(_id, res, getattr(MuCmpOptr, op.opname), idmap[op.op1.mu_type],
                                          varmap[op.op1], varmap[op.op2])
                     elif op.opname in muops.CONVOPS:
-                        nd = ctx.new_conv(bb, getattr(MuConvOptr, op.opname), 
-                                          gblndmap[op.opnd.mu_type], gblndmap[op.T2], varmap[op.opnd])
+                        bdr.new_conv(_id, res, getattr(MuConvOptr, op.opname),
+                                          idmap[op.opnd.mu_type], idmap[op.T2], varmap[op.opnd])
                     else:
                         method = getattr(self, '_OP_'+op.opname, None)
                         assert method, "can't find method to build operation " + op.opname
-                        nd = method(op, bb, varmap, blkmap)
+                        method(_id, op, varmap, blkmap=blkmap, exc=exc)
 
-                    if op.result.mu_type is not mutype.void_t:
-                        res = ctx.get_inst_res(nd, 0)  # NOTE: things will be difficult when ovf is supported in Mu
-                        ctx.set_name(bdl, res, repr(op.result.mu_name))
-                        varmap[op.result] = res
-                    if op.exc.nor and op.exc.exc:
-                        ctx.add_dest(nd, MuDestKind.NORMAL, blkmap[op.exc.nor.blk], map(varmap.get, op.exc.nor.args))
-                        ctx.add_dest(nd, MuDestKind.EXCEPT, blkmap[op.exc.exc.blk], map(varmap.get, op.exc.exc.args))
+                bdr.new_bb(bb, nor_prms, nor_prm_ts, exc_prm_id, op_ids)
 
     # NOTE: This should be refactored into a OpGen (visitor?) class
-    def _OP_SELECT(self, op, bb, varmap, blkmap):
-        return self.ctx.new_select(bb, varmap[op.cond.mu_type], varmap[op.result.mu_type],
-                                   varmap[op.cond], varmap[op.ifTrue], varmap[op.ifFalse])
+    def _OP_SELECT(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_select(op_id, varmap[op.result], varmap[op.cond.mu_type], varmap[op.result.mu_type],
+                            varmap[op.cond], varmap[op.ifTrue], varmap[op.ifFalse])
 
-    def _OP_BRANCH(self, op, bb, varmap, blkmap):
-        nd = self.ctx.new_branch(bb)
-        self.ctx.add_dest(nd, MuDestKind.NORMAL, blkmap[op.dest.blk], map(varmap.get, op.dest.args))
-        return nd
+    def _OP_BRANCH(self, op_id, op, varmap, **kwargs):
+        blkmap = kwargs['blkmap']
+        dest = self.bdr.gen_sym()
+        self.bdr.new_dest_clause(dest, blkmap[op.dest.blk], map(varmap.get, op.dest.args))
+        self.bdr.new_branch(op_id, dest)
 
-    def _OP_BRANCH2(self, op, bb, varmap, blkmap):
-        nd = self.ctx.new_branch2(bb, varmap[op.cond])
-        self.ctx.add_dest(nd, MuDestKind.TRUE, blkmap[op.ifTrue.blk], map(varmap.get, op.ifTrue.args))
-        self.ctx.add_dest(nd, MuDestKind.FALSE, blkmap[op.ifFalse.blk], map(varmap.get, op.ifFalse.args))
-        return nd
+    def _OP_BRANCH2(self, op_id, op, varmap, **kwargs):
+        blkmap = kwargs['blkmap']
+        dst_t = self.bdr.gen_sym()
+        dst_f = self.bdr.gen_sym()
+        self.bdr.new_dest_clause(dst_t, blkmap[op.ifTrue.blk], map(varmap.get, op.ifTrue.args))
+        self.bdr.new_dest_clause(dst_f, blkmap[op.ifFalse.blk], map(varmap.get, op.ifFalse.args))
+        self.bdr.new_branch2(op_id, varmap[op.cond], dst_t, dst_f)
 
-    def _OP_SWITCH(self, op, bb, varmap, blkmap):
-        nd = self.ctx.new_switch(bb, varmap[op.opnd.mu_type], varmap[op.opnd])
-        self.ctx.add_dest(nd, MuDestKind.DEFAULT, blkmap[op.default.blk], map(varmap.get, op.default.args))
+    def _OP_SWITCH(self, op_id, op, varmap, **kwargs):
+        blkmap = kwargs['blkmap']
+        dst_defl = self.bdr.gen_sym()
+        self.bdr.new_dest_clause(dst_defl, blkmap[op.default.blk], map(varmap.get, op.default.args))
+        consts = []
+        dsts = []
         for (v, dst) in op.cases:
-            self.ctx.add_switch_dest(nd, varmap[v], blkmap[dst.blk], map(varmap.get, dst.args))
-        return nd
+            _dst = self.bdr.gen_sym()
+            self.bdr.new_dest_clause(_dst, blkmap[dst.blk], map(varmap.get, dst.args))
+            consts.append(varmap[v])
+            dsts.append(_dst)
 
-    def _OP_CALL(self, op, bb, varmap, blkmap):
-        return self.ctx.new_call(bb, varmap[op.callee.mu_type.Sig], varmap[op.callee], map(varmap.get, op.args))
+        self.bdr.new_switch(op_id, varmap[op.opnd.mu_type], varmap[op.opnd], dst_defl, consts, dsts)
 
-    def _OP_TAILCALL(self, op, bb, varmap, blkmap):
-        return self.ctx.new_tailcall(bb, varmap[op.callee.mu_type.Sig], varmap[op.callee], map(varmap.get, op.args))
+    def _OP_CALL(self, op_id, op, varmap, **kwargs):
+        res = varmap[op.result]
+        self.bdr.new_call(op_id, [res] if not res is MU_NO_ID else [], varmap[op.callee.mu_type.Sig],
+                          varmap[op.callee], map(varmap.get, op.args), exc_clause=kwargs['exc'])
 
-    def _OP_RET(self, op, bb, varmap, blkmap):
+    def _OP_TAILCALL(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_tailcall(op_id, varmap[op.callee.mu_type.Sig], varmap[op.callee], map(varmap.get, op.args))
+
+    def _OP_RET(self, op_id, op, varmap, **kwargs):
         if op.rv:
-            return self.ctx.new_ret(bb, [varmap[op.rv]])
-        return self.ctx.new_ret(bb, [])
+            self.bdr.new_ret(op_id, [varmap[op.rv]])
+        self.bdr.new_ret(op_id, [])
 
-    def _OP_THROW(self, op, bb, varmap, blkmap):
-        return self.ctx.new_throw(bb, varmap[op.excobj])
+    def _OP_THROW(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_throw(op_id, varmap[op.excobj])
 
-    def _OP_EXTRACTVALUE(self, op, bb, varmap, blkmap):
-        return self.ctx.new_extractvalue(bb, *map(varmap.get, op.opnd.mu_type, op.idx, op.opnd))
+    def _OP_EXTRACTVALUE(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_extractvalue(op_id, varmap[op.result], *map(varmap.get, op.opnd.mu_type, op.idx, op.opnd))
 
-    def _OP_INSERTVALUE(self, op, bb, varmap, blkmap):
-        return self.ctx.new_insertvalue(bb, *map(varmap.get, op.opnd.mu_type, op.idx, op.opnd, op.val))
+    def _OP_INSERTVALUE(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_insertvalue(op_id, varmap[op.result], *map(varmap.get, op.opnd.mu_type, op.idx, op.opnd, op.val))
 
-    def _OP_EXTRACTELEMENT(self, op, bb, varmap, blkmap):
-        return self.ctx.new_extractelement(bb, *map(varmap.get, (op.opnd.mu_type, op.idx.mu_type, op.opnd, op.idx)))
+    def _OP_EXTRACTELEMENT(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_extractelement(op_id, varmap[op.result], *map(varmap.get, (op.opnd.mu_type, op.idx.mu_type, op.opnd, op.idx)))
 
-    def _OP_INSERTELEMENT(self, op, bb, varmap, blkmap):
-        return self.ctx.new_insertelement(bb, *map(varmap.get, (op.opnd.mu_type, op.idx.mu_type, op.opnd, op.idx, op.val)))
+    def _OP_INSERTELEMENT(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_insertelement(op_id, varmap[op.result], *map(varmap.get, (op.opnd.mu_type, op.idx.mu_type, op.opnd, op.idx, op.val)))
 
-    def _OP_NEW(self, op, bb, varmap, blkmap):
-        return self.ctx.new_new(bb, varmap[op.T])
+    def _OP_NEW(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_new(op_id, varmap[op.result], varmap[op.T])
 
-    def _OP_ALLOCA(self, op, bb, varmap, blkmap):
-        return self.ctx.new_alloca(bb, varmap[op.T])
+    def _OP_ALLOCA(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_alloca(op_id, varmap[op.result], varmap[op.T])
 
-    def _OP_NEWHYBRID(self, op, bb, varmap, blkmap):
-        return self.ctx.new_newhybrid(bb, varmap[op.T], varmap[op.length.mu_type], varmap[op.length])
+    def _OP_NEWHYBRID(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_newhybrid(op_id, varmap[op.result], varmap[op.T], varmap[op.length.mu_type], varmap[op.length])
 
-    def _OP_ALLOCAHYBRID(self, op, bb, varmap, blkmap):
-        return self.ctx.new_allocahybrid(bb, varmap[op.T], varmap[op.length.mu_type], varmap[op.length])
+    def _OP_ALLOCAHYBRID(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_allocahybrid(op_id, varmap[op.result], varmap[op.T], varmap[op.length.mu_type], varmap[op.length])
 
-    def _OP_GETIREF(self, op, bb, varmap, blkmap):
-        return self.ctx.new_getiref(bb, varmap[op.opnd.mu_type], varmap[op.opnd])
+    def _OP_GETIREF(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_getiref(op_id, varmap[op.result], varmap[op.opnd.mu_type], varmap[op.opnd])
 
-    def _OP_GETFIELDIREF(self, op, bb, varmap, blkmap):
-        return self.ctx.new_getfieldiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
-                                         varmap[op.opnd.mu_type.TO], op.idx, varmap[op.opnd])
+    def _OP_GETFIELDIREF(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_getfieldiref(op_id, varmap[op.result], isinstance(op.opnd.mu_type, mutype.MuUPtr),
+                                  varmap[op.opnd.mu_type.TO], op.idx, varmap[op.opnd])
 
-    def _OP_GETELEMIREF(self, op, bb, varmap, blkmap):
-        return self.ctx.new_getelemiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
-                                        *map(varmap.get, (op.opnd.mu_type.TO, op.idx.mu_type, op.opnd, op.idx)))
+    def _OP_GETELEMIREF(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_getelemiref(op_id, varmap[op.result], isinstance(op.opnd.mu_type, mutype.MuUPtr),
+                                 *map(varmap.get, (op.opnd.mu_type.TO, op.idx.mu_type, op.opnd, op.idx)))
 
-    def _OP_SHIFTIREF(self, op, bb, varmap, blkmap):
-        return self.ctx.new_shiftiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
-                                      *map(varmap.get, (op.opnd.mu_type.TO, op.offset.mu_type, op.opnd, op.offset)))
+    def _OP_SHIFTIREF(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_shiftiref(op_id, varmap[op.result], isinstance(op.opnd.mu_type, mutype.MuUPtr),
+                               *map(varmap.get, (op.opnd.mu_type.TO, op.offset.mu_type, op.opnd, op.offset)))
 
-    def _OP_GETVARPARTIREF(self, op, bb, varmap, blkmap):
-        return self.ctx.new_getvarpartiref(bb, isinstance(op.opnd.mu_type, mutype.MuUPtr),
-                                           varmap[op.opnd.mu_type.TO], varmap[op.opnd])
+    def _OP_GETVARPARTIREF(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_getvarpartiref(op_id, varmap[op.result], isinstance(op.opnd.mu_type, mutype.MuUPtr),
+                                    varmap[op.opnd.mu_type.TO], varmap[op.opnd])
 
-    def _OP_LOAD(self, op, bb, varmap, blkmap):
-        return self.ctx.new_load(bb, isinstance(op.loc.mu_type, mutype.MuUPtr),
-                                 MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc])
+    def _OP_LOAD(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_load(op_id, varmap[op.result], isinstance(op.loc.mu_type, mutype.MuUPtr),
+                          MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc])
 
-    def _OP_STORE(self, op, bb, varmap, blkmap):
-        return self.ctx.new_store(bb, isinstance(op.loc.mu_type, mutype.MuUPtr),
-                                  MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc], varmap[op.val])
+    def _OP_STORE(self, op_id, op, varmap, **kwargs):
+        self.bdr.new_store(op_id, isinstance(op.loc.mu_type, mutype.MuUPtr),
+                           MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc], varmap[op.val])
 
-    def _OP_TRAP(self, op, bb, varmap, blkmap):
-        return self.ctx.new_trap(bb, varmap[op.T])
+    def _OP_TRAP(self, op_id, op, varmap, **kwargs):
+        # self.bdr.new_trap(op_id, varmap[op.T])
+        raise NotImplementedError
 
-    def _OP_CCALL(self, op, bb, varmap, blkmap):
-        return self.ctx.new_ccall(bb, MuCallConv.DEFAULT, varmap[op.callee.mu_type],
-                                  varmap[op.callee.mu_type.Sig], varmap[op.callee],
-                                  map(varmap.get, op.args))
+    def _OP_CCALL(self, op_id, op, varmap, **kwargs):
+        res = varmap[op.result]
+        self.bdr.new_ccall(op_id, [res] if not res is MU_NO_ID else [], MuCallConv.DEFAULT, varmap[op.callee.mu_type],
+                           varmap[op.callee.mu_type.Sig], varmap[op.callee], map(varmap.get, op.args))
 
-    def _OP_COMMINST(self, op, bb, varmap, blkmap):
+    def _OP_COMMINST(self, op_id, op, varmap, **kwargs):
         cls = op.__class__
         if cls is muops.THREAD_EXIT:
-            return self.ctx.new_comminst(bb, MuCommInst.UVM_THREAD_EXIT, [], [], [], [])
+            self.bdr.new_comminst(op_id, [], MuCommInst.THREAD_EXIT, [], [], [], [])
         elif cls is muops.NATIVE_PIN:
-            return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_PIN, [],
+            self.bdr.new_comminst(op_id, [varmap[op.result]], MuCommInst.NATIVE_PIN, [],
                                          [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
         elif cls is muops.NATIVE_UNPIN:
-            return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_UNPIN, [],
+            self.bdr.new_comminst(op_id, [], MuCommInst.NATIVE_UNPIN, [],
                                          [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
-        elif cls is muops.NATIVE_EXPOSE:
-            return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_EXPOSE, [],
-                                         [], [varmap[op.func.mu_type.Sig]],
-                                         [varmap[op.func], varmap[op.cookie]])
-        elif cls is muops.NATIVE_UNEXPOSE:
-            return self.ctx.new_comminst(bb, MuCommInst.UVM_NATIVE_UNEXPOSE, [], [], [], [varmap[op.value]])
+        # elif cls is muops.NATIVE_EXPOSE:
+        #     self.bdr.new_comminst(op_id, [], MuCommInst.NATIVE_EXPOSE, [],
+        #                                  [], [varmap[op.func.mu_type.Sig]],
+        #                                  [varmap[op.func], varmap[op.cookie]])
+        # elif cls is muops.NATIVE_UNEXPOSE:
+        #     self.bdr.new_comminst(op_id, [], MuCommInst.NATIVE_UNEXPOSE, [], [], [], [varmap[op.value]])
         elif cls is muops.GET_THREADLOCAL:
-            return self.ctx.new_comminst(bb, MuCommInst.UVM_GET_THREADLOCAL, [], [], [], [])
+            self.bdr.new_comminst(op_id, [varmap[op.result]], MuCommInst.GET_THREADLOCAL, [], [], [], [])
         elif cls is muops.SET_THREADLOCAL:
-            return self.ctx.new_comminst(bb, MuCommInst.UVM_SET_THREADLOCAL, [], [], [], [varmap[op.ref]])
+            self.bdr.new_comminst(op_id, [], MuCommInst.SET_THREADLOCAL, [], [], [], [varmap[op.ref]])
         else:
             raise NotImplementedError("Building method for %s not implemented" % op)
 
@@ -456,16 +494,16 @@ class MuAPIBundleGenerator(MuBundleGenerator):
     def gen_gcells(self):
         self.log.gen_gcells("start defining global cells")
         for gcl in self.db.mutyper.ldgcells:
-            nd = self.ctx.new_global_cell(self.bdl, self.gblnode_map[gcl._T])
-            self.gblnode_map[gcl] = nd
-            self.ctx.set_name(self.bdl, nd, str(gcl.mu_name))
+            _id = self.bdr.gen_sym(str(gcl.mu_name))
+            self.bdr.new_global_cell(_id, self.idmap[gcl._T])
+            self.idmap[gcl] = _id
 
     def init_heap(self):
         self._create_heap_objects()
 
         # store in global cells
         for gcl in self.db.mutyper.ldgcells:
-            gcl_id = self.ctx.get_id(self.bdl, self.gblnode_map[gcl])
+            gcl_id = self.idmap[gcl]
             hgcl = self.ctx.handle_from_global(gcl_id)
             href = self._objhdl_map[self.db.objtracer.gcells[gcl]]  # object root in gcell -> handle
             self.ctx.store(MuMemOrd.NOT_ATOMIC, hgcl, href)
