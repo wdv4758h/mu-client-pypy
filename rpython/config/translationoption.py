@@ -289,6 +289,9 @@ translation_optiondescription = OptionDescription(
                  suggests={"arm": [("translation.gcrootfinder", "shadowstack"),
                                    ("translation.jit_backend", "arm")]}),
 
+    # Mu backend options
+    ChoiceOption("mucodegen", "Code generator to use for Mu backend",
+                 ["text", "api", "both"], default="text", cmdline="--mugen"),
 ])
 
 def get_combined_translation_config(other_optdescr=None,

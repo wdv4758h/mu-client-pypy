@@ -2,7 +2,6 @@
 Converts the LLTS types and operations to MuTS.
 """
 from rpython.flowspace.model import Variable, Constant, c_last_exception
-from rpython.mutyper.muts.muni import MuExternalFunc
 from rpython.mutyper.muts.muops import DEST
 from rpython.translator.mu.preps import prepare
 from .muts.muentity import *
@@ -27,7 +26,6 @@ class MuTyper:
         self.ldgcells = {}      # MuGlobalCells that need to be LOADed.
         self._cnst_gcell_dict = {}  # mapping Constant to MuGlobalCell
         self._seen = set()
-        self.externfncs = set()
         self._alias = {}
         self.tlr = translator
         self.mlha = MixLevelHelperAnnotator(self.tlr.rtyper)
@@ -66,7 +64,7 @@ class MuTyper:
         mdb.restart()
 
     def specialise(self, g):
-        # log.info("specialising graph '%s'" % g.name)
+        log.info("specialising graph '%s'" % g.name)
         g.mu_name = MuName(g.name)
         get_arg_types = lambda lst: map(ll2mu.ll2mu_ty, map(lambda arg: arg.concretetype, lst))
         g.mu_type = mutype.MuFuncRef(mutype.MuFuncSig(get_arg_types(g.startblock.mu_inputargs),
@@ -99,7 +97,7 @@ class MuTyper:
             self.proc_arglist(e.mu_args, blk)
         if blk.exitswitch is not c_last_exception:
             if len(blk.exits) == 0:
-                if not (len(muops) > 0 and muops[-1].opname == 'THROW'):
+                if len(muops) == 0 or muops[-1].opname not in ("THROW", "COMMINST"):
                     muops.append(muop.RET(blk.mu_inputargs[0] if len(blk.mu_inputargs) == 1 else None))
             elif len(blk.exits) == 1:
                 muops.append(muop.BRANCH(DEST.from_link(blk.exits[0])))
@@ -138,9 +136,6 @@ class MuTyper:
             for _o in _muops:
                 for i in range(len(_o._args)):
                     arg = _o._args[i]
-                    if isinstance(arg, MuExternalFunc):
-                        # Addresses of some C functions stored in global cells need to be processed.
-                        self.externfncs.add(arg)
                     if isinstance(arg, mutype._mufuncref) and hasattr(arg, '_llhelper'):
                         # Some added LL helper functions need to be annotated and rtyped.
                         fnr = arg
@@ -204,6 +199,10 @@ class MuTyper:
                         if not isinstance(muv, mutype._munullref) and isinstance(muv._TYPE, mutype.MuUPtr):
                             muv._TYPE = mutype.MuRef(muv._TYPE.TO)
                             mut = muv._TYPE
+                        if isinstance(muv, mutype._muexternfunc):
+                            # Constants containing extern functions should have UFuncPtr type
+                            mut = muv._TYPE
+
                         Constant.__init__(arg, muv, arg.concretetype)
                         arg.mu_type = mut
                         if isinstance(muv, (mutype._muprimitive, mutype._munullref)):

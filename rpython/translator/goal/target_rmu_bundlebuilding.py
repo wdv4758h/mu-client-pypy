@@ -48,105 +48,133 @@ fac_bundle = """
 
 def main_load(argv):
     # Load the bundle and run, verify its correctness
-    with Mu() as mu:
-        ctx = mu.new_context()
-        ctx.load_bundle(fac_bundle)
-    
-        # Get handle to @main function, and execute it
-        main_id = ctx.id_of("@main")
-        main_h = ctx.handle_from_func(main_id)
-        stack_h = ctx.new_stack(main_h)
-        thread_h = ctx.new_thread_nor(stack_h, lltype.nullptr(MuValue.TO), [])
-        mu.execute()
-    
-        # Load result from global cell
-        gbl_id = ctx.id_of("@gblresult")
-        gbl_h = ctx.handle_from_global(gbl_id)
-        res_h = ctx.load(MuMemOrd.NOT_ATOMIC, gbl_h)
-        res = ctx.handle_to_sint64(res_h)
-    
-        print "fac(10) = %d" % res
+    mu = MuVM("vmLog=ERROR")
+    ctx = mu.new_context()
+    ctx.load_bundle(fac_bundle)
+
+    # Get handle to @main function, and execute it
+    main_id = ctx.id_of("@main")
+    main_h = ctx.handle_from_func(main_id)
+    stack_h = ctx.new_stack(main_h)
+    thread_h = ctx.new_thread_nor(stack_h, lltype.nullptr(MuValue.TO), [])
+    mu.execute()
+
+    # Load result from global cell
+    gbl_id = ctx.id_of("@gblresult")
+    gbl_h = ctx.handle_from_global(gbl_id)
+    res_h = ctx.load(MuMemOrd.NOT_ATOMIC, gbl_h)
+    res = ctx.handle_to_sint64(res_h)
+
+    print "fac(10) = %d" % res
     return 0
 
 def main_build(argv):
-    mu = Mu()
+    mu = MuVM("vmLog=ERROR")
     ctx = mu.new_context()
+    bldr = ctx.new_ir_builder()
 
-    bdl = ctx.new_bundle()
-    i64 = ctx.new_type_int(bdl, 64)
-    ctx.set_name(bdl, i64, "@i64")
-    i1 = ctx.new_type_int(bdl, 1)
-    ctx.set_name(bdl, i1, "@i1")
+    i64 = bldr.gen_sym("@i64")
+    bldr.new_type_int(i64, 64)
+    i1 = bldr.gen_sym("@i1")
+    bldr.new_type_int(i1, 1)
 
-    c_0_i64 = ctx.new_const_int(bdl, i64, 0)
-    ctx.set_name(bdl, c_0_i64, "@0_i64")
-    c_1_i64 = ctx.new_const_int(bdl, i64, 1)
-    ctx.set_name(bdl, c_1_i64, "@1_i64")
-    c_10_i64 = ctx.new_const_int(bdl, i64, 10)
-    ctx.set_name(bdl, c_10_i64, "@10_i64")
+    c_0_i64 = bldr.gen_sym("@0_i64")
+    bldr.new_const_int(c_0_i64, i64, 0)
+    c_1_i64 = bldr.gen_sym("@1_i64")
+    bldr.new_const_int(c_1_i64, i64, 1)
+    c_10_i64 = bldr.gen_sym("@10_64")
+    bldr.new_const_int(c_10_i64, i64, 10)
 
-    gblres = ctx.new_global_cell(bdl, i64)
-    ctx.set_name(bdl, gblres, "@gblresult")
+    gblres = bldr.gen_sym("@gblresult")
+    bldr.new_global_cell(gblres, i64)
 
     # ----
     # fac
-    sig_i64_i64 = ctx.new_funcsig(bdl, [i64], [i64])
-    ctx.set_name(bdl, sig_i64_i64, "@sig_i64_i64")
 
-    fac = ctx.new_func(bdl, sig_i64_i64)
-    ctx.set_name(bdl, fac, "@fac")
-    fac_v1 = ctx.new_func_ver(bdl, fac)
+    sig_i64_i64 = bldr.gen_sym("@sig_i64_i64")
+    bldr.new_funcsig(sig_i64_i64, [i64], [i64])
+
+    fac = bldr.gen_sym("@fac")
+    bldr.new_func(fac, sig_i64_i64)
+    fac_v1 = bldr.gen_sym()
+    blk0 = bldr.gen_sym()
+    blk1 = bldr.gen_sym()
+    blk2 = bldr.gen_sym()
+    fac_v1 = bldr.new_func_ver(fac_v1, fac, [blk0, blk1, blk2])
 
     # blk0
-    blk0 = ctx.new_bb(fac_v1)
-    n_0 = ctx.new_nor_param(blk0, i64)
-    v5 = ctx.get_inst_res(ctx.new_cmp(blk0, MuCmpOptr.EQ, i64, n_0, c_0_i64), 0)
-    v6 = ctx.get_inst_res(ctx.new_cmp(blk0, MuCmpOptr.EQ, i64, n_0, c_1_i64), 0)
-    v7 = ctx.get_inst_res(ctx.new_binop(blk0, MuBinOptr.OR, i1, v5, v6), 0)
-    br2 = ctx.new_branch2(blk0, v7)
-    blk1 = ctx.new_bb(fac_v1)
-    blk2 = ctx.new_bb(fac_v1)
-    ctx.add_dest(br2, MuDestKind.TRUE, blk2, [c_1_i64])
-    ctx.add_dest(br2, MuDestKind.FALSE, blk1, [n_0])
+    n_0 = bldr.gen_sym()
+    v5 = bldr.gen_sym()
+    v6 = bldr.gen_sym()
+    v7 = bldr.gen_sym()
+    blk0_cmp0 = bldr.gen_sym()
+    blk0_cmp1 = bldr.gen_sym()
+    blk0_or = bldr.gen_sym()
+    blk0_br2 = bldr.gen_sym()
+    blk0_br2_t = bldr.gen_sym()
+    blk0_br2_f = bldr.gen_sym()
+    bldr.new_bb(blk0, [n_0], [i64], MU_NO_ID, [blk0_cmp0, blk0_cmp1, blk0_or, blk0_br2])
+    bldr.new_cmp(blk0_cmp0, v5, MuCmpOptr.EQ, i64, n_0, c_0_i64)
+    bldr.new_cmp(blk0_cmp1, v6, MuCmpOptr.EQ, i64, n_0, c_1_i64)
+    bldr.new_binop(blk0_or, v7, MuBinOptr.OR, i1, v5, v6)
+    bldr.new_dest_clause(blk0_br2_t, blk2, [c_1_i64])
+    bldr.new_dest_clause(blk0_br2_f, blk1, [n_0])
+    bldr.new_branch2(blk0_br2, v7, blk0_br2_t, blk0_br2_f)
 
     # blk1
-    n_1 = ctx.new_nor_param(blk1, i64)
-    v8 = ctx.get_inst_res(ctx.new_binop(blk1, MuBinOptr.SUB, i64, n_1, c_1_i64), 0)
-    v9 = ctx.get_inst_res(ctx.new_call(blk1, sig_i64_i64, fac, [v8]), 0)
-    v10 = ctx.get_inst_res(ctx.new_binop(blk1, MuBinOptr.MUL, i64, n_1, v9), 0)
-    br = ctx.new_branch(blk1)
-    ctx.add_dest(br, MuDestKind.NORMAL, blk2, [v10])
+    n_1 = bldr.gen_sym()
+    v8 = bldr.gen_sym()
+    v9 = bldr.gen_sym()
+    v10 = bldr.gen_sym()
+    blk1_sub = bldr.gen_sym()
+    blk1_call = bldr.gen_sym()
+    blk1_mul = bldr.gen_sym()
+    blk1_br = bldr.gen_sym()
+    blk1_br_d = bldr.gen_sym()
+    bldr.new_bb(blk1, [n_1], [i64], MU_NO_ID, [blk1_sub, blk1_call, blk1_mul, blk1_br])
+    bldr.new_binop(blk1_sub, v8, MuBinOptr.SUB, i64, n_1, c_1_i64)
+    bldr.new_call(blk1_call, [v9], sig_i64_i64, fac, [v8])
+    bldr.new_binop(blk1_mul, v10, MuBinOptr.MUL, i64, n_1, v9)
+    bldr.new_dest_clause(blk1_br_d, blk2, [v10])
+    bldr.new_branch(blk1_br, blk1_br_d)
 
     # blk2
-    v11 = ctx.new_nor_param(blk2, i64)
-    ctx.new_ret(blk2, [v11])
+    v11 = bldr.gen_sym()
+    blk2_ret = bldr.gen_sym()
+    bldr.new_bb(blk2, [v11], [i64], MU_NO_ID, [blk2_ret])
+    bldr.new_ret(blk2_ret, [v11])
 
     # ----
     # main
-    sig__ = ctx.new_funcsig(bdl, [], [])
-    ctx.set_name(bdl, sig__, "@sig__")
-    main = ctx.new_func(bdl, sig__)
-    ctx.set_name(bdl, main, "@main")
-    main_v1 = ctx.new_func_ver(bdl, main)
+    sig__ = bldr.gen_sym("@sig__")
+    main = bldr.gen_sym("@main")
+    main_v1 = bldr.gen_sym("@main_v1")
+    bldr.new_funcsig(sig__, [], [])
+    bldr.new_func(main, sig__)
+    blk0 = bldr.gen_sym()
+    bldr.new_func_ver(main_v1, main, [blk0])
+
 
     # blk0
-    blk0 = ctx.new_bb(main_v1)
-    res = ctx.get_inst_res(ctx.new_call(blk0, sig_i64_i64, fac, [c_10_i64]), 0)
-    ctx.new_store(blk0, False, MuMemOrd.NOT_ATOMIC, i64, gblres, res)
-    ctx.new_comminst(blk0, MuCommInst.UVM_THREAD_EXIT, [], [], [], [])
+    res = bldr.gen_sym()
+    blk0_call = bldr.gen_sym()
+    blk0_store = bldr.gen_sym()
+    blk0_comminst = bldr.gen_sym()
+    bldr.new_bb(blk0, [], [], MU_NO_ID, [blk0_call, blk0_store, blk0_comminst])
+    bldr.new_call(blk0_call, [res], sig_i64_i64, fac, [c_10_i64])
+    bldr.new_store(blk0_store, False, MuMemOrd.NOT_ATOMIC, i64, gblres, res)
+    bldr.new_comminst(blk0_comminst, [], MuCommInst.THREAD_EXIT, [], [], [], [])
 
-    main_id = ctx.get_id(bdl, main)
-    ctx.load_bundle_from_node(bdl)
+    bldr.load()
 
-    main_h = ctx.handle_from_func(main_id)
+    main_h = ctx.handle_from_func(main)
     stack_h = ctx.new_stack(main_h)
     thread_h = ctx.new_thread_nor(stack_h, lltype.nullptr(MuValue.TO), [])
 
     mu.execute()
 
     # Load result from global cell
-    gbl_id = ctx.id_of("@gblresult")
-    gbl_h = ctx.handle_from_global(gbl_id)
+    gbl_h = ctx.handle_from_global(gblres)
     res_h = ctx.load(MuMemOrd.NOT_ATOMIC, gbl_h)
     res = ctx.handle_to_sint64(res_h)
 
