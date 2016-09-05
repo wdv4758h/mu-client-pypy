@@ -114,7 +114,7 @@ class MuDatabase:
             cst.mu_name = MuName("%s_%s" % (str(cst.value), cst.mu_type.mu_name._name))
             self.gblcnsts.add(cst)
 
-        self._match_externfunc_names()
+        self._process_externfuncs()
         self.log.collect_gbldefs("finished.")
 
     def _recursive_addtype(self, mut):
@@ -140,11 +140,27 @@ class MuDatabase:
                 for t in ts:
                     self._recursive_addtype(t)
 
-    def _match_externfunc_names(self):
+    def _process_externfuncs(self):
+        def _get_required_libs(extfns):
+            libraries = [fn.eci.libraries for fn in extfns]
+            libs = set()
+            for tup_libs in libraries:
+                assert len(tup_libs) <= 1   # each c function should only be found in one dylib
+                libs.update(tup_libs)
+            return libs
+
+        required_libs = _get_required_libs(self.externfncs)
+        required_libs.add('c')
+        libdic = {}
         # load up the dynamic libraries and find the corresponding functions
-        libc = ctypes.CDLL(ctypes.util.find_library("c"))
-        libm = ctypes.CDLL(ctypes.util.find_library("m"))
-        libutil = ctypes.CDLL(ctypes.util.find_library("util"))
+        for libabbrv in required_libs:
+            ctypes.util.find_library(libabbrv)
+            libpath = ctypes.util.find_library(libabbrv)
+            if not libpath:
+                raise LookupError("library \'%(libabbrv)s not found\'" % locals())
+            lib = ctypes.CDLL(libpath)
+            libdic[libabbrv] = lib
+        # load librpyc.so
         dir_mu = os.path.dirname(__file__)
         dir_librpyc = os.path.join(dir_mu, 'rpyc')
         path_librpyc = os.path.join(dir_librpyc, 'librpyc.so')
@@ -155,54 +171,52 @@ class MuDatabase:
             os.write(2, "ERROR: library {} not found.\n"
                         "Please execute 'make' in the directory {}\n".format(path_librpyc, dir_librpyc))
             raise e
+        libdic['rpyc'] = librpyc
 
-        libs = (librpyc, libc, libm, libutil)
-        self.dylibs = libs
+        self.dylibs = libdic.values()
+
+        # manage function name mappings
         _pypy_linux_prefix = "__pypy_mu_linux_"
         _pypy_apple_prefix = "__pypy_mu_apple_"
         _pypy_macro_prefix = "__pypy_macro_"
         _LINUX = sys.platform.startswith('linux')
         _APPLE = sys.platform.startswith('darwin')
-        def correct_name(c_name):
+        def _get_c_symname(extfn):
             """
             Correct some function naming
             especially needed for stat system calls.
             """
+            def sym_in_lib(c_symname, lib):
+                try:
+                    getattr(lib, c_symname)
+                    return True
+                except AttributeError:
+                    return False
+
+            c_name = extfn.c_name
             if _APPLE:
                 if c_name in ('stat', 'fstat', 'lstat'):
-                    return c_name + '64'  # stat64, fstat64, lstat64
+                    c_name = c_name + '64'  # stat64, fstat64, lstat64
                 if c_name == "readdir":  # fixing the macro defined return type (struct dirent*)
-                    return _pypy_apple_prefix + c_name
-            return c_name
+                    c_name = _pypy_apple_prefix + c_name
 
-        librpyc = libs[0]
-        for extfn in self.externfncs:
-            c_symname = correct_name(extfn.c_name)
-            dylib = None
+            # find symbol in shared lib
+            default_libs = ('rpyc', 'c')
+            libdeps = map(libdic.get, extfn.eci.libraries if len(extfn.eci.libraries) > 0 else default_libs)
+            for lib in libdeps:
+                if sym_in_lib(c_name, lib):
+                    return c_name
 
-            adr = None
-            for lib in libs:
-                try:
-                    adr = ctypes.cast(getattr(lib, c_symname), ctypes.c_void_p).value
-                    dylib = lib
-                    break
-                except AttributeError:
-                    pass
-            if adr is None:
                 for prefix in (_pypy_linux_prefix, _pypy_macro_prefix):
-                    try:
-                        adr = ctypes.cast(getattr(librpyc, prefix + c_symname), ctypes.c_void_p).value
-                        c_symname = prefix + c_symname
-                        dylib = lib
-                        break
-                    except AttributeError:
-                        pass
-            if adr is None:
-                os.write(2, "Failed to find function '%(c_name)s'.\n" % locals())
-                raise NotImplementedError
+                    if sym_in_lib(prefix + c_name, lib):
+                        return prefix + c_name
 
+            raise LookupError("Failed to find function '%(c_name)s'.\n" % locals())
+
+        for extfn in self.externfncs:
+            c_symname = _get_c_symname(extfn)
             extfn.c_symname = c_symname
-            extfn.lib = dylib
+
 
 class HeapObjectTracer:
     def __init__(self):
