@@ -1,0 +1,20 @@
+opassembler.py/GuardOpAssembler
+    _emit_guard:
+        * if is_guard_not_invalidated:
+            # Seems to be controlling 2 flavors of guard
+            1: can be invalidated or not (watchpoint!)
+                Doest test anything else - nothing to test
+            2: Ordinary guard: tests some dynamic condition. ie is the value of
+                this var > 0
+            
+            Want a wp_branch w/ normal and exceptional branches
+
+            Not sure how to assign global watchpoint ids - might be a problem to assign
+            them globally.
+
+        * WHY CONTORTED CONVENTIONS? Trying to create machine code with a forward jump
+            without knowing the destination. We don't have to do this.
+        
+        * self.bb Normal path vs Exceptional path
+
+        * Creating a directed graph of bb's 
