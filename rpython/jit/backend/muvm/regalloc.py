@@ -125,8 +125,11 @@ class MuVMRegisterManager(RegisterManager):
         return 0
 
     def possibly_free_var(self, v):
-        ### OVERRIDE
-        return None
+        if isinstance(v, ConstLocation):
+            return
+        if v not in self.longevity or slef.longevity[v][1] <= position:
+            self.live_regs.remove(self.bindings[v])
+            del self.bindings[v]
     
     def _pick_variable_to_spill(self, v, forbidden_vars, selected_reg=None,
                                 need_lower_byte=False):
@@ -147,6 +150,7 @@ class MuVMRegisterManager(RegisterManager):
         ### OVERRIDE
         ### Scratch Method
         assert is_instance(t, Type)
+        assert selectedReg == None
         v = len(self.all_regs)      # Position
         ssa = SSALocation(v, t)     # SSA variable, to be appended
         self.all_regs.append(ssa)
