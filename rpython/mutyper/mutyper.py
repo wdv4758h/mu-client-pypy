@@ -115,6 +115,11 @@ class MuTyper:
                 defl_exit = next((DEST.from_link(e) for e in blk.exits if e.exitcase == 'default'), cases[-1][1])
                 muops.append(muop.SWITCH(blk.exitswitch, defl_exit, cases))
 
+        elif isinstance(muops[-1], muop.CCALL):
+                # NOTE: CCALL will NEVER throw a Mu exception;
+                # still not sure why calling a native C library function will throw an RPython exception...
+                # So in this case just branch the normal case
+                muops.append(muop.BRANCH(DEST.from_link(blk.exits[0])))
         else:
             muops[-1].exc = muop.EXCEPT(DEST.from_link(blk.exits[0]), DEST.from_link(blk.exits[1]))
         blk.mu_operations = tuple(muops)
