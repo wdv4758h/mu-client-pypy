@@ -234,9 +234,10 @@ class MuCommInst:
     KILL_DEPENDENCY = rffi.cast(MuFlag, 0x230)
     NATIVE_PIN = rffi.cast(MuFlag, 0x240)
     NATIVE_UNPIN = rffi.cast(MuFlag, 0x241)
-    NATIVE_EXPOSE = rffi.cast(MuFlag, 0x242)
-    NATIVE_UNEXPOSE = rffi.cast(MuFlag, 0x243)
-    NATIVE_GET_COOKIE = rffi.cast(MuFlag, 0x244)
+    NATIVE_GET_ADDR = rffi.cast(MuFlag, 0x242)
+    NATIVE_EXPOSE = rffi.cast(MuFlag, 0x243)
+    NATIVE_UNEXPOSE = rffi.cast(MuFlag, 0x244)
+    NATIVE_GET_COOKIE = rffi.cast(MuFlag, 0x245)
     META_ID_OF = rffi.cast(MuFlag, 0x250)
     META_NAME_OF = rffi.cast(MuFlag, 0x251)
     META_LOAD_BUNDLE = rffi.cast(MuFlag, 0x252)
@@ -383,17 +384,6 @@ class MuVM:
         muerrno = self.get_errno()
         if muerrno:
             raise MuRuntimeError(muerrno)
-
-    def make_boot_image(self, whitelist, output_file):
-        # type: ([MuID], str) -> None
-        whitelist_arr, whitelist_sz = lst2arr(MuID, whitelist)
-        with rffi.scoped_str2charp(output_file) as output_file_buf:
-            self._mu.c_make_boot_image(self._mu, whitelist_arr, whitelist_sz, output_file_buf)
-            muerrno = self.get_errno()
-            if muerrno:
-                raise MuRuntimeError(muerrno)
-            if whitelist_arr:
-                lltype.free(whitelist_arr, flavor='raw')
 
     def execute(self):
         # type: () -> None
@@ -1110,6 +1100,14 @@ class MuCtx:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
+    def get_addr(self, loc):
+        # type: (MuValue) -> MuUPtrValue
+        res = self._ctx.c_get_addr(self._ctx, loc)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        return res
+
     def expose(self, func, call_conv, cookie):
         # type: (MuFuncRefValue, MuFlag, MuIntValue) -> MuValue
         res = self._ctx.c_expose(self._ctx, func, call_conv, cookie)
@@ -1132,6 +1130,29 @@ class MuCtx:
         if muerrno:
             raise MuRuntimeError(muerrno)
         return res
+
+    def make_boot_image(self, whitelist, primordial_func, primordial_stack, primordial_threadlocal, sym_fields, sym_strings, reloc_fields, reloc_strings, output_file):
+        # type: ([MuID], MuFuncRefValue, MuStackRefValue, MuRefValue, [MuIRefValue], [MuCString], [MuIRefValue], [MuCString], str) -> None
+        whitelist_arr, whitelist_sz = lst2arr(MuID, whitelist)
+        sym_fields_arr, sym_fields_sz = lst2arr(MuIRefValue, sym_fields)
+        sym_strings_arr, sym_strings_sz = lst2arr(MuCString, sym_strings)
+        reloc_fields_arr, reloc_fields_sz = lst2arr(MuIRefValue, reloc_fields)
+        reloc_strings_arr, reloc_strings_sz = lst2arr(MuCString, reloc_strings)
+        with rffi.scoped_str2charp(output_file) as output_file_buf:
+            self._ctx.c_make_boot_image(self._ctx, whitelist_arr, whitelist_sz, primordial_func, primordial_stack, primordial_threadlocal, sym_fields_arr, sym_strings_arr, sym_strings_sz, reloc_fields_arr, reloc_strings_arr, reloc_strings_sz, output_file_buf)
+            muerrno = self._mu.get_errno()
+            if muerrno:
+                raise MuRuntimeError(muerrno)
+            if whitelist_arr:
+                lltype.free(whitelist_arr, flavor='raw')
+            if sym_fields_arr:
+                lltype.free(sym_fields_arr, flavor='raw')
+            if sym_strings_arr:
+                lltype.free(sym_strings_arr, flavor='raw')
+            if reloc_fields_arr:
+                lltype.free(reloc_fields_arr, flavor='raw')
+            if reloc_strings_arr:
+                lltype.free(reloc_strings_arr, flavor='raw')
 
 
 class MuIRBuilder:
@@ -1822,7 +1843,6 @@ _MuVM.become(rffi.CStruct(
     ('id_of', rffi.CCallback([_MuVMPtr, MuName], MuID)),
     ('name_of', rffi.CCallback([_MuVMPtr, MuID], MuName)),
     ('set_trap_handler', rffi.CCallback([_MuVMPtr, MuTrapHandler, MuCPtr], lltype.Void)),
-    ('make_boot_image', rffi.CCallback([_MuVMPtr, MuIDPtr, MuArraySize, MuCString], lltype.Void)),
     ('execute', rffi.CCallback([_MuVMPtr], lltype.Void)),
     ('get_mu_error_ptr', rffi.CCallback([_MuVMPtr], rffi.INTP)),
 ))
@@ -1913,9 +1933,11 @@ _MuCtx.become(rffi.CStruct(
     ('disable_watchpoint', rffi.CCallback([_MuCtxPtr, MuWPID], lltype.Void)),
     ('pin', rffi.CCallback([_MuCtxPtr, MuValue], MuUPtrValue)),
     ('unpin', rffi.CCallback([_MuCtxPtr, MuValue], lltype.Void)),
+    ('get_addr', rffi.CCallback([_MuCtxPtr, MuValue], MuUPtrValue)),
     ('expose', rffi.CCallback([_MuCtxPtr, MuFuncRefValue, MuFlag, MuIntValue], MuValue)),
     ('unexpose', rffi.CCallback([_MuCtxPtr, MuFlag, MuValue], lltype.Void)),
     ('new_ir_builder', rffi.CCallback([_MuCtxPtr], _MuIRBuilderPtr)),
+    ('make_boot_image', rffi.CCallback([_MuCtxPtr, MuIDPtr, MuArraySize, MuFuncRefValue, MuStackRefValue, MuRefValue, MuIRefValuePtr, MuCStringPtr, MuArraySize, MuIRefValuePtr, MuCStringPtr, MuArraySize, MuCString], lltype.Void)),
 ))
 _MuIRBuilder.become(rffi.CStruct(
     'MuIRBuilder',
@@ -2009,6 +2031,9 @@ mu_close = rffi.llexternal('mu_refimpl2_close', [_MuVMPtr], lltype.Void, compila
 
 # -------------------------------------------------------------------------------------------------------
 # Helpers
+def null(rmu_t):
+    return lltype.nullptr(rmu_t.TO)
+
 @specialize.ll()
 def lst2arr(ELM_T, lst, need_rffi_cast=False):
     sz = rffi.cast(MuArraySize, len(lst))

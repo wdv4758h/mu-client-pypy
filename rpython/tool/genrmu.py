@@ -376,6 +376,9 @@ mu_close = rffi.llexternal('mu_refimpl2_close', [_MuVMPtr], lltype.Void, compila
 """\
 # -------------------------------------------------------------------------------------------------------
 # Helpers
+def null(rmu_t):
+    return lltype.nullptr(rmu_t.TO)
+
 @specialize.ll()
 def lst2arr(ELM_T, lst, need_rffi_cast=False):
     sz = rffi.cast(MuArraySize, len(lst))
