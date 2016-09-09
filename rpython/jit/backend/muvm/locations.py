@@ -109,8 +109,10 @@ class SSALocation(AssemblerLocation):
     def is_core_reg(self):
         # TODO find out what this implies
         return True
+
     def is_float(self):
         return self.ty.ty == FLOAT
+
     def is_local(self):
         return False
 
@@ -173,7 +175,7 @@ class ConstLocation(SSALocation):
         return self.value
 
     def __repr__(self):
-        return "@c_{}_{}".format(self.t.prefix(), self.value)
+        return "@const_{}_{}".format(self.t.prefix(), self.value)
 
     def is_imm_float(self):
         ''' Do we need this? '''
