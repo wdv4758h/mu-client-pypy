@@ -88,21 +88,26 @@ class MuVMRegisterManager(RegisterManager):
     all_regs = r.registers  # Registers 
     
     def __init__(self, longevity, frame_manager=None, assembler=None):
+        # Find out what longevity is exactly - dict to tuple?
         self.longevity = longevity
+        self.live_regs = Set()  # Store alive ssaLocations
         self.temp_boxes = []
+
         if not we_are_translated():
             self.reg_bindings = OrderedDict()
         else:
             self.reg_bindings = {}
+        self.const_bindings = {}    # Map (Type,val) to const
+        self.type_bindings  = {}    # Map
+
         self.bindings_to_frame_reg = {}
         self.frame_manager = frame_manager
         self.assembler = assembler
 
-        self.const_bindings = {}    # Map (Type,val) to const
-        self.type_bindings  = {}    # Map
 
     def return_constant(self, v, forbidden_vars=[], selected_reg=None):
-        """DEV: Need to determine what this will do in our new model."""
+        """ Need to determine what this will do in our new model."""
+        #TODO: what is v, and what do we want to return here? what is v?
         self.check_type(v)
         if isinstance(v, ConstLocation):
             loc = self.force_allocate_reg(v.tp)
@@ -112,25 +117,25 @@ class MuVMRegisterManager(RegisterManager):
 
     def convert_to_imm(self, c):
         # (Const) -> (TempVar)
-        #TODO
+        #TODO: This converts a Constant to an Immediate value. There are no
+        # immediates in mu
         return
 
     def is_still_alive(self, v):
-        # (SSALocation) -> (Boolean)
-        ### OVERRIDE
-        return False
+        return v in self.live_regs
 
     def stays_alive(self, v):
         ### OVERRIDE
-        return 0
+        #TODO: What are we checking for here?
+        pass
 
     def possibly_free_var(self, v):
         assert isinstance(v, SSALocation)
         if isinstance(v, ConstLocation):
             return
-        if v not in self.longevity or slef.longevity[v][1] <= position:
-            self.live_regs.remove(self.bindings[v])
-            del self.bindings[v]
+        if v not in self.longevity or self.longevity[v][1] <= position:
+            self.live_regs.remove(self.reg_bindings[v])
+            del self.reg_bindings[v]
     
     def _pick_variable_to_spill(self, v, forbidden_vars, selected_reg=None,
                                 need_lower_byte=False):
@@ -155,7 +160,7 @@ class MuVMRegisterManager(RegisterManager):
         v = len(self.all_regs)      # Position
         ssa = SSALocation(v, t)     # SSA variable, to be appended
         self.all_regs.append(ssa)
-        self.bindings[str(ssa)] = v # update bindings
+        self.reg_bindings[str(ssa)] = v # update bindings
         return v                    # Return location in all_regs of ssa
 
     def force_allocate_reg(self, t, forbidden_vars=[], selected_reg=None,
@@ -168,18 +173,20 @@ class MuVMRegisterManager(RegisterManager):
 
     def force_spill_var(self, var):
         ### OVERRIDE
+        #TODO: should this be an error or should we handle gracefully?
         raise RuntimeError("Muvm does not support variable spilling")
 
     def get_free_reg(self):
-        #TODO
+        #TODO: There are no 'free regs' per se, but we may have ssaLocations we
+        # don't need any more.
         pass
 
-    def get_scratch_reg(self, type=INT, forbidden_vars=[], selected_reg=None):
-        #TODO
-        pass
+    def get_scratch_reg(self, ty=INT, forbidden_vars=[], selected_reg=None):
+        #TODO: just return new ssaLocation?
+        return try_allocate_reg(ty)  #TODO: Check if this is right
     
     def free_temp_vars(self):
-        #TODO
+        #TODO: no temp variables, so just pass?
         pass
 
 class Regalloc(BaseRegalloc):
@@ -221,7 +228,7 @@ class Regalloc(BaseRegalloc):
     def force_allocate_reg_or_cc(self, var, forbidden_vars=[]):
         #TODO
         #Note sure what this should do -- what is `cc'?
-        '''
+        # The following is from ARM
         assert var.type == INT
         if self.next_op_can_accept_cc(self.operations, self.rm.position):
             # hack: return the 'fp' location to mean "lives in CC".  This
@@ -232,8 +239,6 @@ class Regalloc(BaseRegalloc):
         else:
             # else, return a regular register (not fp).
             return self.rm.force_allocate_reg(var)
-        '''
-        pass
 
     def try_allocate_reg(self, v, selected_reg=None, need_lower_byte=False):
         return self.rm.try_allocate_reg(v, selected_reg, need_lower_byte)
