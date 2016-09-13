@@ -23,5 +23,5 @@ class AssemblerMu(OpAssembler, BaseAssembler):
         fv = mc.new_funcver(bndl, func)
         bb = mc.new_bb(fv)
 
-    def setup(self, looptoken)
+    def setup(self, looptoken):
         BaseAssembler.setup(self, looptoken)

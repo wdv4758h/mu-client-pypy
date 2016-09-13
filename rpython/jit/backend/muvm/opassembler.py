@@ -44,7 +44,7 @@ from rpython.rlib.rarithmetic import r_uint
 """
 
 class MuGuardToken(GuardToken):
-    def __init__(self, cpu, gcmap, descr, failargs, faillocs, guard_opnum, frame_depth, faildescrindex, fcond=c.cond_none)
+    def __init__(self, cpu, gcmap, descr, failargs, faillocs, guard_opnum, frame_depth, faildescrindex, fcond=c.cond_none):
         GuardToken.__init__(self, cpu, gcmap, descr, failargs, faillocs, guard_opnum, frame_depth, faildescrindex)
         self.fcond = fcond
 
@@ -165,7 +165,7 @@ class IntOpAssembler(object):
 class FloatOpAssembler(object):
     _mixin_ = True
     
-     def do_emit_float_op(self, arglocs, optr):
+    def do_emit_float_op(self, arglocs, optr):
         l0, l1, res = arglocs
         v0 = get_float(l0)
         v1 = get_float(l1)
@@ -309,6 +309,7 @@ class GuardOpAssembler(object):
             #self.mc.add_dest(branch2, self.mc.MuDestKind.FALSE, guard_block, guard_args)
             self.bb = norm_path
         else:
+            pass
             #TODO: create a wpbranch
         self.pending_guard_tokens.append(token)
 
@@ -1592,7 +1593,7 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
     def get_int(arg):
         if arg in self.vars:
             var = self.vars[arg]
-        else
+        else:
             var = self.mc.new_const_int(self.bndl, self.type_int, arg.value)
             self.vars[arg] = var
         return var
@@ -1600,9 +1601,10 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
     def get_float(arg):
         if arg in self.vars:
             var = self.vars[arg]
-        else
+        else:
             var = self.mc.new_const_float(self.bndl, self.type_float, arg.value)
             self.vars[arg] = var
         return var
 
     def nop(self):
+        pass
