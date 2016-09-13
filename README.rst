@@ -76,7 +76,7 @@ To use the API backend (which is currently under `mu-benchmarks`/`apicodegen` br
 
     $ PYTHONPATH=$MU/tools pypy rpython/bin/rpython -b mu --mugen=api <target>
 
-Note that this backend depends on :bash:$MU/tools/mar.py, :bash:PYTHONPATH variable needs to be set.
+Note that this backend depends on :bash:`$MU/tools/mar.py`, :bash:`PYTHONPATH` variable needs to be set.
 This will start up a Mu instance, build a bundle in Mu via API calls, and dump a boot image.
 To run the dumped boot image, use the `runmu.sh` provided by the reference implementation.
 
