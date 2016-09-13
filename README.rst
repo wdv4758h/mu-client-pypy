@@ -73,12 +73,14 @@ Note the default Mu code generation backend is textform which is going to be dep
 To use the API backend, do:
 
 ::
+
     $ pypy rpython/bin/rpython -b mu --mugen=api <target>
     
 This will start up a Mu instance, build a bundle in Mu via API calls, and dump a boot image.
 To run the dumped boot image, use the `runmu.sh` provided by the reference implementation.
 
 ::
+
     $ $MU/tools/runmu.sh <mu-flags> <bootimage> <program-args>
 
 --------------------------
