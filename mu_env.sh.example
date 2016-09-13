@@ -7,8 +7,10 @@
 # Before executing ./rpython/mucli/murpy.py, invoke this in the shell:
 # source mu_env.sh
 
-MU_PATH=/path/to/microvm-refimpl2     # edit me
+MU_PATH=/path/to/mu-impl-ref2     # edit me
+export MU=$MU_PATH
 export LD_LIBRARY_PATH=$MU_PATH/cbinding:$LD_LIBRARY_PATH
-export PYTHONPATH=$MU_PATH/pythonbinding:$PYTHONPATH
+export LIBRARY_PATH=$MU_PATH/cbinding:$LIBRARY_PATH
+export PYTHONPATH=$MU_PATH/pythonbinding:$MU_PATH/tools:$PYTHONPATH
 
 # vim: tw=80
