@@ -32,3 +32,5 @@ release/
 !pypy/tool/release/
 rpython/_cache/
 .cache/
+
+mu_env.sh
