@@ -1,6 +1,0 @@
-* TempVars - no value. Same with inherited classes. These are used in reg_bindings.
-Do we need to hold onto these? It seems that they map to a value
-
-* we_are_translated() is defined to return False consistently. However this is
-  used frequently throughout the project. Perhaps it is updated w/ meta 
-  programming (it is not updated explicitly in the entire pypy project)
