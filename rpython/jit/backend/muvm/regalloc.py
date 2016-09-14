@@ -108,6 +108,8 @@ class MuVMRegisterManager(RegisterManager):
     def return_constant(self, v, forbidden_vars=[], selected_reg=None):
         """ Need to determine what this will do in our new model."""
         #TODO: what is v, and what do we want to return here? what is v?
+        # ASSUMPTION: v is ConstLocation
+        # Question: Do we bind this?
         self._check_type(v)
         if isinstance(v, ConstLocation):
             loc = self.force_allocate_reg(v.tp)
@@ -117,19 +119,18 @@ class MuVMRegisterManager(RegisterManager):
 
     def convert_to_imm(self, c):
         # (Const) -> (TempVar)
-        #TODO: This converts a Constant to an Immediate value. There are no
-        # immediates in mu
-        return
+        raise RuntimeError("Muvm does not support immediate values")
 
     def is_still_alive(self, v):
         return v in self.live_regs
 
-    def stays_alive(self, v):
-        ### OVERRIDE
-        #TODO: What are we checking for here?
-        pass
+
+
+
+
 
     def possibly_free_var(self, v):
+        #TODO: This is wrong
         assert isinstance(v, SSALocation)
         if isinstance(v, ConstLocation):
             return
@@ -176,10 +177,10 @@ class MuVMRegisterManager(RegisterManager):
         #TODO: should this be an error or should we handle gracefully?
         raise RuntimeError("Muvm does not support variable spilling")
 
-    def get_free_reg(self):
-        #TODO: There are no 'free regs' per se, but we may have ssaLocations we
-        # don't need any more.
-        pass
+
+
+
+
 
     def get_scratch_reg(self, ty=INT, forbidden_vars=[], selected_reg=None):
         #TODO: just return new ssaLocation?
@@ -188,6 +189,7 @@ class MuVMRegisterManager(RegisterManager):
     def free_temp_vars(self):
         #TODO: no temp variables, so just pass?
         pass
+
     def _check_type(self, v):
         assert isinstance(v, SSALocation) # We may be able to refine this
 
