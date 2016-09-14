@@ -177,9 +177,25 @@ class MuVMRegisterManager(RegisterManager):
         temp_boxes.append(res)
         return res
     
+    def possibly_free_var(self, v):
+        """ If v is stored in a register and v is not used beyond the
+            current position, then free it.  Must be called at some
+            point for all variables that might be in registers.
+        """
+        #TODO: Update to reflect MuVM - frame_manager references be removed?
+        self._check_type(v)
+        if isinstance(v, ConstLocation):
+            return
+        if v not in self.longevity or self.longevity[v][1] <= self.position:
+            if v in self.reg_bindings:
+                self.free_regs.append(self.reg_bindings[v])
+                del self.reg_bindings[v]
+            if self.frame_manager is not None:
+                self.frame_manager.mark_as_free(v)
+
     def free_temp_vars(self):
-        #TODO: no temp variables, so just pass?
-        pass
+        self.possibly_free_vars(self.temp_boxes)
+        self.temp_boxes = []
 
     def _check_type(self, v):
         assert isinstance(v, SSALocation) # We may be able to refine this
