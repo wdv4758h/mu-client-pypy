@@ -193,10 +193,6 @@ class MuVMRegisterManager(RegisterManager):
             if self.frame_manager is not None:
                 self.frame_manager.mark_as_free(v)
 
-    def free_temp_vars(self):
-        self.possibly_free_vars(self.temp_boxes)
-        self.temp_boxes = []
-
     def _check_type(self, v):
         assert isinstance(v, SSALocation) # We may be able to refine this
 
