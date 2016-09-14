@@ -8,14 +8,14 @@ type_bindings = {}
 
 class Type(object):
     ''' Type value for SSALocations. Includes type and width info.'''
-    def __init__(self, ty = INT, width = INT_WIDTH):
-        self.ty  = ty
+    def __init__(self, tp = INT, width = INT_WIDTH):
+        self.tp  = tp
         self.width = width
     
     def prefix(self):
         """Return type signature"""
-        res = self.ty
-        if self.ty == INT:
+        res = self.tp
+        if self.tp == INT:
             res += str(self.width)
         return res
 
@@ -23,16 +23,16 @@ class Type(object):
         return '@' + self.prefix() + '_t'
     
     def __eq__(self, other):
-        return self.ty == other.ty and self.width == other.width
+        return self.tp == other.tp and self.width == other.width
     def __ne__(self, other):
         return not self.__eq__(other)
     def __hash__(self):
-        return hash( (self.ty, self.width) )   # Just hash the tuple
+        return hash( (self.tp, self.width) )   # Just hash the tuple
 
-def get_type( ty, width):
-    if (ty, width) not in type_bindings:
-        type_bindings[ (ty, width) ] = Type(ty, width)
-    return type_bindings[ (ty, width) ]
+def get_type(tp, width):
+    if (tp, width) not in type_bindings:
+        type_bindings[ (tp, width) ] = Type(tp, width)
+    return type_bindings[ (tp, width) ]
 
 INT64   = get_type(INT,   64)
 INT32   = get_type(INT,   32)
@@ -50,7 +50,7 @@ if INT_WIDTH == 32:
 class AssemblerLocation(object):
     _immutable_ = True
     value  = None
-    ty = Type(INT, INT_WIDTH)
+    tp = Type(INT, INT_WIDTH)
     type = INT
 
     def is_imm(self):
@@ -91,26 +91,26 @@ class SSALocation(AssemblerLocation):
     ### TODO t,width -> Type()
     _immutable_ = True
 
-    def __init__(self, value, ty=INT_DEFAULT):
+    def __init__(self, value, tp=INT_DEFAULT):
         '''Constructor for SSALocation class. Parameters as follow
            value: int:       index in registers. Default is none: auto
-           t:     type str:  (INT = 'i', FLOAT = 'f', etc)
+           tp:     type str:  (INT = 'i', FLOAT = 'f', etc)
            width: int:       for int types only
            Defaults to 64 bits - we are doing 64 bit python for now
         '''
         self.value  = value
-        self.ty = ty
+        self.tp = tp
 
     def __repr__(self):
         """Temp implementation. Will update"""
-        return '{}_{}'.format( self.ty.prefix(), self.value)
+        return '{}_{}'.format( self.tp.prefix(), self.value)
     
     def is_core_reg(self):
         # TODO find out what this implies
         return True
 
     def is_float(self):
-        return self.ty.ty == FLOAT
+        return self.tp.tp == FLOAT
 
     def is_local(self):
         return False
@@ -131,15 +131,9 @@ class LocalSSALocation(SSALocation):
         treat as normal.
     '''
 
-    def __init__(self, value, ty=INT_DEFAULT ):
-        # TODO handle value when used as a copy constructor. This should be
-        # updated.
-
-        if isinstance(value, SSALocation):
-            super(LocalSSALocation, self).__init__(value.value, value.ty)
-        else:
-            self.value = value
-            self.ty = ty
+    def __init__(self, value, tp=INT):
+        self.value = value
+        self.tp = tp
 
     def is_local(self):
         return True
@@ -148,12 +142,12 @@ class LocalSSALocation(SSALocation):
         return '%{}_{}'.format(self.t.prefix(), self.value)
     
 class GlobalSSALocation(SSALocation):
-    def __init__(self, value=None, ty=None, ):
+    def __init__(self, value=None, tp=None, ):
         if isinstance(value, SSALocation):
-            super(GlobalSSALocation, self).__init__(value.value, value.ty)
+            super(GlobalSSALocation, self).__init__(value.value, value.tp)
         else:
             self.value = value
-            self.ty = ty
+            self.tp = tp
     def is_global(self):
         return True
 
@@ -161,12 +155,12 @@ class GlobalSSALocation(SSALocation):
         return '@{}_{}'.format(self.t.prefix(), self.value)
 
 class ConstLocation(SSALocation):
-    def __init__(self, value, ty=Type()):
+    def __init__(self, value, tp=Type()):
         ''' Constructor:
             value: literal value of the constant
-            ty: Type() instance
+            tp: Type() instance
         '''
-        self.ty = ty
+        self.tp = tp
         self.value = value
 
     def getval(self):
@@ -178,16 +172,16 @@ class ConstLocation(SSALocation):
 
     def is_imm_float(self):
         ''' Do we need this? '''
-        return self.ty.ty == FLOAT
+        return self.tp.tp == FLOAT
 
     def as_key(self):          # a real address + 1
         return self.value | 1
 
     def is_float(self):
-        return self.ty.ty == FLOAT
+        return self.tp.tp == FLOAT
 
     def is_int(self):
-        return self.ty.tyh == INT
+        return self.tp.tp == INT
 
 
 """
