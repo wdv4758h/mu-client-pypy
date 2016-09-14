@@ -82,14 +82,13 @@ class AssemblerLocation(object):
         
 class SSALocation(AssemblerLocation):
     """This is replacing the RegisterLocation class. Rather than `value` being
-    in [0..15] we let `value` member hold the value of the ssa variable. Thus,
-    we are no longer treating it as a location but as a stand alone variable.
+    in [0..15] we let `value` member be arbitrarily large.
 
     __init__ is also updated so that it takes `value`, type `t` (INT default),
     and `width` (WORD*8 = 32 by default). The `width` parameter is necessary for
     ints and does not need to be specified for other types (as of now).
     """
-    ### DEV: t,width -> Type()
+    ### TODO t,width -> Type()
     _immutable_ = True
 
     def __init__(self, value, ty=INT_DEFAULT):
