@@ -58,25 +58,15 @@ math_copysign = llexternal(UNDERSCORE_ON_WIN32 + 'copysign',
 math_atan2 = llexternal('atan2', [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE)
 math_frexp = llexternal('frexp', [rffi.DOUBLE, rffi.INTP], rffi.DOUBLE)
 math_modf  = llexternal('modf',  [rffi.DOUBLE, rffi.DOUBLEP], rffi.DOUBLE)
-
-from rpython.config.translationoption import get_translation_config
-if get_translation_config().translation.backend == "mu":
-    # don't save errno.
-    math_ldexp = llexternal('ldexp', [rffi.DOUBLE, rffi.INT], rffi.DOUBLE)
-    math_pow = llexternal('pow', [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE)
-    math_fmod = llexternal('fmod', [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE,)
-    math_hypot = llexternal(UNDERSCORE_ON_WIN32 + 'hypot',
-                            [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE)
-else:
-    math_ldexp = llexternal('ldexp', [rffi.DOUBLE, rffi.INT], rffi.DOUBLE,
-                            save_err=rffi.RFFI_FULL_ERRNO_ZERO)
-    math_pow   = llexternal('pow', [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE,
-                            save_err=rffi.RFFI_FULL_ERRNO_ZERO)
-    math_fmod  = llexternal('fmod',  [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE,
-                            save_err=rffi.RFFI_FULL_ERRNO_ZERO)
-    math_hypot = llexternal(UNDERSCORE_ON_WIN32 + 'hypot',
-                            [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE,
-                            save_err=rffi.RFFI_FULL_ERRNO_ZERO)
+math_ldexp = llexternal('ldexp', [rffi.DOUBLE, rffi.INT], rffi.DOUBLE,
+                        save_err=rffi.RFFI_FULL_ERRNO_ZERO)
+math_pow   = llexternal('pow', [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE,
+                        save_err=rffi.RFFI_FULL_ERRNO_ZERO)
+math_fmod  = llexternal('fmod',  [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE,
+                        save_err=rffi.RFFI_FULL_ERRNO_ZERO)
+math_hypot = llexternal(UNDERSCORE_ON_WIN32 + 'hypot',
+                        [rffi.DOUBLE, rffi.DOUBLE], rffi.DOUBLE,
+                        save_err=rffi.RFFI_FULL_ERRNO_ZERO)
 math_floor = llexternal('floor', [rffi.DOUBLE], rffi.DOUBLE, elidable_function=True)
 math_sqrt = llexternal('sqrt', [rffi.DOUBLE], rffi.DOUBLE)
 math_sin = llexternal('sin', [rffi.DOUBLE], rffi.DOUBLE, elidable_function=True)
