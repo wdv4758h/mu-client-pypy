@@ -211,6 +211,12 @@ class MuDatabase:
                     if sym_in_lib(prefix + c_name, lib):
                         return prefix + c_name
 
+            # search librpyc.so for last resort.
+            for prefix in (_pypy_linux_prefix, _pypy_macro_prefix):
+                if sym_in_lib(prefix + c_name, librpyc):
+                    return prefix + c_name
+
+            # otherwise fail
             raise LookupError("Failed to find function '%(c_name)s'.\n" % locals())
 
         for extfn in self.externfncs:
