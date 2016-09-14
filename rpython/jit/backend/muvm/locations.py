@@ -38,10 +38,11 @@ INT64   = get_type(INT,   64)
 INT32   = get_type(INT,   32)
 FLOAT32 = get_type(FLOAT, 32)
 FLOAT64 = get_type(FLOAT, 64)
+DOUBLE  = FLOAT64
 
 DEFAULT_CONSTS = []
-for t in (INT32, INT64, FLOAT32, FLOAT64):
-    for v in (0,1):
+for t in (INT32, INT64, FLOAT32, DOUBLE):
+    for v in (-1,0,1,2,4,8,16,32,64,128,256,512,1024):
         DEFAULT_CONSTS.append(ConstLocation(t,v))
 
 

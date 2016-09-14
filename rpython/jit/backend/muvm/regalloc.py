@@ -57,29 +57,6 @@ try:
 except ImportError:
     OrderedDict = dict # too bad
 
-'''
-# Temp Variables -- find out what these are
-class TempInt(TempVar):
-    type = INT
-
-    def __repr__(self):
-        return "<TempInt at %s>" % (id(self),)
-
-
-class TempPtr(TempVar):
-    type = REF
-
-    def __repr__(self):
-        return "<TempPtr at %s>" % (id(self),)
-
-
-class TempFloat(TempVar):
-    type = FLOAT
-
-    def __repr__(self):
-        return "<TempFloat at %s>" % (id(self),)
-'''
-
 def void(self, op, fcond):
     return []
 
@@ -130,6 +107,18 @@ class MuVMRegisterManager(RegisterManager):
 
 
     def possibly_free_var(self, v):
+        """
+        ### From llsupport
+        self._check_type(v)
+        if isinstance(v, Const):
+            return
+        if v not in self.longevity or self.longevity[v][1] <= self.position:
+            if v in self.reg_bindings:
+                self.free_regs.append(self.reg_bindings[v])
+                del self.reg_bindings[v]
+            if self.frame_manager is not None:
+                self.frame_manager.mark_as_free(v)
+        """
         #TODO: This is wrong
         assert isinstance(v, SSALocation)
         if isinstance(v, ConstLocation):
@@ -140,7 +129,7 @@ class MuVMRegisterManager(RegisterManager):
     
     def _pick_variable_to_spill(self, v, forbidden_vars, selected_reg=None,
                                 need_lower_byte=False):
-        ### OVERRIDE
+        #TODO: Error?
         return None
     
     def try_allocate_reg(self, t, selected_reg=None, need_lower_byte=False):
@@ -174,7 +163,7 @@ class MuVMRegisterManager(RegisterManager):
 
     def force_spill_var(self, var):
         ### OVERRIDE
-        #TODO: should this be an error or should we handle gracefully?
+        #TODO: 
         raise RuntimeError("Muvm does not support variable spilling")
 
 
@@ -183,8 +172,10 @@ class MuVMRegisterManager(RegisterManager):
 
 
     def get_scratch_reg(self, ty=INT, forbidden_vars=[], selected_reg=None):
-        #TODO: just return new ssaLocation?
-        return try_allocate_reg(ty)  #TODO: Check if this is right
+        #TODO: Tentatively in -- may take out if not needed.
+        res = try_allocate_reg(ty)
+        temp_boxes.append(res)
+        return res
     
     def free_temp_vars(self):
         #TODO: no temp variables, so just pass?
