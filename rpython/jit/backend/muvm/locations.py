@@ -39,6 +39,11 @@ INT32   = get_type(INT,   32)
 FLOAT32 = get_type(FLOAT, 32)
 FLOAT64 = get_type(FLOAT, 64)
 
+DEFAULT_CONSTS = []
+for t in (INT32, INT64, FLOAT32, FLOAT64):
+    for v in (0,1):
+        DEFAULT_CONSTS.append(ConstLocation(t,v))
+
 
 
 INT_DEFAULT = INT64
@@ -155,11 +160,12 @@ class GlobalSSALocation(SSALocation):
         return '@{}_{}'.format(self.t.prefix(), self.value)
 
 class ConstLocation(SSALocation):
-    def __init__(self, value, tp=Type()):
+    def __init__(self, tp=INT64, value = 0):
         ''' Constructor:
             value: literal value of the constant
             tp: Type() instance
         '''
+        #TODO: Check that value is of proper type?
         self.tp = tp
         self.value = value
 
@@ -240,7 +246,6 @@ class RawSPStackLocation(AssemblerLocation):
 
     def as_key(self):            # a word >= 1000, and < 1000 + size of SP frame
         return self.value + 1000
-"""
 
 def imm(i):
     return ImmLocation(i)
@@ -251,6 +256,7 @@ def imm_float(i):
 def imm_int(i):
     return ImmLocation(i, t=INT, width=INT_SIZE)
 
+"""
 
 def get_fp_offset(base_ofs, position):
     return base_ofs + WORD * (position + JITFRAME_FIXED_SIZE)
