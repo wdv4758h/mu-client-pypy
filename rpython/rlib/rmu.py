@@ -2035,19 +2035,15 @@ def null(rmu_t):
     return lltype.nullptr(rmu_t.TO)
 
 @specialize.ll()
-def lst2arr(ELM_T, lst, need_rffi_cast=False):
+def lst2arr(ELM_T, lst):
     sz = rffi.cast(MuArraySize, len(lst))
 
     if len(lst) == 0:
         buf = lltype.nullptr(rffi.CArray(ELM_T))
     else:
         buf = lltype.malloc(rffi.CArray(ELM_T), len(lst), flavor='raw')
-        if need_rffi_cast:
-            for i, e in enumerate(lst):
-                buf[i] = rffi.cast(ELM_T, e)
-        else:
-            for i, e in enumerate(lst):
-                buf[i] = e
+        for i, e in enumerate(lst):
+            buf[i] = rffi.cast(ELM_T, e)
 
     return buf, sz
 
