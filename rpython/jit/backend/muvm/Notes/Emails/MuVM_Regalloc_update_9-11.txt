@@ -1,0 +1,98 @@
+On 9/11/2016 3:10 PM, Benjamin Kushigian wrote:
+
+    Hey all, so I've been working on the MuVMRegisterManager class and I've come
+    up with some questions.
+
+
+Great! Thanks for efforts to keep things rolling!
+
+    *108: return_constant(self, v, forbidden_vars=[], selected_reg=None)* -- I
+    will look into this but not sure what it should do right now --
+    specifically, what can we assume about `v'?
+
+
+I'd have to dig into the code to be sure.  Presumably v is the value, a
+constant.  I suspect this figures out whether an immediate can be used or not,
+and returns either the constant value (if an immediate can be used) or the
+register allocated (if an immediate won't work).
+
+I see that ARM and PPC have the concept of an "immediate location", ImmLocation.
+Of course this isn't exactly a location in the usual sense (it's not in a data
+area, but embedded in the bits of an instruction.
+
+It seems clear that we should not have this concept in Mu and should never try
+to build one.  So, we should allocate a register.
+
+As I mentioned at our last in-person meeting, we can either track these
+register, resulting in minimal number of registers used, but perhaps many *live*
+registers, OR we can allocate a fresh one for each constant we see.  I think I
+prefer the latter.  For some commonly used constants (0, 1, 2, -1, etc.) we
+might provide global SSA variables.  We'd need ones for 32- and 64-bit ints,
+floats, and doubles.  These could be preloaded into a table used for lookup.  We
+might call these seomthing like GlobalConstLocation.  The ones that we allocate
+locally and that die almost immediately, we could call LocalConstLocation.
+
+    *118: convert_to_imm(self, c)* -- according to llsupport this converts a
+    constant to an immediate value. MuVM does not have immediates, correct?
+    Should we do anything here?
+
+
+I think we should do nothing, but should detect the case if it arises -- i.e.,
+it should not come up, and if it does, we'll want to know why.  If I am wrong,
+then this should allocate a register, load it with the constant value, and
+return the register Location.
+
+    *127: stays_alive(self, v)* -- Are we asking if v is still in its longevity
+    range?
+
+
+Yes; the superclass may well do what you need already.  This is useful only if
+that behavior needs to be overriden in some cases ...
+
+    *174: force_spill_var(self, var)* -- we aren't spilling in mu, so should we
+    handle this gracefully or should we raise an error?
+
+
+Actually, we may need to do something.  While we do not need to free registers,
+I think this is called in some cases where the value of a variable needs to be
+stored back into its home in the stack frame.  (See RegisterManager._sync_var,
+called from RegisterManager.force_spill_var.)  That may be all the work that
+*we* need to do here.  Maybe you can dig into the code and figure it out?
+
+    *179: get_free_reg(self)* Is this just an alias for force_allocate_reg?
+    There are differing type sigs so I feel like this is not correct
+
+
+This function does not occur in the generic RegisterManager or in PPC.  And near
+as I can tell in ARM, it's never called.  So I think we can drop it, since we
+always allocate a fresh reg anyway.
+
+    *184: get_scratch_reg(self, ty=INT, forbidden_vars, selected_reg)* -- this
+    seems like it could be an alias for force_allocate_reg
+
+
+I don't think they're the same, but I'm not sure of the difference / purpose.
+What I see is allocation of a register that gets added to temp_boxes.  Maybe
+this is one we don't need, since we can allocate registers at will.  Something
+we may need to is allocate registers used only with the code of one operation
+(i.e., the op requires multiple Mu instructions to perform, and values need to
+be passed from one to another).  The "extra" values here do not correspond to
+"user" (meta-interpreter / interpreter) variables.
+
+    *189: free_temp_vars(self)* -- I think we are just passing on this one,
+    yeah?
+
+
+I'm not sure.  This would seem to free the temps allocate by get_scratch_reg.
+In our case freeing does not mean a LOT, but we doo need to know which regs are
+live and which are dead, since we have to pass the live ones forward.
+
+    In general, Regalloc is pulling much from ARM. I've skimmed through and
+    tried to identify methods that are using parts of ARM's RegisterManager that
+    we are avoiding and marked them with TODO. In general, the entirety of
+    Regalloc is under a big 'TODO' right now...
+
+
+Yes, I saw that :-) ...
+
+Cheers - E

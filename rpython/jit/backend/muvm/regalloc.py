@@ -108,7 +108,7 @@ class MuVMRegisterManager(RegisterManager):
     def return_constant(self, v, forbidden_vars=[], selected_reg=None):
         """ Need to determine what this will do in our new model."""
         #TODO: what is v, and what do we want to return here? what is v?
-        self.check_type(v)
+        self._check_type(v)
         if isinstance(v, ConstLocation):
             loc = self.force_allocate_reg(v.tp)
             self.assembler.load(loc, v.value)
@@ -188,6 +188,8 @@ class MuVMRegisterManager(RegisterManager):
     def free_temp_vars(self):
         #TODO: no temp variables, so just pass?
         pass
+    def _check_type(self, v):
+        assert isinstance(v, SSALocation) # We may be able to refine this
 
 class Regalloc(BaseRegalloc):
     def __init__(self, assembler):
