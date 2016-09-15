@@ -397,9 +397,11 @@ def _llval2mu_funcptr(llv):
     if graph:
         return mutype._mufuncref(mut, graph=graph, fncname=getattr(fnc, '_name', ''))
     else:
-        def _ref2uptrvoid(t):
-            return mutype.MuUPtr(mutype.void_t) if isinstance(t, mutype.MuRef) else t
         def _getname(c_name):
+            # add a prefix to external functions so not to conflict with defined functions
+            # (one instance is 'read')
+            prefix = '_pypymu_cextfnc_'
+
             # use a counter to distinguish external functions that
             # have variable length arguments and hence
             # have different static signature
@@ -407,9 +409,11 @@ def _llval2mu_funcptr(llv):
             nd = __externfnc_namectr
             if c_name in nd:
                 nd[c_name] += 1
-                return "%s_%d" % (c_name, nd[c_name] - 1)
+                return prefix + "%s_%d" % (c_name, nd[c_name] - 1)
             nd[c_name] = 2
-            return c_name
+
+            return prefix + c_name
+
         # external functions
         sig = mut.Sig
         # ref2voidptr on arg_ts and rtn_t?
