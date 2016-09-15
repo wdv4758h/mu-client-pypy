@@ -57,7 +57,7 @@ class MuTyper:
         for g in self.helper_graphs.values():
             self.specialise(g)
 
-        self.tlr.graphs = self.graphs = self.graphs + self.helper_graphs.values()
+        self.tlr.graphs = self.graphs = self.graphs.union(self.helper_graphs.values())
 
         mdb.restart()
         ll2mu.resolve_refobjs()
@@ -156,7 +156,7 @@ class MuTyper:
                         backend_optimizations(self.tlr, [graph])
                         key = (graph.name, ) + tuple(a.concretetype for a in graph.startblock.inputargs)
                         if key not in self.helper_graphs:
-                            graph = prepare([graph], graph)[0]
+                            graph = prepare([graph], graph).pop()
                             self.helper_graphs[key] = graph
                         else:
                             graph = self.helper_graphs[key]

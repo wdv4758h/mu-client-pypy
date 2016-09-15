@@ -19,35 +19,32 @@ def chop(graphs, g_entry):
     :return: a chopped down list of graphs
     """
 
-    # A dictionary that maps FunctionGraph -> bool
-    ref = {}
-    for g in graphs:
-        ref[g] = False
-
+    graph_closure = set()
+    pending_graphs = []
+    pending_objects = []
     is_ptr_const = lambda a: isinstance(a, Constant) and isinstance(a.value, lltype._ptr)
-    def visit(graph):
-        def _visit(callee):
-            try:
-                assert callee in graphs
-                if not ref[callee]:
-                    ref[callee] = True
-                    visit(callee)
-            except AssertionError:
-                log.error("Error: \"%s\" graph not found" % callee._name)
+    visited_obj = set()
 
-        def _find_funcrefs(obj):
-            if isinstance(obj, lltype._ptr):
-                refnt = obj._obj
-                if isinstance(refnt, lltype._struct):
-                    refnt = refnt._normalizedcontainer()
+    def _find_funcrefs(obj):
+        if isinstance(obj, lltype._ptr):
+            refnt = obj._obj
+            if isinstance(refnt, lltype._struct):
+                refnt = refnt._normalizedcontainer()
 
-                _find_funcrefs(refnt)
-
-            elif isinstance(obj, lltype._struct):
-                for fld in lltype.typeOf(obj)._flds:
+            pending_objects.append(refnt)
+        else:
+            if isinstance(obj, lltype._struct):
+                if obj in visited_obj:
+                    return
+                visited_obj.add(obj)
+                fld_dic = lltype.typeOf(obj)._flds
+                for fld in fld_dic:
                     _find_funcrefs(obj._getattr(fld))
 
             elif isinstance(obj, lltype._array):
+                if obj in visited_obj:
+                    return
+                visited_obj.add(obj)
                 if isinstance(lltype.typeOf(obj).OF, (lltype.ContainerType, lltype.Ptr)):
                     for i in range(len(obj.items)):
                         itm = obj.getitem(i)
@@ -55,15 +52,20 @@ def chop(graphs, g_entry):
 
             elif isinstance(obj, lltype._func):
                 if hasattr(obj, 'graph'):
-                    _visit(obj.graph)
+                    pending_graphs.append(obj.graph)
+
+    def visit(graph):
+        if graph in graph_closure:
+            return
+        graph_closure.add(graph)
 
         for blk in graph.iterblocks():
             for op in blk.operations:
                 if op.opname == 'indirect_call':
                     possible_graphs = op.args[-1].value
                     if possible_graphs:
-                        for callee in possible_graphs:
-                            _visit(callee)
+                        pending_graphs.extend(possible_graphs)
+
                 else:
                     for arg in filter(is_ptr_const, op.args):
                         _find_funcrefs(arg.value)
@@ -71,10 +73,17 @@ def chop(graphs, g_entry):
                 for arg in filter(is_ptr_const, e.args):
                     _find_funcrefs(arg.value)
 
-    ref[g_entry] = True
-    visit(g_entry)
+        # process all pending objects before moving on to next graph
+        while len(pending_objects) > 0:
+            obj = pending_objects.pop()
+            _find_funcrefs(obj)
 
-    return [g for g in graphs if ref[g]]
+    pending_graphs.append(g_entry)
+    while len(pending_graphs) > 0:
+        graph = pending_graphs.pop()
+        visit(graph)
+
+    return graph_closure
 
 
 _OPS_ALLOW_LLTYPE_ARGS = []
