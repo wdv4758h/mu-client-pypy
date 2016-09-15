@@ -1,7 +1,7 @@
 """
 Preparations before the MuTyper process
 """
-from rpython.rtyper.lltypesystem import lltype
+from rpython.rtyper.lltypesystem import lltype, llmemory
 from rpython.flowspace.model import Constant, Variable
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.rtyper.lltypesystem.lloperation import LL_OPERATIONS
@@ -49,6 +49,13 @@ def chop(graphs, g_entry):
                     for i in range(len(obj.items)):
                         itm = obj.getitem(i)
                         _find_funcrefs(itm)
+
+            elif isinstance(obj, lltype._opaque):
+                if hasattr(obj, 'container'):
+                    _find_funcrefs(obj._normalizedcontainer())
+
+            elif isinstance(obj, llmemory._wref):
+                _find_funcrefs(obj._dereference())
 
             elif isinstance(obj, lltype._func):
                 if hasattr(obj, 'graph'):
