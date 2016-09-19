@@ -5,7 +5,7 @@
 from rpython.rlib import jit
 
 driver = jit.JitDriver(greens = [], reds = 'auto')
-driver2 = jit.JitDriver(greens = [], reds = 'auto')
+driver2 = jit.JitDriver(greens = [], reds = 'auto', is_recursive=True)
 
 def main(count):
     i = 0

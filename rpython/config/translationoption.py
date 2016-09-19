@@ -52,7 +52,7 @@ translation_optiondescription = OptionDescription(
                  requires={
                      "c":      [("translation.type_system", "lltype")],
                      "mu":     [("translation.type_system", "lltype"),
-                                ("translation.gc", "none"),
+                                # ("translation.gc", "none"),
                                 ("translation.backendopt.raisingop2direct_call", True),
                                 ("translation.backendopt.remove_asserts", True),
                                 ("translation.backendopt.really_remove_asserts", True),
