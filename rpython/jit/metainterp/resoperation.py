@@ -1174,6 +1174,12 @@ _oplist = [
     'INT_SUB_OVF/2/i',
     'INT_MUL_OVF/2/i',
     '_OVF_LAST', # ----- end of is_ovf operations -----
+
+    '_MU_FIRST',    # ------ start of mu operations -----
+    'MU_NEW/*d/r',
+    'MU_NEWHYBRID/*d/r',
+    '_MU_LAST',     # ------ end of mu operations -----
+
     '_LAST',     # for the backend to add more internal operations
 ]
 

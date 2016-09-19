@@ -729,6 +729,14 @@ class GcRewriterAssembler(object):
         mallocs.  (For all I know this latter case never occurs in
         practice, but better safe than sorry.)
         """
+        if self.gc_ll_descr.kind == 'mu':
+            self.emitting_an_operation_that_can_collect()
+            args = [ConstInt(typeid)]
+            op = ResOperation(rop.MU_NEW, args, descr=self.gc_ll_descr.malloc_fixedsize_descr)
+            self.replace_op_with(v_result, op)
+            self.emit_op(op)
+            return
+
         if self.gc_ll_descr.fielddescr_tid is not None:  # framework GC
             assert (size & (WORD-1)) == 0, "size not aligned?"
             addr = self.gc_ll_descr.get_malloc_fn_addr('malloc_big_fixedsize')

@@ -687,6 +687,12 @@ def op_ll_read_timestamp():
     from rpython.rlib.rtimer import read_timestamp
     return read_timestamp()
 
+def op_jit_mu_new(tid):
+    pass
+
+def op_jit_mu_newhybrid(tid, length):
+    pass
+
 def op_debug_fatalerror(ll_msg):
     from rpython.rtyper.lltypesystem import lltype, rstr
     from rpython.rtyper.llinterp import LLFatalError

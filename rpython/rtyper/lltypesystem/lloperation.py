@@ -465,6 +465,9 @@ LL_OPERATIONS = {
     'get_write_barrier_from_array_failing_case': LLOp(sideeffects=False),
     'gc_get_type_info_group': LLOp(sideeffects=False),
     'll_read_timestamp': LLOp(canrun=True),
+    # Mu backend hacks
+    'jit_mu_new': LLOp(canrun=True),
+    'jit_mu_newhybrid': LLOp(canrun=True),
 
     # __________ GC operations __________
 

@@ -232,6 +232,29 @@ class GcLLDescr_boehm(GcLLDescription):
                                  arraydescr.lendescr.offset)
 
 # ____________________________________________________________
+# Mu backend
+class GcLLDescr_mu(GcLLDescr_boehm):
+    kind = 'mu'
+
+    def __init__(self, gcdescr, translator, rtyper):
+        GcLLDescription.__init__(self, gcdescr, translator, rtyper)
+    @staticmethod
+    def malloc_fixedsize(tid):
+        from rpython.rtyper.lltypesystem.lloperation import llop
+        llop.jit_mu_new(tid)
+
+    @staticmethod
+    def malloc_array(*args):
+        # TODO
+        pass
+
+    def _bh_malloc(self, sizedescr):
+        return self.malloc_fixedsize(sizedescr.get_type_id())
+
+    def _bh_malloc_array(self, num_elem, arraydescr):
+        return self.malloc_array(arraydescr.get_type_id(), num_elem)
+
+# ____________________________________________________________
 # All code below is for the hybrid or minimark GC
 
 class GcRootMap_asmgcc(object):
