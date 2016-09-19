@@ -3,7 +3,6 @@ from rpython.rtyper.lltypesystem import lltype, llmemory, rffi
 from rpython.tool.ansi_mandelbrot import Driver
 from .muts import mutype
 from .muts import muops
-from .muts import muni
 from rpython.translator.mu import mem as mumem
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
@@ -390,13 +389,39 @@ def resolve_refobjs():
         muref.setobj(ll2mu_val(llv))
         mdb.dot()
 
+__externfnc_namectr = {}
 def _llval2mu_funcptr(llv):
     mut = ll2mu_ty(llv._TYPE)
-    return mutype._mufuncref(mut,
-                          graph=getattr(llv._obj, 'graph', None),
-                          fncname=getattr(llv._obj, '_name', ''),
-                          compilation_info=getattr(llv._obj, 'compilation_info', None))
+    fnc = llv._obj
+    graph = getattr(fnc, 'graph', None)
+    if graph:
+        return mutype._mufuncref(mut, graph=graph, fncname=getattr(fnc, '_name', ''))
+    else:
+        def _getname(c_name):
+            # add a prefix to external functions so not to conflict with defined functions
+            # (one instance is 'read')
+            prefix = '_pypymu_cextfnc_'
 
+            # use a counter to distinguish external functions that
+            # have variable length arguments and hence
+            # have different static signature
+            # e.g. see pypy.module.fcntl.interp_fcntl.ioctl_int
+            nd = __externfnc_namectr
+            if c_name in nd:
+                nd[c_name] += 1
+                return prefix + "%s_%d" % (c_name, nd[c_name] - 1)
+            nd[c_name] = 2
+
+            return prefix + c_name
+
+        # external functions
+        sig = mut.Sig
+        # ref2voidptr on arg_ts and rtn_t?
+        # rtn_t = mutype.void_t if fnc_sig._voidrtn() else _ref2uptrvoid(fnc_sig.RTNS[0])
+        # sig = mutype.MuFuncSig(map(_ref2uptrvoid, fnc_sig.ARGS), rtn_t)
+        mut = mutype.MuUFuncPtr(sig)
+        c_name = fnc._name
+        return mutype._muexternfunc(mut, c_name, MuName(_getname(c_name)), fnc.compilation_info)
 
 def _llval2mu_adrofs(llv):
     def rec(llv):
@@ -531,22 +556,17 @@ def _llop2mu_mu_throw(exc, res=None, llopname='mu_throw'):
 # ----------------
 # call ops
 def _llop2mu_direct_call(cst_fnc, *args, **kwargs):
-    def _ref2uptrvoid(t):
-        return mutype.MuUPtr(mutype.void_t) if isinstance(t, mutype.MuRef) else t
+
     ops = _MuOpList()
-    g = cst_fnc.value.graph
-    if g is None:
-        fr = cst_fnc.value
-        fnc_sig = fr._TYPE.Sig
-        rtn_t = mutype.void_t if fnc_sig._voidrtn() else _ref2uptrvoid(fnc_sig.RTNS[0])
-        extfnc = muni.MuExternalFunc(fr.fncname, tuple(map(_ref2uptrvoid, fnc_sig.ARGS)),
-                                     rtn_t, map(str, fr.compilation_info.includes))
-        ldfncptr = ops.append(muops.LOAD(extfnc))
-        callee = ldfncptr
+    fr = cst_fnc.value
+    if isinstance(fr, mutype._muexternfunc):
+        callee = fr
         call_op = muops.CCALL
     else:
-        callee = g
+        isinstance(fr, mutype._mufuncref)
+        callee = fr.graph
         call_op = muops.CALL
+
     res = kwargs['res'] if 'res' in kwargs else None
     ops.append(call_op(callee, args, result=res))
     return ops
@@ -839,7 +859,7 @@ def _llop2mu_malloc_varsize(T, _hints, n, res=None, llopname='malloc_varsize'):
     try:
         _rflenfld, _ops = __getfieldiref(obj, 'length')
         ops.extend(_ops)
-        ops.append(muops.STORE(_rflenfld, n))
+        ops.append(__store(_rflenfld, n))
     except KeyError:  # doesn't have a length field
         # log.malloc_varsize("Ignored setting length field in type '%s'." % obj)
         pass
@@ -886,11 +906,16 @@ def _llop2mu_getfield(var, cnst_fldname, res=None, llopname='getfield'):
         raise IgnoredLLOp
     return ops
 
+def __store(iref, val):
+    if isinstance(val, Constant) and isinstance(val.value, mutype._mufuncref) and hasattr(val.value, 'graph'):
+        return muops.STORE(iref, val.value.graph)
+    else:
+        return muops.STORE(iref, val)
 
 def _llop2mu_setfield(var, cnst_fldname, val, res=None, llopname='setfield'):
     try:
         iref_fld, ops = __getfieldiref(var, cnst_fldname.value)
-        ops.append(muops.STORE(iref_fld, val))
+        ops.append(__store(iref_fld, val))
     except KeyError:
         if val.concretetype is lltype.Void:     # trying to set a field with a value that can't be translated.
             raise IgnoredLLOp
@@ -926,7 +951,7 @@ def _llop2mu_getarraysubstruct(var, idx, res=None, llopname='getarraysubstruct')
 
 def _llop2mu_setarrayitem(var, idx, val, res=None, llopname='setarrayitem'):
     iref_itm, ops = __getarrayitemiref(var, idx)
-    ops.append(muops.STORE(iref_itm, val))
+    ops.append(__store(iref_itm, val))
     return ops
 
 
@@ -974,7 +999,7 @@ def _llop2mu_setinteriorfield(var, *offsets_val, **kwards):
     offsets, val = offsets_val[:-1], offsets_val[-1]
     try:
         iref, ops = __getinterioriref(var, offsets)
-        ops.append(muops.STORE(iref, val))
+        ops.append(__store(iref, val))
     except KeyError:
         if val.concretetype is lltype.Void:
             raise IgnoredLLOp
@@ -1065,14 +1090,33 @@ def _llop2mu_direct_arrayitems(ptr, res=None, llopname='direct_arrayitems'):
 # ----------------
 # address operations
 def _llop2mu_keepalive(ptr, res=None, llopname='keepalive'):
-    return [muops.NATIVE_UNPIN(ptr, result=res)]
+    if isinstance(ptr.mu_type, mutype.MuRef):
+        return [muops.NATIVE_UNPIN(ptr, result=res)]
+    else:
+        return [], res
 
+
+from rpython.rlib.rposix import eci
+def external(name, args, res):
+    return rffi.llexternal(name, args, res, compilation_info=eci, _nowrapper=True)
+c_malloc = external("malloc", [rffi.SIZE_T], rffi.VOIDP)
+c_free = external("free", [rffi.VOIDP], lltype.Void)
+c_memcpy = external("memcpy", [rffi.VOIDP, rffi.VOIDP, rffi.SIZE_T], lltype.Void)
+c_memset = external("memset", [rffi.VOIDP, lltype.Signed, rffi.SIZE_T], lltype.Void)
+c_memmove = external("memmove", [rffi.CCHARP, rffi.CCHARP, rffi.SIZE_T], lltype.Void)
+__predef_extfns = {
+    "malloc": ll2mu_val(c_malloc),
+    "free": ll2mu_val(c_free),
+    "memset": ll2mu_val(c_memset),
+    "memcpy": ll2mu_val(c_memcpy),
+    "memmove": ll2mu_val(c_memmove),
+}
+__predef_extfns['memcopy'] = __predef_extfns['memcpy']
 
 def __raw2ccall(*args, **kwargs):
     ops = _MuOpList()
-    externfnc = getattr(muni, kwargs['llopname'].replace('raw', 'c'))
-    fnp = ops.append(muops.LOAD(externfnc))
-    sig = externfnc._T.Sig
+    fnp = __predef_extfns[kwargs['llopname'][4:]]
+    sig = fnp._TYPE.Sig
     args = list(args)
     for i, arg_t in enumerate(sig.ARGS):
         if isinstance(arg_t, mutype.MuUPtr):
@@ -1082,7 +1126,7 @@ def __raw2ccall(*args, **kwargs):
         res.mu_type = sig.RTNS[0]
 
     # Correct memcpy and memmove argument order
-    if externfnc.c_name in ('memcpy', 'memmove'):
+    if fnp.c_name in ('memcpy', 'memmove'):
         args = (args[1], args[0], args[2])
     ops.append(muops.CCALL(fnp, args, result=res))
     return ops
@@ -1112,7 +1156,7 @@ def _llop2mu_raw_store(adr, ofs, val, res=None, llopname='raw_store'):
         ops = _MuOpList()
         loc_adr = ops.extend(_ll2mu_op('adr_add', [adr, ofs]))
         loc_ptr = ops.append(muops.PTRCAST(loc_adr, mutype.MuUPtr(val.mu_type)))
-        ops.append(muops.STORE(loc_ptr, val))
+        ops.append(__store(loc_ptr, val))
         return ops
     elif isinstance(adr.mu_type, mutype.MuRef):
         assert isinstance(ofs.value, CDefinedIntSymbolic)
@@ -1304,6 +1348,22 @@ def _llop2mu_threadlocalref_addr(res=None, llopname='threadlocalref_addr'):
     ops.extend(_ll2mu_op('cast_pointer', [Constant(reftlstt_t, mutype.void_t), tlref_void], result=res))
 
     return ops
+
+
+def _llop2mu_mu_threadlocalref_init(res=None, llopname='mu_threadlocalref_init'):
+    ops = _MuOpList()
+
+    # HACK!
+    tlstt_t = globals().get('__mu_threadlocalstt_t', None)
+    assert tlstt_t
+
+    ref = ops.append(muops.NEW(tlstt_t))
+    ops.append(muops.SET_THREADLOCAL(ref))
+    return ops
+
+
+def _llop2mu_mu_thread_exit(res=None, llopname='mu_thread_exit'):
+    return [muops.THREAD_EXIT()]
 
 
 # ----------------

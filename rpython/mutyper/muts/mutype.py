@@ -665,6 +665,7 @@ class _muarray(_mumemarray, _mucontainer):
 
 # ----------------------------------------------------------
 class MuRefType(MuType):
+    type_constr_name = None
     def _defl(self, parent=None, parentindex=None):
         return _munullref(self)
 
@@ -984,6 +985,14 @@ class MuUFuncPtr(MuFuncRef):
 
 class _muufuncptr(_mufuncref):
     pass
+
+class _muexternfunc(_muufuncptr):
+    def __init__(self, TYPE, c_name, mu_name, eci):
+        _mufuncref.__init__(self, TYPE,
+                            c_name=c_name, mu_name=mu_name, eci=eci, mu_type=TYPE)
+
+    def __str__(self):
+        return "* %s" % self.c_name
 
 
 class MuWeakRef(MuRef):

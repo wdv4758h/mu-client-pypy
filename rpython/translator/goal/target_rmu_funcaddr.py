@@ -159,38 +159,34 @@ hello_world_hail = """
 
 
 def main(argv):
-    with Mu() as mu:
-        ctx = mu.new_context()
+    mu = MuVM("vmLog=ERROR")
+    ctx = mu.new_context()
 
-        ctx.load_bundle(prelude)
-        ctx.load_bundle(hello_world_uir)
-        ctx.load_hail(hello_world_hail)
+    ctx.load_bundle(prelude)
+    ctx.load_bundle(hello_world_uir)
+    ctx.load_hail(hello_world_hail)
+    write_g_id = ctx.id_of("@write.g")
+    write_g_hdle = ctx.handle_from_global(write_g_id)
+    write_fp_id = ctx.id_of("@write.fp")
+    ll_fncptr = rposix.c_write._ptr
+    if we_are_translated():
+        addr = ll_fncptr
+    else:
+        import ctypes
+        from rpython.rtyper.lltypesystem.ll2ctypes import get_ctypes_callable, ctypes2lltype
+        from rpython.rtyper.lltypesystem import llmemory
+        c_fncptr = get_ctypes_callable(ll_fncptr, ll_fncptr._obj.calling_conv)
+        addr = ctypes2lltype(llmemory.Address, ctypes.cast(c_fncptr, ctypes.c_void_p).value)
+    write_addr = rffi.cast(MuCFP, addr)
+    write_addr_hdle = ctx.handle_from_fp(write_fp_id, write_addr)
+    ctx.store(MuMemOrd.NOT_ATOMIC, write_g_hdle, write_addr_hdle)
+    _start_id = ctx.id_of("@_start")
+    _start_hdle = ctx.handle_from_func(_start_id)
+    stack_hdle = ctx.new_stack(_start_hdle)
+    thread_hdle = ctx.new_thread_nor(stack_hdle, rffi.cast(MuRefValue, 0), [])
+    mu.execute()
 
-        write_g_id = ctx.id_of("@write.g")
-        write_g_hdle = ctx.handle_from_global(write_g_id)
-        write_fp_id = ctx.id_of("@write.fp")
-
-        ll_fncptr = rposix.c_write._ptr
-        if we_are_translated():
-            addr = ll_fncptr
-        else:
-            import ctypes
-            from rpython.rtyper.lltypesystem.ll2ctypes import get_ctypes_callable, ctypes2lltype
-            from rpython.rtyper.lltypesystem import llmemory
-            c_fncptr = get_ctypes_callable(ll_fncptr, ll_fncptr._obj.calling_conv)
-            addr = ctypes2lltype(llmemory.Address, ctypes.cast(c_fncptr, ctypes.c_void_p).value)
-
-        write_addr = rffi.cast(MuCFP, addr)
-        write_addr_hdle = ctx.handle_from_fp(write_fp_id, write_addr)
-        ctx.store(MuMemOrd.NOT_ATOMIC, write_g_hdle, write_addr_hdle)
-
-        _start_id = ctx.id_of("@_start")
-        _start_hdle = ctx.handle_from_func(_start_id)
-        stack_hdle = ctx.new_stack(_start_hdle)
-        thread_hdle = ctx.new_thread_nor(stack_hdle, rffi.cast(MuRefValue, 0), [])
-
-        mu.execute()
-
+    mu.close()
     return 0
 
 

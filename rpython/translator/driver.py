@@ -14,7 +14,7 @@ from rpython.tool.ansi_print import AnsiLogger
 from rpython.tool.udir import udir
 from rpython.translator.goal import query
 from rpython.translator.goal.timing import Timer
-from rpython.translator.mu.genmu import MuTextIRBuilder
+from rpython.translator.mu.genmu import get_codegen_class, MuTextBundleGenerator, MuAPIBundleGenerator
 from rpython.translator.tool.taskengine import SimpleTaskEngine
 from rpython.translator.translator import TranslationContext
 from .mu.database import MuDatabase
@@ -543,9 +543,43 @@ class TranslationDriver(SimpleTaskEngine):
 
         log.llinterpret("result -> %s" % v)
 
+    def _mu_create_entry_point(self):
+        from rpython.rtyper.lltypesystem import rffi, lltype
+        from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
+        from rpython.rtyper.llannotation import lltype_to_annotation as l2a
+        from rpython.translator.backendopt.all import backend_optimizations
+        from rpython.rtyper.lltypesystem.lloperation import llop
+        def pypy_mu_main(argc, argv):
+            args = []
+            for i in range(argc):
+                s = rffi.charp2str(argv[i])
+                args.append(s)
+            llop.mu_threadlocalref_init(lltype.Void)
+            try:
+                exitcode = self.entry_point(args)
+            except Exception as e:
+                os.write(2, "Caught exception: %s\n" % str(e))
+                return 1
+            # What do I do with the exitcode?
+            return exitcode
+
+        mlha = MixLevelHelperAnnotator(self.translator.rtyper)
+        g = mlha.getgraph(pypy_mu_main, [l2a(rffi.INT), l2a(rffi.CCHARPP)], l2a(lltype.Signed))
+        mlha.finish()
+        backend_optimizations(self.translator)
+
+        # Hack the return block of the entry point to exit thread instead of returning
+        from rpython.flowspace.model import Variable, SpaceOperation
+        v = Variable()
+        v.concretetype = lltype.Void
+        g.returnblock.operations = (SpaceOperation('mu_thread_exit', [], v),)
+        self.translator.entry_point_graph = g
+
     @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
     def task_mutype_mu(self):
         self.log.info("Task mutype_mu.")
+        self._mu_create_entry_point()
+
         exctran = MuExceptionTransformer(self.translator)
         exctran.transform_all()
 
@@ -569,12 +603,22 @@ class TranslationDriver(SimpleTaskEngine):
     def task_compile_mu(self):
         self.log.info("Task compile_mu")
         target_name = self.compute_exe_name()
-        if target_name.ext != MuDatabase.bundle_suffix:
-            bundle_name = target_name + MuDatabase.bundle_suffix
+
+        if self.config.translation.mucodegen == "both":
+            self.log.info("generating bundle using text backend")
+            bdlgen_text = MuTextBundleGenerator(self.mudb)
+            bdlgen_text.bundlegen(target_name + '.mutxt')
+            self.log.info("generating bundle using Mu API backend")
+            bdlgen_api = MuAPIBundleGenerator(self.mudb)
+            bdlgen_api.bundlegen(target_name + '.muapi')
         else:
-            bundle_name = target_name
-        builder = MuTextIRBuilder(self.mudb)
-        builder.bundlegen(bundle_name)
+            if target_name.ext != MuDatabase.bundle_suffix:
+                bundle_name = target_name + MuDatabase.bundle_suffix
+            else:
+                bundle_name = target_name
+            cls = get_codegen_class()
+            bdlgen = cls(self.mudb)
+            bdlgen.bundlegen(bundle_name)
 
     def proceed(self, goals):
         if not goals:
