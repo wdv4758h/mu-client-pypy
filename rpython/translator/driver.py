@@ -382,7 +382,7 @@ class TranslationDriver(SimpleTaskEngine):
         jittest.jittest(self)
 
     BACKENDOPT = 'backendopt_lltype'
-    @taskdef([RTYPE, '??pyjitpl_lltype', '??jittest_lltype'], "lltype back-end optimisations")
+    @taskdef([RTYPE, '??pyjitpl_lltype', '??jittest_lltype', '?entrypoint_mu'], "lltype back-end optimisations")
     def task_backendopt_lltype(self):
         """ Run all backend optimizations - lltype version
         """
@@ -543,11 +543,13 @@ class TranslationDriver(SimpleTaskEngine):
 
         log.llinterpret("result -> %s" % v)
 
-    def _mu_create_entry_point(self):
+    @taskdef([RTYPE], "Create entry point function for Mu backend")
+    def task_entrypoint_mu(self):
+        self.log.info("Task entrypoint_mu")
+
         from rpython.rtyper.lltypesystem import rffi, lltype
         from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
         from rpython.rtyper.llannotation import lltype_to_annotation as l2a
-        from rpython.translator.backendopt.all import backend_optimizations
         from rpython.rtyper.lltypesystem.lloperation import llop
         def pypy_mu_main(argc, argv):
             args = []
@@ -566,19 +568,18 @@ class TranslationDriver(SimpleTaskEngine):
         mlha = MixLevelHelperAnnotator(self.translator.rtyper)
         g = mlha.getgraph(pypy_mu_main, [l2a(rffi.INT), l2a(rffi.CCHARPP)], l2a(lltype.Signed))
         mlha.finish()
-        backend_optimizations(self.translator)
-
-        # Hack the return block of the entry point to exit thread instead of returning
-        from rpython.flowspace.model import Variable, SpaceOperation
-        v = Variable()
-        v.concretetype = lltype.Void
-        g.returnblock.operations = (SpaceOperation('mu_thread_exit', [], v),)
         self.translator.entry_point_graph = g
 
     @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
     def task_mutype_mu(self):
         self.log.info("Task mutype_mu.")
-        self._mu_create_entry_point()
+
+        # Hack the return block of the entry point to exit thread instead of returning
+        from rpython.flowspace.model import Variable, SpaceOperation
+        from rpython.rtyper.lltypesystem import lltype
+        v = Variable()
+        v.concretetype = lltype.Void
+        self.translator.entry_point_graph.returnblock.operations = (SpaceOperation('mu_thread_exit', [], v),)
 
         exctran = MuExceptionTransformer(self.translator)
         exctran.transform_all()
