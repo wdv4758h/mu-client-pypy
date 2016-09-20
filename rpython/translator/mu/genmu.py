@@ -140,7 +140,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             libconfig.append("extraLibs=" + ":".join(extlibs))
 
             # dumpBundle
-            libconfig.append("dumpBundle=%s" % True)
+            libconfig.append("dumpBundle=%s" % False)
 
             # silent
             libconfig.append("vmLog=ERROR")
@@ -529,7 +529,6 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             @param obj: a mutype._muobject
             @return: Mu handle
             """
-            print "_init_obj: ", obj
             TYPE = obj._TYPE
             if isinstance(obj, mutype._muprimitive):
                 if isinstance(TYPE, mutype.MuInt):
