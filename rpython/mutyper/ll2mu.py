@@ -763,14 +763,35 @@ for triplet in __spec_cast_map:
 
 
 def _llop2mu_force_cast(x, res, llopname='force_cast'):
-    SRC_LLTYPE = x.concretetype
-    RES_LLTYPE = res.concretetype
-    SRC_MUTYPE = ll2mu_ty(SRC_LLTYPE)
-    RES_MUTYPE = ll2mu_ty(RES_LLTYPE)
+    SRC_MUTYPE = x.mu_type
+    RES_MUTYPE = res.mu_type
 
     def is_unsigned(LLT):
         return LLT in (lltype.Bool, lltype.Unsigned, lltype.UnsignedLongLong) or \
                (hasattr(LLT, '_type') and LLT._type in _inttypes.values() and not LLT._type.SIGNED)
+
+    if SRC_MUTYPE == RES_MUTYPE:
+        return [], x
+
+    if SRC_MUTYPE in (mutype.double_t, mutype.float_t) and isinstance(RES_MUTYPE, mutype.MuInt):
+        # float/double -> int
+        return [muops.FPTOSI(x, RES_MUTYPE, result=res)]
+
+    elif isinstance(SRC_MUTYPE, mutype.MuInt) and RES_MUTYPE in (mutype.double_t, mutype.float_t):
+        # int -> float/double
+        return [muops.SITOFP(x, RES_MUTYPE, result=res)]
+
+    elif SRC_MUTYPE is mutype.float_t and RES_MUTYPE is mutype.double_t:
+        # float -> double
+        return [muops.FPEXT(x, RES_MUTYPE, result=res)]
+
+    elif SRC_MUTYPE is mutype.double_t and RES_MUTYPE is mutype.float_t:
+        # double -> float
+        return [muops.FPTRUNC(x, RES_MUTYPE, result=res)]
+
+    # needs lltype
+    SRC_LLTYPE = x.concretetype
+    RES_LLTYPE = res.concretetype
 
     if isinstance(SRC_LLTYPE, lltype.Ptr) and \
             (RES_LLTYPE == llmemory.Address or isinstance(RES_LLTYPE, lltype.Primitive)):
@@ -794,28 +815,9 @@ def _llop2mu_force_cast(x, res, llopname='force_cast'):
             return [], x
         return [op(x, RES_MUTYPE, result=res)]
 
-    elif SRC_MUTYPE in (mutype.double_t, mutype.float_t) and isinstance(RES_MUTYPE, mutype.MuInt):
-        # float/double -> int
-        return [muops.FPTOSI(x, RES_MUTYPE, result=res)]
-
-    elif isinstance(SRC_MUTYPE, mutype.MuInt) and RES_MUTYPE in (mutype.double_t, mutype.float_t):
-        # int -> float/double
-        return [muops.SITOFP(x, RES_MUTYPE, result=res)]
-
-    elif SRC_MUTYPE is mutype.float_t and RES_MUTYPE is mutype.double_t:
-        # float -> double
-        return [muops.FPEXT(x, RES_MUTYPE, result=res)]
-
-    elif SRC_MUTYPE is mutype.double_t and RES_MUTYPE is mutype.float_t:
-        # double -> float
-        return [muops.FPTRUNC(x, RES_MUTYPE, result=res)]
-
     elif isinstance(SRC_LLTYPE, lltype.Ptr) and isinstance(RES_LLTYPE, lltype.Ptr):
         # Ptr -> Ptr
         return _ll2mu_op('cast_pointer', [Constant(RES_LLTYPE), x], result=res)
-
-    elif SRC_MUTYPE == RES_MUTYPE:
-        return [], x
 
     else:
         raise NotImplementedError("force_cast(%s) -> %s" % (SRC_LLTYPE, RES_LLTYPE))
@@ -1416,5 +1418,7 @@ def _llop2mu_debug_offset(res, llopname='debug_offset'):
 def _llop2mu_debug_fatalerror(msg, res, llopname='debug_fatalerror'):
     return [], res
 
+def _llop2mu_have_debug_prints(res, llopname='have_debug_prints'):
+    return [], _newprimconst(res.mu_type, 0)
 
 # TODO: rest of the operations
