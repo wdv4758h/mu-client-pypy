@@ -39,6 +39,8 @@ INT32   = get_type(INT,   32)
 FLOAT32 = get_type(FLOAT, 32)
 FLOAT64 = get_type(FLOAT, 64)
 DOUBLE  = FLOAT64
+REF32   = get_type(REF,   32)
+REF64   = get_type(REF,   64)
 
 DEFAULT_CONSTS = []
 for t in (INT32, INT64, FLOAT32, DOUBLE):
@@ -163,8 +165,8 @@ class GlobalSSALocation(SSALocation):
 class ConstLocation(SSALocation):
     def __init__(self, tp=INT64, value = 0):
         ''' Constructor:
-            value: literal value of the constant
             tp: Type() instance
+            value: literal value of the constant
         '''
         #TODO: Check that value is of proper type?
         self.tp = tp

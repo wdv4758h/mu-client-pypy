@@ -62,24 +62,26 @@ def void(self, op, fcond):
 
 ### I think we can get away with a single RegisterManager, namely this one.
 class MuVMRegisterManager(RegisterManager):
-    all_regs = r.registers  # Registers 
     
     def __init__(self, longevity, frame_manager=None, assembler=None):
         # Find out what longevity is exactly - dict to tuple?
         self.longevity = longevity
         self.live_regs = Set()  # Store alive ssaLocations
-        self.temp_boxes = []
+        self.temp_boxes = []    # assumed by super
 
         if not we_are_translated():
             self.reg_bindings = OrderedDict()
         else:
             self.reg_bindings = {}
-        self.const_bindings = {}    # Map (Type,val) to const
-        self.type_bindings  = {}    # Map
-
         self.bindings_to_frame_reg = {}
+        self.position = -1
         self.frame_manager = frame_manager
         self.assembler = assembler
+
+        # MuVM Specific variables
+        self.local_const__loc_bindings = {}    # Map (Type,val) to ConstLocation
+        self.global_const_loc_bindings = {}    # Map (Type,val) to ConstLocation
+        self.type_bindings  = {}               # Map (type_str, width) to Type
 
 
     def return_constant(self, v, forbidden_vars=[], selected_reg=None):
@@ -88,10 +90,29 @@ class MuVMRegisterManager(RegisterManager):
         # ASSUMPTION: v is ConstLocation
         # Question: Do we bind this?
         self._check_type(v)
-        if isinstance(v, ConstLocation):
-            loc = self.force_allocate_reg(v.tp)
-            self.assembler.load(loc, v.value)
-            return loc
+        if isinstance(v, Const):
+            if v.type == INT:
+                tp = INT_DEFAULT
+                val = v.getint()
+
+            elif v.type == FLOAT:
+                # TODO: always choose float64?
+                tp = FLOAT64  
+                val = v.getfloat()
+            elif v.type == PTR:
+                # TODO: always choose ref64? Should depend on 32/64 bit arch
+                tp = REF64
+                val = v.getref()
+
+            if (tp, val) in global_constant_loc_bindings:
+                c = global_const_loc_bindings[(tp, val)]
+            elif (tp, val) in local_constant_loc_bindings:
+                c = local_const_loc_bindings[(tp, val)]
+            else:
+                c = ConstLocation(tp, val)
+                local_const_loc_bindings[(tp,val)] = c
+            self.assembler.load(c, v.value)
+            return c
             
 
     def convert_to_imm(self, c):
