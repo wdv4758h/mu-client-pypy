@@ -238,15 +238,14 @@ class GcLLDescr_mu(GcLLDescr_boehm):
 
     def __init__(self, gcdescr, translator, rtyper):
         GcLLDescription.__init__(self, gcdescr, translator, rtyper)
-    @staticmethod
-    def malloc_fixedsize(tid):
-        from rpython.rtyper.lltypesystem.lloperation import llop
-        llop.jit_mu_new(tid)
 
     @staticmethod
-    def malloc_array(*args):
-        # TODO
-        pass
+    def malloc_fixedsize(tid):
+        return llop.jit_mu_new(tid)
+
+    @staticmethod
+    def malloc_array(tid, length):
+        return llop.jit_mu_newhybrid(tid, length)
 
     def _bh_malloc(self, sizedescr):
         return self.malloc_fixedsize(sizedescr.get_type_id())
