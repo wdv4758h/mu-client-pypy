@@ -600,7 +600,7 @@ class OpaqueType(ContainerType):
     def _allocate(self, initialization, parent=None, parentindex=None):
         return self._defl(parent=parent, parentindex=parentindex)
 
-RuntimeTypeInfo = OpaqueType("RuntimeTypeInfo", hints={'mu_ptr_as_ref': True})
+RuntimeTypeInfo = OpaqueType("RuntimeTypeInfo")
 
 class GcOpaqueType(OpaqueType):
     _gckind = 'gc'
