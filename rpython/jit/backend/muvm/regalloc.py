@@ -66,7 +66,7 @@ class MuVMRegisterManager(RegisterManager):
     def __init__(self, longevity, frame_manager=None, assembler=None):
         # Find out what longevity is exactly - dict to tuple?
         self.longevity = longevity
-        self.live_regs = Set()  # Store alive ssaLocations
+        self.live_regs = set()  # Store alive ssaLocations
         self.temp_boxes = []    # assumed by super
 
         if not we_are_translated():
@@ -79,9 +79,28 @@ class MuVMRegisterManager(RegisterManager):
         self.assembler = assembler
 
         # MuVM Specific variables
-        self.local_const__loc_bindings = {}    # Map (Type,val) to ConstLocation
+        self.local_const_loc_bindings = {}    # Map (Type,val) to ConstLocation
         self.global_const_loc_bindings = {}    # Map (Type,val) to ConstLocation
         self.type_bindings  = {}               # Map (type_str, width) to Type
+
+    def reset(self, longevity, frame_manager=None, assembler=None):
+        ''' Reset our register manager. Currently just copies __init__()'''
+        self.longevity = {}
+        self.live_regs = set()
+        self.temp_boxes = []
+        if not we_are_translated():
+            self.reg_bindings = OrderedDict()
+        else:
+            self.reg_bindings = {}
+        self.bindings_to_frame_reg = {}
+        self.position = -1
+        self.frame_manager = frame_manager
+        self.assembler = assembler
+
+        # MuVM Specific variables
+        self.local_const_loc_bindings = {}    # Map (Type,val) to ConstLocation
+        self.global_const_loc_bindings = {}   # Map (Type,val) to ConstLocation
+        self.type_bindings  = {}              # Map (type_str, width) to Type
 
 
     def return_constant(self, v, forbidden_vars=[], selected_reg=None):
@@ -121,10 +140,6 @@ class MuVMRegisterManager(RegisterManager):
 
     def is_still_alive(self, v):
         return v in self.live_regs
-
-
-
-
 
 
     def possibly_free_var(self, v):
@@ -308,7 +323,7 @@ class Regalloc(BaseRegalloc):
                                                             operations)
         self.longevity = longevity
         self.last_real_usage = last_real_usage
-        asm = self.assemlber
+        asm = self.assembler
         self.rm = MuVMRegisterManager(longevity) #TODO  Check arguments...
         return operations
 
@@ -333,19 +348,16 @@ class Regalloc(BaseRegalloc):
         #TODO
         # Check if this is valid with our definitions
         pass
-        '''
         used = {}
         i = 0
         for loc in locs:
             if loc is None:
-                loc = r.fp
+                pass
+                # loc = r.fp #TODO: fp?
             arg = inputargs[i]
             i += 1
             if loc.is_core_reg():
                 self.rm.reg_bindings[arg] = loc
-                used[loc] = None
-            elif loc.is_vfp_reg():
-                self.vfprm.reg_bindings[arg] = loc
                 used[loc] = None
             else:
                 assert loc.is_stack()
@@ -365,7 +377,6 @@ class Regalloc(BaseRegalloc):
         self.possibly_free_vars(list(inputargs))
         self.fm.finish_binding()
         self._check_invariants()
-        '''
 
     def get_gcmap(self, forbidden_regs=[], noregs=False):
         #TODO

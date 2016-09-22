@@ -43,10 +43,6 @@ REF32   = get_type(REF,   32)
 REF64   = get_type(REF,   64)
 
 DEFAULT_CONSTS = []
-for t in (INT32, INT64, FLOAT32, DOUBLE):
-    for v in (-1,0,1,2,4,8,16,32,64,128,256,512,1024):
-        DEFAULT_CONSTS.append(ConstLocation(t,v))
-
 
 
 INT_DEFAULT = INT64
@@ -263,3 +259,8 @@ def imm_int(i):
 
 def get_fp_offset(base_ofs, position):
     return base_ofs + WORD * (position + JITFRAME_FIXED_SIZE)
+
+for t in (INT32, INT64, FLOAT32, DOUBLE):
+    for v in (-1,0,1,2,4,8,16,32,64,128,256,512,1024):
+        DEFAULT_CONSTS.append(ConstLocation(t,v))
+
