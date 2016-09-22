@@ -24,6 +24,7 @@ from rpython.jit.backend.muvm.locations import (Type, SSALocation,
 #from rpython.jit.backend.arm.locations import imm, get_fp_offset
 from rpython.jit.backend.muvm.helper.regalloc import (prepare_op_by_helper_call,
                                                    prepare_unary_cmp,
+                                                   prepare_binop_int,
                                                    prepare_op_ri,
                                                    prepare_int_cmp,
                                                    prepare_unary_op,
@@ -368,14 +369,11 @@ class Regalloc(BaseRegalloc):
         for reg in self.rm.all_regs:
             if reg not in used:
                 self.rm.free_regs.append(reg)
-        self.vfprm.free_regs = []
-        for reg in self.vfprm.all_regs:
-            if reg not in used:
-                self.vfprm.free_regs.append(reg)
         # note: we need to make a copy of inputargs because possibly_free_vars
         # is also used on op args, which is a non-resizable list
         self.possibly_free_vars(list(inputargs))
-        self.fm.finish_binding()
+        
+        # self.fm.finish_binding()
         self._check_invariants()
 
     def get_gcmap(self, forbidden_regs=[], noregs=False):
@@ -415,7 +413,6 @@ class Regalloc(BaseRegalloc):
     def force_spill_var(self, var):
         # This will raise an exception in rm
         # No spillage in muvm
-        
         self.rm.force_spill_var(var)
 
     def before_call(self, force_store=[], save_all_regs=False):
@@ -424,7 +421,8 @@ class Regalloc(BaseRegalloc):
     def _sync_var(self, v):
         self.rm._sync_var(v)
 
-    def _prepare_op_int_add(self, op, fcond):
+    def _prepare_binop_int(self, op, fcond):
+        #TODO: check_imm_box - looks for ConstInt. Is this right?
         boxes = op.getarglist()
         a0, a1 = boxes
         imm_a0 = check_imm_box(a0)
@@ -440,51 +438,17 @@ class Regalloc(BaseRegalloc):
             l1 = self.make_sure_var_in_reg(a1, boxes)
         return [l0, l1]
 
-    def prepare_op_int_add(self, op, fcond):
-        locs = self._prepare_op_int_add(op, fcond)
+    def prepare_binop_int(self, op, fcond):
+        locs = self._prepare_binop_int(op, fcond)
         self.possibly_free_vars_for_op(op)
         self.free_temp_vars()
         res = self.force_allocate_reg(op)
         return locs + [res]
 
-    prepare_op_nursery_ptr_increment = prepare_op_int_add
-
-    def _prepare_op_int_sub(self, op, fcond):
-        a0, a1 = boxes = op.getarglist()
-        imm_a0 = check_imm_box(a0)
-        imm_a1 = check_imm_box(a1)
-        if not imm_a0 and imm_a1:
-            l0 = self.make_sure_var_in_reg(a0, boxes)
-            l1 = self.convert_to_imm(a1)
-        elif imm_a0 and not imm_a1:
-            l0 = self.convert_to_imm(a0)
-            l1 = self.make_sure_var_in_reg(a1, boxes)
-        else:
-            l0 = self.make_sure_var_in_reg(a0, boxes)
-            l1 = self.make_sure_var_in_reg(a1, boxes)
-        return [l0, l1]
-
-    def prepare_op_int_sub(self, op, fcond):
-        locs = self._prepare_op_int_sub(op, fcond)
-        self.possibly_free_vars_for_op(op)
-        self.free_temp_vars()
-        res = self.force_allocate_reg(op)
-        return locs + [res]
-
-    ###TODO Check on forbidden vars here on
-
-    def prepare_op_int_mul(self, op, fcond):
-        boxes = op.getarglist()
-        a0, a1 = boxes
-
-        reg1 = self.make_sure_var_in_reg(a0, forbidden_vars=boxes)
-        reg2 = self.make_sure_var_in_reg(a1, forbidden_vars=boxes)
-
-        self.possibly_free_vars(boxes)
-        self.possibly_free_vars_for_op(op)
-        res = self.force_allocate_reg(op)
-        self.possibly_free_var(op)
-        return [reg1, reg2, res]
+    prepare_op_int_add                = prepare_binop_int
+    prepare_op_nursery_ptr_increment  = prepare_binop_int
+    prepare_op_int_sub                = prepare_binop_int
+    prepare_op_int_mul                = prepare_binop_int
 
     def prepare_op_int_force_ge_zero(self, op, fcond):
         argloc = self.make_sure_var_in_reg(op.getarg(0))
@@ -497,6 +461,7 @@ class Regalloc(BaseRegalloc):
         resloc = self.force_allocate_reg(op)
         return [argloc, imm(numbytes), resloc]
 
+    #TODO: Implement helper.regalloc.py
     prepare_op_int_floordiv = prepare_op_by_helper_call('int_floordiv')
     prepare_op_int_mod = prepare_op_by_helper_call('int_mod')
     prepare_op_uint_floordiv = prepare_op_by_helper_call('unit_floordiv')
