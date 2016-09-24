@@ -1063,15 +1063,16 @@ def _llop2mu_ptr_ne(ptr1, ptr2, res=None, llopname='ptr_eq'):
 
 
 def _llop2mu_ptr_nonzero(ptr, res=None, llopname='ptr_nonzero'):
-    cst = Constant(mutype._munullref(ptr.mu_type))
+    cls = mutype._munullptr if isinstance(ptr.mu_type, mutype.MuUPtr) else mutype._munullref
+    cst = Constant(cls(ptr.mu_type))
     cst.mu_type = ptr.mu_type
     cst.mu_name = MuName("%s_%s" % (str(cst.value), ptr.mu_type.mu_name._name))
     return _llop2mu_ptr_ne(ptr, cst, res)
 
 
 def _llop2mu_ptr_iszero(ptr, res=None, llopname='ptr_zero'):
-    cst = Constant(mutype._munullref(ptr.mu_type))
-    cst.mu_type = ptr.mu_type
+    cls = mutype._munullptr if isinstance(ptr.mu_type, mutype.MuUPtr) else mutype._munullref
+    cst = Constant(cls(ptr.mu_type))
     cst.mu_name = MuName("%s_%s" % (str(cst.value), ptr.mu_type.mu_name._name))
     return _llop2mu_ptr_eq(ptr, cst, res)
 

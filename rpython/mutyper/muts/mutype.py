@@ -962,7 +962,7 @@ class MuUPtr(MuIRef):
     type_constr_name = "uptr"
 
 
-class _muuptr(_muiref):
+class _muuptr(_muref):
     def __str__(self):
         return "* %s" % self._obj0
 
