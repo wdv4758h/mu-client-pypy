@@ -159,9 +159,7 @@ def _lltype2mu_arr(llt):
 def _lltype2mu_ptr(llt):
     if isinstance(llt.TO, lltype.FuncType):
         return _lltype2mu_funcptr(llt)
-    if llt.TO._gckind == 'gc' or (hasattr(llt.TO, '_hints') and llt.TO._hints.get("immutable", False)):
-        cls = mutype.MuRef
-    elif isinstance(llt.TO, lltype.OpaqueType) and llt.TO.hints.get("mu_ptr_as_ref", False):
+    if llt.TO._gckind == 'gc':
         cls = mutype.MuRef
     else:
         cls = mutype.MuUPtr
@@ -366,21 +364,23 @@ def _llval2mu_arr(llv):
 
 __todorefs = []
 def _llval2mu_ptr(llv):
+    is_uptr = llv._T._gckind == 'raw'
+    null_cls = mutype._munullptr if is_uptr else mutype._munullref
+    cls = mutype._muuptr if is_uptr else mutype._muref
     if llv._obj0 is None:
-        return mutype._munullref(ll2mu_ty(llv._TYPE))
+        return null_cls(ll2mu_ty(llv._TYPE))
     if isinstance(llv._TYPE.TO, lltype.FuncType):
         return _llval2mu_funcptr(llv)
     mut = ll2mu_ty(llv._TYPE)
 
     if mut.TO is mutype.void_t:
-        muv = mutype._munullref(mut)
+        muv = null_cls(mut)
         log.warning("Translating LL value '%(llv)r' to '%(muv)r'" % locals())
         return muv
 
-    muref = mutype._muref(mut)
+    muref = mutype._muuptr(mut)
     __todorefs.append((llv._obj, muref))
     return muref
-    # return mutype._muref(mut, ll2mu_val(llv._obj))
 
 
 def resolve_refobjs():

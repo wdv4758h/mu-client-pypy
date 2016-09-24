@@ -680,13 +680,12 @@ class _mugenref(_muobject):  # value of general reference types
 
 class _munullref(_mugenref):
     def __init__(self, TYPE):
+        assert isinstance(TYPE, MuRef)
+        assert not isinstance(TYPE, MuUPtr)
         _mugenref.__init__(self, TYPE)
 
     def __str__(self):
-        if isinstance(self._TYPE, (MuUPtr, MuUFuncPtr)):
-            return '0'
-        else:
-            return 'NULL'
+        return 'NULL'
 
     def __repr__(self):
         return str(self)
@@ -697,6 +696,14 @@ class _munullref(_mugenref):
     def __hash__(self):
         return hash((self._TYPE, 'NULL'))
 
+
+class _munullptr(_munullref):
+    def __init__(self, TYPE):
+        assert isinstance(TYPE, MuUPtr)
+        _mugenref.__init__(self, TYPE)
+
+    def __str__(self):
+        return '0'
 
 # ----------------------------------------------------------
 class MuFuncSig(MuType):
