@@ -493,7 +493,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
     # NOTE: Heap object initialisation algorithm perhaps should be put into a (visitor?) class
     def gen_gcells(self):
         self.log.gen_gcells("start defining global cells")
-        for gcl in self.db.mutyper.ldgcells:
+        for gcl in self.db.objtracer.gcells:
             _id = self.bdr.gen_sym(str(gcl.mu_name))
             self.bdr.new_global_cell(_id, self.idmap[gcl._T])
             self.idmap[gcl] = _id

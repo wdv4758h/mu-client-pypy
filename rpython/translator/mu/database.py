@@ -2,9 +2,8 @@
 Mu IR text-form generation code
 """
 from rpython.flowspace.model import Constant
-from rpython.mutyper.muts.muentity import MuName
+from rpython.mutyper.muts.muentity import MuName, MuGlobalCell
 from rpython.mutyper.muts import mutype
-from rpython.translator.mu.hail import HAILGenerator
 from rpython.tool.ansi_mandelbrot import Driver
 from rpython.tool.ansi_print import AnsiLogger
 import ctypes, ctypes.util
@@ -228,6 +227,7 @@ class HeapObjectTracer:
     def __init__(self):
         self.gcells = {}        # forms a list of roots
         self.objs = set()
+        self.reloc_objs = set()
         self.nullref_ts = set()
 
     def trace(self, gcell):
@@ -240,12 +240,16 @@ class HeapObjectTracer:
         self.gcells[gcell] = obj
 
     def _find_refs(self, obj):
-        if isinstance(obj, (mutype._muref, mutype._muiref)):
+        if isinstance(obj, (mutype._muref, mutype._muiref, mutype._muuptr)):
             refnt = obj._obj0
             if isinstance(refnt, mutype._mustruct):
                 refnt = refnt._top_container()
+            if isinstance(obj, mutype._muuptr) and refnt not in self.reloc_objs:
+                self.reloc_objs.add(refnt)
+                gcl = MuGlobalCell(obj._TYPE.TO, refnt)
+                self.gcells[gcl] = refnt
 
-            if refnt not in self.objs:
+            elif refnt not in self.objs:
                 self.objs.add(refnt)
                 self._find_refs(refnt)
 
