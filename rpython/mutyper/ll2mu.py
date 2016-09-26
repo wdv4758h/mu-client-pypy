@@ -470,7 +470,13 @@ def _llval2mu_wref(llv):
     mut = ll2mu_ty(llv._TYPE)
     stt = mutype._mustruct(mut)
     llobj = llv._dereference()
-    setattr(stt, 'wref', ll2mu_val(llobj) if llobj else mutype._munullref(mut.wref))
+    if llobj:
+        wref = ll2mu_val(llobj)
+    else:
+        # NULL of weakref must be of ref type.
+        REF = mutype.MuRef(mut.wref.TO)
+        wref = mutype._munullref(REF)
+    setattr(stt, 'wref', wref)
     return stt
 
 
