@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """ Modified version of ../arm/registers.py. Will update as needed.
 """
 from rpython.jit.backend.muvm.locations import SSALocation
@@ -16,7 +17,7 @@ all_vfp_regs = vfpregisters
 
 argument_regs = caller_resp = []
 callee_resp = []
-callee_saved_registers = callee_resp 
+callee_saved_registers = callee_resp
 callee_restored_registers = callee_resp
 
 vfp_argument_regs = caller_vfp_resp = []
@@ -25,3 +26,5 @@ callee_vfp_resp = []
 
 callee_saved_vfp_registers = callee_vfp_resp
 
+# This is a hack and might not work ¯\_(ツ)_/¯
+fp = None
