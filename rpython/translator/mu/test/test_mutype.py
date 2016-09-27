@@ -75,3 +75,13 @@ def test_mutypeOf():
     S = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
     s = S._allocate()
     assert mutypeOf(s) == S
+
+
+def test_func():
+    F = MuFuncType([MU_INT64, MU_INT64], [MU_INT8, MU_FLOAT])
+    assert F.RESULTS == (MU_INT8, MU_FLOAT)
+    f = F._container_example()
+    assert f._callable() == (mu_int8(0), mu_float(0.0))
+
+
+# TODO: test MuOpaqueType, MuReferenceType

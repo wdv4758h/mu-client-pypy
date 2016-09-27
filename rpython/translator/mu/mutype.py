@@ -6,12 +6,13 @@ from rpython.rtyper.lltypesystem import lltype, rffi
 
 
 class MuType(lltype.LowLevelType):
-    pass
+    def _allocate(self, initialization, parent=None, parentindex=None):
+        assert initialization == 'new'
 
 
 # ----------------------------------------------------------
 class MuPrimitive(MuType, lltype.Primitive):
-    def _allocate(self, initialization='raw', parent=None, parentindex=None):
+    def _allocate(self, initialization='new', parent=None, parentindex=None):
         return self._default
 
 
@@ -37,7 +38,7 @@ class MuNumber(MuPrimitive, lltype.Number):
         MuNumber._mu_numbertypes[(type_cls, value_type_cls)] = num_type
         return num_type
 
-    def get_value_type(self):
+    def _val_type(self):
         return self._val_t
 
 
@@ -166,7 +167,7 @@ class MuStruct(MuContainerType):
     def __getitem__(self, idx):     # support indexing into a struct
         return self._flds[self._names[idx]]
 
-    def _allocate(self, initialization='raw', parent=None, parentindex=None):
+    def _allocate(self, initialization='new', parent=None, parentindex=None):
         return _mustruct(self, initialization=initialization,
                        parent=parent, parentindex=parentindex)
 
@@ -409,7 +410,7 @@ class MuArray(MuContainerType):
     def _is_varsize(self):
         return False    # arrays in Mu have fixed size
 
-    def _allocate(self, initialization='raw', parent=None, parentindex=None):
+    def _allocate(self, initialization='new', parent=None, parentindex=None):
         return _muarray(self, initialization=initialization,
                         parent=parent, parentindex=parentindex)
 
@@ -449,6 +450,201 @@ class _muarray(lltype._parentable):
 _setup_consistent_methods(MuArray)
 _setup_consistent_methods(_muarray)
 
+
+# ----------------------------------------------------------
+class MuOpaqueType(MuType):     # note this is not a container type
+    _template = (lltype.OpaqueType, (
+        "__init__",
+        "__str__",
+    ))
+
+    def _note_inlined_into(self, parent, first, last):
+        raise TypeError("%s can not be inlined" % self.__class__.__name__)
+
+    def _example(self):
+        return _muopaque(self)
+
+    def _allocate(self, initialization='new', parent=None, parentindex=None):
+        return _muopaque(self)
+
+
+class _muopaque(object):
+    _template = (lltype._opaque, (
+        "__repr__",
+        "__str__",
+        "__eq__",
+        "__ne__",
+    ))
+
+    def __init__(self, TYPE, **attrs):
+        self._name = "?"
+        self.__dict__.update(attrs)
+
+_setup_consistent_methods(MuOpaqueType)
+_setup_consistent_methods(_muopaque)
+
+
+# ----------------------------------------------------------
+class MuFuncType(MuContainerType):
+    _template = (lltype.FuncType, (
+        "__name__",
+    ))
+
+    def __init__(self, arg_ts, res_ts):
+        for arg in arg_ts + res_ts:
+            assert isinstance(arg, MuType)
+
+        self.ARGS = tuple(arg_ts)
+        self.RESULTS = tuple(res_ts)
+
+    def __str__(self):
+        return "Func ( %s ) -> ( %s )" % (
+            ", ".join(map(str, self.ARGS)),
+            ", ".join(map(str, self.RESULTS))
+        )
+    __str__ = lltype.saferecursive(__str__, '...')
+
+    def _short_name(self):
+        return "Func(%s)->(%s)" % (
+            ", ".join(map(str, self.ARGS)),
+            ", ".join(map(str, self.RESULTS))
+        )
+    _short_name = lltype.saferecursive(_short_name, '...')
+
+    def _container_example(self):
+        def f(*args):
+            return tuple(T._defl() for T in self.RESULTS)
+        return _mufunc(self, _callable=f)
+
+_setup_consistent_methods(MuFuncType)
+
+class _mufunc(lltype._func):
+    pass
+
+
+# ----------------------------------------------------------
+class MuReferenceType(MuType):
+    _template = (lltype.Ptr, (
+
+    ))
+    __suffix = None     # child class must specify
+    __symbol = None     # child class must specify
+
+    __name__ = property(lambda self: '%s%s' % (self.TO.__name__, self.__suffix))
+
+    _cache = lltype.WeakValueDictionary()
+    def __new__(cls, TO, use_cache=True):
+        if not use_cache:
+            obj = MuType.__new__(cls)
+        else:
+            try:
+                return MuReferenceType._cache[TO]
+            except KeyError:
+                obj = MuReferenceType._cache[TO] = MuType.__new__(cls)
+            except TypeError:
+                obj = MuType.__new__(cls)
+        obj.TO = TO
+        return obj
+
+    def __str__(self):
+        return '%s %s' % (self.__symbol, self.TO)
+
+    def _short_name(self):
+        return '%s %s' % (self.__suffix, self.TO._short_name())
+
+    def _val_type(self):
+        return self._val_t
+
+    def _defl(self, parent=None, parentindex=None):
+        return self._val_type()(self, None)
+
+    def _allocate(self, initialization='new', parent=None, parentindex=None):
+        return self._defl()
+
+    def _example(self):
+        if isinstance(self.TO, MuContainerType):
+            o = self.TO._container_example()
+        else:
+            o = self.TO._example()
+        return self._val_type()(self, o)
+
+
+class _muabstract_reference(object):
+    __slots__ = ('_T', '_TYPE', '_obj0')
+
+    _template = (lltype._abstract_ptr, (
+        '__eq__',
+        '__ne__',
+        '_same_obj',
+        '__nonzero__',
+        '__repr__',
+    ))
+
+    def _set_T(self, T):
+        self._T = T
+
+    def _set_TYPE(self, TYPE):
+        self._TYPE = TYPE
+
+    def _set_obj0(self, obj):
+        self.__obj = obj
+
+    def __str__(self):
+        try:
+            return '%s %s' % (self._TYPE.__symbol, self.__obj)
+        except RuntimeError:
+            return '%s DEAD %s' % (self._TYPE.__symbol, self._T)
+
+    def __call__(self, *args):
+        if isinstance(self._T, MuFuncType):
+            if len(args) != len(self._T.ARGS):
+                raise TypeError("calling %r with wrong argument number: %r" %
+                                (self._T, args))
+            for i, a, ARG in zip(range(len(self._T.ARGS)), args, self._T.ARGS):
+                if mutypeOf(a) != ARG:
+                    # be either None or 0 (MuUPtr)
+                    if isinstance(ARG, MuReferenceType):
+                        if a == ARG._defl()._obj0:
+                            pass
+
+                        # Any ref is convertible to ref<void> of same ref type
+                        elif ARG.TO is MU_VOID and \
+                                isinstance(mutypeOf(a), ARG):
+                            pass
+                    # # special case: ARG can be a container type, in which
+                    # # case a should be a pointer to it.  This must also be
+                    # # special-cased in the backends.
+                    # elif (isinstance(ARG, ContainerType) and
+                    #       typeOf(a) == Ptr(ARG)):
+                    #     pass
+                    else:
+                        args_repr = [mutypeOf(arg) for arg in args]
+                        raise TypeError("calling %r with wrong argument "
+                                        "types: %r" % (self._T, args_repr))
+            callb = self._obj._callable
+            if callb is None:
+                raise RuntimeError("calling undefined function")
+            return callb(*args)     # call the callbale
+        raise TypeError("%r instance is not a function" % (self._T,))
+
+_setup_consistent_methods(MuReferenceType)
+_setup_consistent_methods(_muabstract_reference)
+
+class MuRef(MuReferenceType):
+    __suffix = 'Ref'
+    __symbol = '@'
+
+    def _defl(self, parent=None, parentindex=None):
+        return _muref(self, None)
+
+    def _allocate(self, initialization='new', parent=None, parentindex=None):
+        return self._defl(parent, parentindex)
+
+    def _example(self):
+        o = self.TO._allocate()
+        return _muref(self, o, solid=True)
+
+# TODO: _muref type
 
 # ----------------------------------------------------------
 _prim_val_type_map = {
