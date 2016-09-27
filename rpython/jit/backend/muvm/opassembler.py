@@ -41,10 +41,12 @@ from rpython.jit.backend.ppc import callbuilder
 from rpython.rlib.rarithmetic import r_uint
 """
 
+
 class MuGuardToken(GuardToken):
     def __init__(self, cpu, gcmap, descr, failargs, faillocs, guard_opnum, frame_depth, faildescrindex, fcond=c.cond_none):
         GuardToken.__init__(self, cpu, gcmap, descr, failargs, faillocs, guard_opnum, frame_depth, faildescrindex)
         self.fcond = fcond
+
 
 class IntOpAssembler(object):
 
@@ -161,6 +163,7 @@ class IntOpAssembler(object):
                 self.mc.sradi(r.SCRATCH.value, r.SCRATCH.value, 1, 31)
             self.mc.and_(res.value, arg.value, r.SCRATCH.value)
         """
+
 
 class FloatOpAssembler(object):
     _mixin_ = True
@@ -287,6 +290,7 @@ class FloatOpAssembler(object):
         inst_res = self.mc.get_inst_res(inst, 0)
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
+
 
 class GuardOpAssembler(object):
 
@@ -1589,7 +1593,7 @@ class OpAssembler(IntOpAssembler, GuardOpAssembler,
                   AllocOpAssembler, FloatOpAssembler):
     _mixin_ = True
 
-    #Temporary until regalloc has functionality to keep track of variables
+    # Temporary until regalloc has functionality to keep track of variables
     def get_int(arg):
         if arg in self.vars:
             var = self.vars[arg]
