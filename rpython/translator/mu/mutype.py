@@ -12,7 +12,7 @@ class MuType(lltype.LowLevelType):
 # ----------------------------------------------------------
 class MuPrimitive(MuType, lltype.Primitive):
     def _allocate(self, initialization='raw', parent=None, parentindex=None):
-        return lltype.Primitive._allocate(self, initialization, parent, parentindex)
+        return self._default
 
 
 class MuNumber(MuPrimitive, lltype.Number):
@@ -55,15 +55,21 @@ class MuFloatType(MuNumber):
         self._val_t = value_type_cls
 
 
-r_int1 = rarithmetic.build_int('r_int1', False, 1, True)
-MU_INT1 = MuIntType("MU_INT1", r_int1)
-MU_INT8 = MuIntType("MU_INT8", rffi.r_uchar)
-MU_INT16 = MuIntType("MU_INT16", rffi.r_ushort)
-MU_INT32 = MuIntType("MU_INT32", rffi.r_uint)
-MU_INT64 = MuIntType("MU_INT64", rffi.r_ulong)
+mu_int1 = rarithmetic.build_int('r_int1', False, 1, True)
+mu_int8 = rffi.r_uchar
+mu_int16 = rffi.r_ushort
+mu_int32 = rffi.r_uint
+mu_int64 = rffi.r_ulong
+MU_INT1 = MuIntType("MU_INT1", mu_int1)
+MU_INT8 = MuIntType("MU_INT8", mu_int8)
+MU_INT16 = MuIntType("MU_INT16", mu_int16)
+MU_INT32 = MuIntType("MU_INT32", mu_int32)
+MU_INT64 = MuIntType("MU_INT64", mu_int64)
 
-MU_FLOAT = MuFloatType("MU_FLOAT", rffi.r_singlefloat, 32)
-MU_DOUBLE = MuFloatType("MU_DOUBLE", rarithmetic.r_longfloat, 64)
+mu_float = rffi.r_singlefloat
+mu_double = rarithmetic.r_longfloat
+MU_FLOAT = MuFloatType("MU_FLOAT", mu_float, 32)
+MU_DOUBLE = MuFloatType("MU_DOUBLE", mu_double, 64)
 
 MU_VOID = MuPrimitive("MU_VOID", None)
 
@@ -85,11 +91,12 @@ class MuBigIntType(MuIntType):
                 val >>= 64
             return lst
 
-        val_cls.__dict__['get_uint64s'] = get_uint64s
+        setattr(val_cls, 'get_uint64s', get_uint64s)
+        # val_cls.__dict__['get_uint64s'] = get_uint64s
         MuIntType.__init__(self, name, val_cls)
 
 MU_INT128 = MuBigIntType("MU_INT128", 128)
-
+mu_int128 = MU_INT128.get_value_type()
 
 # ----------------------------------------------------------
 # Container types
@@ -106,7 +113,8 @@ class MuForwardReference(MuContainerType, lltype.ForwardReference):
 
 
 def _setup_consistent_methods(cls):
-    for tmpcls, mtd in cls._template:
+    tmpcls, mtds = cls._template
+    for mtd in mtds:
         setattr(cls, mtd, tmpcls.__dict__[mtd])
 
 
@@ -174,7 +182,7 @@ class _mustruct(lltype._parentable):
     _template = (lltype._struct, (
         '__repr__',
         '_str_fields',
-        '__str__'
+        '__str__',
         '_getattr',
     ))
 
@@ -263,12 +271,17 @@ class _mumemarray(lltype._parentable):
         'shrinklength',
         'getbounds',
         'getitem',
-        'setitem'
     ))
 
     def setitem(self, index, value):
         assert mutypeOf(value) == self._TYPE.OF
         self.items[index] = value
+
+    def __getitem__(self, idx):
+        return self.getitem(idx)
+
+    def __setitem__(self, idx, value):
+        self.setitem(idx, value)
 
 _setup_consistent_methods(_MuMemArray)
 _setup_consistent_methods(_mumemarray)
@@ -314,6 +327,7 @@ class MuHybrid(MuContainerType):
         self._arrayfld = name
         self._varfld = self._arrayfld
         self._vartype = _MuMemArray(var_t)      # wrap with _MuMemArray
+        flds[self._varfld] = self._vartype    # correct field dictionary
 
         self._flds = lltype.frozendict(flds)
         self._names = tuple(names)
@@ -417,9 +431,9 @@ class _muarray(lltype._parentable):
 
         typ = TYPE.OF
         storage = []
-        for i, fld in enumerate(TYPE._names):
+        for i in range(TYPE.length):
             value = typ._allocate(initialization=initialization,
-                                  parent=self, parentindex=fld)
+                                  parent=self, parentindex=i)
             storage.append(value)
         self._items = storage
         if parent is not None:
@@ -438,15 +452,15 @@ _setup_consistent_methods(_muarray)
 
 # ----------------------------------------------------------
 _prim_val_type_map = {
-        r_int1: MU_INT1,
-        rffi.r_uchar: MU_INT8,
-        rffi.r_ushort: MU_INT16,
-        rffi.r_uint: MU_INT32,
-        rffi.r_ulong: MU_INT64,
-        MU_INT128.get_value_type(): MU_INT128,
-        rffi.r_singlefloat: MU_FLOAT,
-        rarithmetic.r_longfloat: MU_DOUBLE,
-        NoneType: MU_VOID
+        mu_int1: MU_INT1,
+        mu_int8: MU_INT8,
+        mu_int16: MU_INT16,
+        mu_int32: MU_INT32,
+        mu_int64: MU_INT64,
+        mu_int128: MU_INT128,
+        mu_float: MU_FLOAT,
+        mu_double: MU_DOUBLE,
+        type(None): MU_VOID
     }
 
 
