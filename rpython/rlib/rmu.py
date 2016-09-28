@@ -343,8 +343,8 @@ class MuCommInst:
     IRBUILDER_NEW_NEWTHREAD = rffi.cast(MuFlag, 0x34d)
     IRBUILDER_NEW_SWAPSTACK = rffi.cast(MuFlag, 0x34e)
     IRBUILDER_NEW_COMMINST = rffi.cast(MuFlag, 0x34f)
-    IRBUILDER_NEW_COMMINST = rffi.cast(MuFlag, 0xc001)
-    IRBUILDER_NEW_COMMINST = rffi.cast(MuFlag, 0xc002)
+    EXT_PRINT_STATS = rffi.cast(MuFlag, 0xc001)
+    EXT_CLEAR_STATS = rffi.cast(MuFlag, 0xc002)
 
 MU_NO_ID = rffi.cast(MuID, 0)
 
@@ -1753,10 +1753,10 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_atomicrmw(self, id, result_id, is_ptr, ord, optr, refTy, loc, opnd, exc_clause=MU_NO_ID):
+    def new_atomicrmw(self, id, result_id, is_ptr, ord, optr, ref_ty, loc, opnd, exc_clause=MU_NO_ID):
         # type: (MuID, MuID, bool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
-        self._bldr.c_new_atomicrmw(self._bldr, id, result_id, is_ptr_c, ord, optr, refTy, loc, opnd, exc_clause)
+        self._bldr.c_new_atomicrmw(self._bldr, id, result_id, is_ptr_c, ord, optr, ref_ty, loc, opnd, exc_clause)
         muerrno = self._mu.get_errno()
         if muerrno:
             raise MuRuntimeError(muerrno)
