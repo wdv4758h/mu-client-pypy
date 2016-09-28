@@ -1,8 +1,11 @@
+from sys import maxsize
 """Some architecture-related values""" 
 WORD = 4
 DOUBLE_WORD = 8
 
-INT_WIDTH = 64     # Are we using 64 bit python or 32 bit python?
+INT_WIDTH = 32
+if maxsize > 2**32:
+    INT_WIDTH = 64
 
 # the number of registers that we need to save around malloc calls
 N_REGISTERS_SAVED_BY_MALLOC = 9

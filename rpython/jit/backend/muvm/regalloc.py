@@ -182,7 +182,7 @@ class MuVMRegisterManager(RegisterManager):
         """
         ### OVERRIDE
         ### Scratch Method
-        assert is_instance(t, Type)
+        assert isinstance(t, Type)
         assert selectedReg == None
         v = len(self.all_regs)      # Position
         ssa = SSALocation(v, t)     # SSA variable, to be appended
@@ -202,11 +202,6 @@ class MuVMRegisterManager(RegisterManager):
         ### OVERRIDE
         #TODO: 
         raise RuntimeError("Muvm does not support variable spilling")
-
-
-
-
-
 
     def get_scratch_reg(self, ty=INT, forbidden_vars=[], selected_reg=None):
         #TODO: Tentatively in -- may take out if not needed.
@@ -421,29 +416,6 @@ class Regalloc(BaseRegalloc):
     def _sync_var(self, v):
         self.rm._sync_var(v)
 
-    def _prepare_binop_int(self, op, fcond):
-        #TODO: check_imm_box - looks for ConstInt. Is this right?
-        boxes = op.getarglist()
-        a0, a1 = boxes
-        imm_a0 = check_imm_box(a0)
-        imm_a1 = check_imm_box(a1)
-        if not imm_a0 and imm_a1:
-            l0 = self.make_sure_var_in_reg(a0, boxes)
-            l1 = self.convert_to_imm(a1)
-        elif imm_a0 and not imm_a1:
-            l0 = self.convert_to_imm(a0)
-            l1 = self.make_sure_var_in_reg(a1, boxes)
-        else:
-            l0 = self.make_sure_var_in_reg(a0, boxes)
-            l1 = self.make_sure_var_in_reg(a1, boxes)
-        return [l0, l1]
-
-    def prepare_binop_int(self, op, fcond):
-        locs = self._prepare_binop_int(op, fcond)
-        self.possibly_free_vars_for_op(op)
-        self.free_temp_vars()
-        res = self.force_allocate_reg(op)
-        return locs + [res]
 
     prepare_op_int_add                = prepare_binop_int
     prepare_op_nursery_ptr_increment  = prepare_binop_int
@@ -462,19 +434,16 @@ class Regalloc(BaseRegalloc):
         return [argloc, imm(numbytes), resloc]
 
     #TODO: Implement helper.regalloc.py
-    prepare_op_int_floordiv = prepare_op_by_helper_call('int_floordiv')
-    prepare_op_int_mod = prepare_op_by_helper_call('int_mod')
-    prepare_op_uint_floordiv = prepare_op_by_helper_call('unit_floordiv')
+    prepare_op_int_floordiv   = prepare_binop_int
+    prepare_op_int_mod        = prepare_binop_int
+    prepare_op_uint_floordiv  = prepare_binop_int
 
-    prepare_op_int_and = prepare_op_ri('int_and')
-    prepare_op_int_or = prepare_op_ri('int_or')
-    prepare_op_int_xor = prepare_op_ri('int_xor')
-    prepare_op_int_lshift = prepare_op_ri('int_lshift', imm_size=0x1F,
-                                        allow_zero=False, commutative=False)
-    prepare_op_int_rshift = prepare_op_ri('int_rshift', imm_size=0x1F,
-                                        allow_zero=False, commutative=False)
-    prepare_op_uint_rshift = prepare_op_ri('uint_rshift', imm_size=0x1F,
-                                        allow_zero=False, commutative=False)
+    prepare_op_int_and      = prepare_binop_int
+    prepare_op_int_or       = prepare_binop_int
+    prepare_op_int_xor      = prepare_binop_int
+    prepare_op_int_lshift   = prepare_binop_int
+    prepare_op_int_rshift   = prepare_binop_int
+    prepare_op_uint_rshift  = prepare_binop_int
 
     prepare_op_int_lt = prepare_int_cmp
     prepare_op_int_le = prepare_int_cmp
@@ -506,7 +475,6 @@ class Regalloc(BaseRegalloc):
         #TODO
         # Check in on EffectInfo.*
         pass
-        '''
         calldescr = op.getdescr()
         assert calldescr is not None
         effectinfo = calldescr.get_extra_info()
@@ -536,7 +504,6 @@ class Regalloc(BaseRegalloc):
             #elif oopspecindex == EffectInfo.OS_MATH_READ_TIMESTAMP:
             #    ...
         return self._prepare_call(op)
-        '''
     
     prepare_op_call_i = _prepare_op_call
     prepare_op_call_r = _prepare_op_call
@@ -566,9 +533,9 @@ class Regalloc(BaseRegalloc):
         args[0] = self._call(op, args, force_store, save_all_regs)
         return args
 
-       #################################################################
-       ###             ### TODO: Check following code ###            ###
-       #################################################################
+   #################################################################
+   ###               TODO: Check following code ###              ###
+   #################################################################
 
     def _call(self, op, arglocs, force_store=[], save_all_regs=False):
         if not save_all_regs:

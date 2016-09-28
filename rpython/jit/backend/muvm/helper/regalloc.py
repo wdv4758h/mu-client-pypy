@@ -84,9 +84,7 @@ def prepare_op_by_helper_call(name):
     #TODO
     pass
 
-def prepare_int_cmp(self, op, fcond):
-    #TODO
-    pass
+prepare_int_cmp = prepare_binop_int
 
 def prepare_unary_cmp(self, op, fcond):
     #TODO
