@@ -1409,6 +1409,16 @@ def _llop2mu_gc_stack_bottom(res, llopname='gc_stack_bottom'):
 
 
 # ----------------
+# Other operations
+def _llop2mu_mu_stat_print(cookie, res, llopname='mu_stat_print'):
+    return [muops.STATS_PRINT(cookie)]
+
+
+def _llop2mu_mu_stat_clear(res, llopname='mu_stat_clear'):
+    return [muops.STATS_CLEAR()]
+
+
+# ----------------
 # Other dummy operations
 def _llop2mu_debug_offset(res, llopname='debug_offset'):
     return [], _newprimconst(res.mu_type, -1)

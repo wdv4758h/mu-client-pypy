@@ -586,7 +586,9 @@ LL_OPERATIONS = {
 
     # __________ Mu backend __________
     'mu_threadlocalref_init': LLOp(canrun=True),
-    'mu_thread_exit': LLOp(canrun=True)
+    'mu_thread_exit': LLOp(canrun=True),
+    'mu_stat_print': LLOp(canrun=True),
+    'mu_stat_clear': LLOp(canrun=True)
 }
 # ***** Run test_lloperation after changes. *****
 

@@ -487,6 +487,10 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             self.bdr.new_comminst(op_id, [varmap[op.result]], rmu.MuCommInst.GET_THREADLOCAL, [], [], [], [])
         elif cls is muops.SET_THREADLOCAL:
             self.bdr.new_comminst(op_id, [], rmu.MuCommInst.SET_THREADLOCAL, [], [], [], [varmap[op.ref]])
+        elif cls is muops.STATS_PRINT:
+            self.bdr.new_comminst(op_id, [], rmu.MuCommInst.EXT_PRINT_STATS, [], [], [], [varmap[op.cookie]])
+        elif cls is muops.STATS_CLEAR:
+            self.bdr.new_comminst(op_id, [], rmu.MuCommInst.EXT_CLEAR_STATS, [], [], [], [])
         else:
             raise NotImplementedError("Building method for %s not implemented" % op)
 

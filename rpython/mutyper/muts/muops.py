@@ -327,4 +327,8 @@ GET_THREADLOCAL = _newcomminst("uvm.get_threadlocal", "", lambda args: MuRef(voi
 
 SET_THREADLOCAL = _newcomminst("uvm.set_threadlocal", "ref", lambda args: void_t, lambda op: "(%s)" % op.ref.mu_name)
 
+STATS_PRINT = _newcomminst("uvm.ext.print_stats", "cookie", lambda args: void_t, lambda op: "(%s)" % op.cookie.mu_name)
+
+STATS_CLEAR = _newcomminst("uvm.ext.clear_stats", "", lambda args: void_t, lambda op: "")
+
 # TODO: a few more?
