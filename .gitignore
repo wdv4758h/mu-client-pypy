@@ -34,3 +34,5 @@ rpython/_cache/
 .cache/
 
 mu_env.sh
+
+.vagrant

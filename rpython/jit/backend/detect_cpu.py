@@ -9,7 +9,7 @@ from rpython.translator.platform import is_host_build
 class ProcessorAutodetectError(Exception):
     pass
 
-
+MU_VM             = 'mu'
 MODEL_X86         = 'x86'
 MODEL_X86_NO_SSE2 = 'x86-without-sse2'
 MODEL_X86_64      = 'x86-64'
@@ -113,7 +113,9 @@ def getcpuclassname(backend_name="auto"):
     if backend_name == "auto":
         backend_name = autodetect()
     backend_name = backend_name.replace('_', '-')
-    if backend_name == MODEL_X86:
+    if backend_name == MU_VM:
+        return  "rpython.jit.backend.muvm.runner", "MuCPU"
+    elif backend_name == MODEL_X86:
         return "rpython.jit.backend.x86.runner", "CPU"
     elif backend_name == MODEL_X86_NO_SSE2:
         return "rpython.jit.backend.x86.runner", "CPU386_NO_SSE2"
