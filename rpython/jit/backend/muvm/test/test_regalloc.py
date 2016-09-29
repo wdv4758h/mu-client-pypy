@@ -20,6 +20,7 @@ from rpython.rtyper import rclass
 from rpython.jit.codewriter.effectinfo import EffectInfo
 from rpython.jit.codewriter import longlong
 from rpython.jit.backend.llsupport.test.test_regalloc_integration import BaseTestRegalloc
+from rpython.jit.backend.muvm.runner import MuCPU
 
 
 def test_is_comparison_or_ovf_op():
@@ -27,7 +28,10 @@ def test_is_comparison_or_ovf_op():
     assert is_comparison_or_ovf_op(rop.INT_ADD_OVF)
     assert is_comparison_or_ovf_op(rop.INT_EQ)
 
-CPU = getcpuclass()
+#XXX: Test value; fool JIT to think it's on MuVM
+#TODO: What should rtyper and stats be?
+CPU = MuCPU
+# CPU = getcpuclass()
 
 
 class MockGcDescr(GcCache):

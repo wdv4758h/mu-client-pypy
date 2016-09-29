@@ -56,7 +56,7 @@ from rpython.jit.backend.llsupport.descr import CallDescr
 try:
     from collections import OrderedDict
 except ImportError:
-    OrderedDict = dict # too bad
+    OrderedDict = dict() # too bad
 
 def void(self, op, fcond):
     return []
