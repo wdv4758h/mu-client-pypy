@@ -3,6 +3,7 @@
 """
 
 import py
+
 from rpython.jit.metainterp.history import (BasicFailDescr,
                                         BasicFinalDescr,
                                         JitCellToken,
@@ -22,14 +23,14 @@ from rpython.jit.codewriter import longlong
 from rpython.jit.backend.llsupport.test.test_regalloc_integration import BaseTestRegalloc
 from rpython.jit.backend.muvm.runner import MuCPU
 
-
 def test_is_comparison_or_ovf_op():
     assert not is_comparison_or_ovf_op(rop.INT_ADD)
     assert is_comparison_or_ovf_op(rop.INT_ADD_OVF)
     assert is_comparison_or_ovf_op(rop.INT_EQ)
 
+
+
 #XXX: Test value; fool JIT to think it's on MuVM
-#TODO: What should rtyper and stats be?
 CPU = MuCPU
 # CPU = getcpuclass()
 
