@@ -11,6 +11,8 @@ from rpython.jit.backend.model import CompiledLoopToken
 from rpython.jit.backend.muvm import conditions as c, regalloc
 from rpython.jit.backend.muvm.arch import JITFRAME_FIXED_SIZE
 from rpython.jit.backend.muvm.regalloc import Regalloc
+from rpython.jit.codewriter.effectinfo import EffectInfo
+from rpython.jit.metainterp.resoperation import rop
 from rpython.rlib.debug import debug_print, debug_start, debug_stop
 from rpython.rlib.jit import AsmInfo
 from rpython.rlib.objectmodel import we_are_translated
@@ -248,24 +250,24 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    emit_int_add = gen_emit_int_op(MuBinOptr.ADD)
-    emit_int_sub = gen_emit_int_op(MuBinOptr.SUB)
-    emit_int_mul = gen_emit_int_op(MuBinOptr.MUL)
-    emit_int_add_ovf = emit_int_add  # TODO: overflows need to be handled
-    emit_int_sub_ovf = emit_int_sub
-    emit_int_mul_ovf = emit_int_mul
-    emit_int_floordiv = gen_emit_int_op(MuBinOptr.SDIV)
-    emit_uint_floordiv = gen_emit_int_op(MuBinOptr.UDIV)
-    emit_int_mod = gen_emit_int_op(MuBinOptr.SREM)
+    emit_op_int_add = gen_emit_int_op(MuBinOptr.ADD)
+    emit_op_int_sub = gen_emit_int_op(MuBinOptr.SUB)
+    emit_op_int_mul = gen_emit_int_op(MuBinOptr.MUL)
+    emit_op_int_add_ovf = emit_op_int_add  # TODO: overflows need to be handled
+    emit_op_int_sub_ovf = emit_op_int_sub
+    emit_op_int_mul_ovf = emit_op_int_mul
+    emit_op_int_floordiv = gen_emit_int_op(MuBinOptr.SDIV)
+    emit_op_uint_floordiv = gen_emit_int_op(MuBinOptr.UDIV)
+    emit_op_int_mod = gen_emit_int_op(MuBinOptr.SREM)
 
-    emit_int_and = gen_emit_int_op(MuBinOptr.AND)
-    emit_int_or = gen_emit_int_op(MuBinOptr.OR)
-    emit_int_xor = gen_emit_int_op(MuBinOptr.XOR)
-    emit_int_lshift = gen_emit_int_op(MuBinOptr.SHL)
-    emit_int_rshift = gen_emit_int_op(MuBinOptr.ASHR)
-    emit_uint_rshift = gen_emit_int_op(MuBinOptr.LSHR)
+    emit_op_int_and = gen_emit_int_op(MuBinOptr.AND)
+    emit_op_int_or = gen_emit_int_op(MuBinOptr.OR)
+    emit_op_int_xor = gen_emit_int_op(MuBinOptr.XOR)
+    emit_op_int_lshift = gen_emit_int_op(MuBinOptr.SHL)
+    emit_op_int_rshift = gen_emit_int_op(MuBinOptr.ASHR)
+    emit_op_uint_rshift = gen_emit_int_op(MuBinOptr.LSHR)
 
-    emit_nursery_ptr_increment = emit_int_add  # unsure what this does
+    emit_op_nursery_ptr_increment = emit_op_int_add  # unsure what this does
 
     def do_emit_cmp_op(self, arglocs, condition):
         l0, l1, res = arglocs
@@ -276,28 +278,28 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    emit_int_le = gen_emit_cmp_op(MuCmpOptr.SLE)
-    emit_int_lt = gen_emit_cmp_op(MuCmpOptr.SLT)
-    emit_int_gt = gen_emit_cmp_op(MuCmpOptr.SGT)
-    emit_int_ge = gen_emit_cmp_op(MuCmpOptr.SGE)
-    emit_int_eq = gen_emit_cmp_op(MuCmpOptr.EQ)
-    emit_int_ne = gen_emit_cmp_op(MuCmpOptr.NE)
+    emit_op_int_le = gen_emit_cmp_op(MuCmpOptr.SLE)
+    emit_op_int_lt = gen_emit_cmp_op(MuCmpOptr.SLT)
+    emit_op_int_gt = gen_emit_cmp_op(MuCmpOptr.SGT)
+    emit_op_int_ge = gen_emit_cmp_op(MuCmpOptr.SGE)
+    emit_op_int_eq = gen_emit_cmp_op(MuCmpOptr.EQ)
+    emit_op_int_ne = gen_emit_cmp_op(MuCmpOptr.NE)
 
-    emit_uint_lt = gen_emit_cmp_op(MuCmpOptr.ULT)
-    emit_uint_le = gen_emit_cmp_op(MuCmpOptr.ULE)
-    emit_uint_gt = gen_emit_cmp_op(MuCmpOptr.UGT)
-    emit_uint_ge = gen_emit_cmp_op(MuCmpOptr.UGE)
+    emit_op_uint_lt = gen_emit_cmp_op(MuCmpOptr.ULT)
+    emit_op_uint_le = gen_emit_cmp_op(MuCmpOptr.ULE)
+    emit_op_uint_gt = gen_emit_cmp_op(MuCmpOptr.UGT)
+    emit_op_uint_ge = gen_emit_cmp_op(MuCmpOptr.UGE)
 
-    emit_int_is_zero = emit_int_eq  # EQ to 0
-    emit_int_is_true = emit_int_ne  # NE to 0
+    emit_op_int_is_zero = emit_op_int_eq  # EQ to 0
+    emit_op_int_is_true = emit_op_int_ne  # NE to 0
 
-    emit_ptr_eq = emit_int_eq
-    emit_ptr_ne = emit_int_ne
+    emit_op_ptr_eq = emit_op_int_eq
+    emit_op_ptr_ne = emit_op_int_ne
 
-    emit_instance_ptr_eq = emit_ptr_eq
-    emit_instance_ptr_ne = emit_ptr_ne
+    emit_op_instance_ptr_eq = emit_op_ptr_eq
+    emit_op_instance_ptr_ne = emit_op_ptr_ne
 
-    def emit_int_neg(self, op, arglocs, regalloc):
+    def emit_op_int_neg(self, op, arglocs, regalloc):
         pass
         l0, res = arglocs
         v0 = self.get_int(l0)
@@ -307,7 +309,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    def emit_int_invert(self, op, arglocs, regalloc):
+    def emit_op_int_invert(self, op, arglocs, regalloc):
         pass
         l0, res = arglocs
         v0 = self.get_int(l0)
@@ -317,7 +319,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    def emit_int_signext(self, op, arglocs, regalloc):
+    def emit_op_int_signext(self, op, arglocs, regalloc):
         pass
         l0, res = arglocs
         v0 = self.get_int(l0)
@@ -327,7 +329,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    def emit_int_force_ge_zero(self, op, arglocs, regalloc):
+    def emit_op_int_force_ge_zero(self, op, arglocs, regalloc):
         pass
         """
         arg, res = arglocs
@@ -350,12 +352,12 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    emit_float_add = gen_emit_float_op(MuBinOptr.FADD)
-    emit_float_sub = gen_emit_float_op(MuBinOptr.FSUB)
-    emit_float_mul = gen_emit_float_op(MuBinOptr.FMUL)
-    emit_float_truediv = gen_emit_float_op(MuBinOptr.FDIV)
+    emit_op_float_add = gen_emit_float_op(MuBinOptr.FADD)
+    emit_op_float_sub = gen_emit_float_op(MuBinOptr.FSUB)
+    emit_op_float_mul = gen_emit_float_op(MuBinOptr.FMUL)
+    emit_op_float_truediv = gen_emit_float_op(MuBinOptr.FDIV)
 
-    def emit_float_neg(self, op, arglocs, regalloc):
+    def emit_op_float_neg(self, op, arglocs, regalloc):
         pass
         l0, res = arglocs
         v0 = self.get_float(l0)
@@ -365,7 +367,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    def emit_float_abs(self, op, arglocs, regalloc):
+    def emit_op_float_abs(self, op, arglocs, regalloc):
         pass
         """
         l0, res = arglocs
@@ -410,14 +412,14 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    emit_float_le = gen_emit_fp_cmp_op(MuCmpOptr.FOLE)
-    emit_float_lt = gen_emit_fp_cmp_op(MuCmpOptr.FOLT)
-    emit_float_gt = gen_emit_fp_cmp_op(MuCmpOptr.FOGT)
-    emit_float_ge = gen_emit_fp_cmp_op(MuCmpOptr.FOGE)
-    emit_float_eq = gen_emit_fp_cmp_op(MuCmpOptr.FOEQ)
-    emit_float_ne = gen_emit_fp_cmp_op(MuCmpOptr.FONE)
+    emit_op_float_le = gen_emit_fp_cmp_op(MuCmpOptr.FOLE)
+    emit_op_float_lt = gen_emit_fp_cmp_op(MuCmpOptr.FOLT)
+    emit_op_float_gt = gen_emit_fp_cmp_op(MuCmpOptr.FOGT)
+    emit_op_float_ge = gen_emit_fp_cmp_op(MuCmpOptr.FOGE)
+    emit_op_float_eq = gen_emit_fp_cmp_op(MuCmpOptr.FOEQ)
+    emit_op_float_ne = gen_emit_fp_cmp_op(MuCmpOptr.FONE)
 
-    def emit_cast_float_to_int(self, op, arglocs, regalloc):
+    def emit_op_cast_float_to_int(self, op, arglocs, regalloc):
         pass
         l0, res = arglocs
         v0 = self.get_float(l0)
@@ -427,7 +429,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    def emit_cast_int_to_float(self, op, arglocs, regalloc):
+    def emit_op_cast_int_to_float(self, op, arglocs, regalloc):
         pass
         l0, res = arglocs
         v0 = self.get_int(l0)
@@ -437,7 +439,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    def emit_convert_float_bytes_to_longlong(self, op, arglocs, regalloc):
+    def emit_op_convert_float_bytes_to_longlong(self, op, arglocs, regalloc):
         pass
         l0, res = arglocs
         v0 = self.get_float(l0)
@@ -447,7 +449,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
-    def emit_convert_longlong_bytes_to_float(self, op, arglocs, regalloc):
+    def emit_op_convert_longlong_bytes_to_float(self, op, arglocs, regalloc):
         pass
         l0, res = arglocs
         v0 = self.get_int(l0)
@@ -494,34 +496,34 @@ class AssemblerMu(BaseAssembler):
                              fcond)
         return token
 
-    def emit_guard_true(self, op, arglocs, regalloc):
+    def emit_op_guard_true(self, op, arglocs, regalloc):
         pass
         """
         self._emit_guard(op, arglocs)
         """
 
-    def emit_guard_false(self, op, arglocs, regalloc):
+    def emit_op_guard_false(self, op, arglocs, regalloc):
         pass
         """
         self.guard_success_cc = c.invert(self.guard_success_cc)
         self._emit_guard(op, arglocs)
         """
 
-    def emit_guard_overflow(self, op, arglocs, regalloc):
+    def emit_op_guard_overflow(self, op, arglocs, regalloc):
         pass
         """
         self.guard_success_cc = c.SO
         self._emit_guard(op, arglocs)
         """
 
-    def emit_guard_no_overflow(self, op, arglocs, regalloc):
+    def emit_op_guard_no_overflow(self, op, arglocs, regalloc):
         pass
         """
         self.guard_success_cc = c.NS
         self._emit_guard(op, arglocs)
         """
 
-    def emit_guard_value(self, op, arglocs, regalloc):
+    def emit_op_guard_value(self, op, arglocs, regalloc):
         pass
         l0 = arglocs[0]
         l1 = arglocs[1]
@@ -555,10 +557,10 @@ class AssemblerMu(BaseAssembler):
         self._emit_guard(op, failargs)
         """
 
-    emit_guard_nonnull = emit_guard_true
-    emit_guard_isnull = emit_guard_false
+    emit_op_guard_nonnull = emit_op_guard_true
+    emit_op_guard_isnull = emit_op_guard_false
 
-    def emit_guard_class(self, op, arglocs, regalloc):
+    def emit_op_guard_class(self, op, arglocs, regalloc):
         pass
         """
         self._cmp_guard_class(op, arglocs, regalloc)
@@ -566,7 +568,7 @@ class AssemblerMu(BaseAssembler):
         self._emit_guard(op, arglocs[2:])
         """
 
-    def emit_guard_nonnull_class(self, op, arglocs, regalloc):
+    def emit_op_guard_nonnull_class(self, op, arglocs, regalloc):
         pass
         """
         self.mc.cmp_op(0, arglocs[0].value, 1, imm=True, signed=False)
@@ -621,7 +623,7 @@ class AssemblerMu(BaseAssembler):
                        imm=True, signed=False)
         """
 
-    def emit_guard_gc_type(self, op, arglocs, regalloc):
+    def emit_op_guard_gc_type(self, op, arglocs, regalloc):
         pass
         """
         self._cmp_guard_gc_type(arglocs[0], arglocs[1].value)
@@ -629,7 +631,7 @@ class AssemblerMu(BaseAssembler):
         self._emit_guard(op, arglocs[2:])
         """
 
-    def emit_guard_is_object(self, op, arglocs, regalloc):
+    def emit_op_guard_is_object(self, op, arglocs, regalloc):
         pass
         """
         assert self.cpu.supports_guard_gc_type
@@ -650,7 +652,7 @@ class AssemblerMu(BaseAssembler):
         self._emit_guard(op, arglocs[1:])
         """
 
-    def emit_guard_subclass(self, op, arglocs, regalloc):
+    def emit_op_guard_subclass(self, op, arglocs, regalloc):
         pass
         """
         assert self.cpu.supports_guard_gc_type
@@ -693,13 +695,13 @@ class AssemblerMu(BaseAssembler):
         self._emit_guard(op, arglocs[2:])
         """
 
-    def emit_guard_not_invalidated(self, op, arglocs, regalloc):
+    def emit_op_guard_not_invalidated(self, op, arglocs, regalloc):
         pass
         """
         self._emit_guard(op, arglocs, is_guard_not_invalidated=True)
         """
 
-    def emit_guard_not_forced(self, op, arglocs, regalloc):
+    def emit_op_guard_not_forced(self, op, arglocs, regalloc):
         pass
         """
         ofs = self.cpu.get_ofs_of_frame_field('jf_descr')
@@ -709,7 +711,7 @@ class AssemblerMu(BaseAssembler):
         self._emit_guard(op, arglocs)
         """
 
-    def emit_guard_not_forced_2(self, op, arglocs, regalloc):
+    def emit_op_guard_not_forced_2(self, op, arglocs, regalloc):
         pass
         """
         guard_token = self.build_guard_token(op, arglocs[0].value, arglocs[1:],
@@ -719,10 +721,10 @@ class AssemblerMu(BaseAssembler):
         self.store_info_on_descr(0, guard_token)
         """
 
-    def emit_label(self, op, arglocs, regalloc):
+    def emit_op_label(self, op, arglocs, regalloc):
         pass
 
-    def emit_increment_debug_counter(self, op, arglocs, regalloc):
+    def emit_op_increment_debug_counter(self, op, arglocs, regalloc):
         pass
         """
         [addr_loc, value_loc] = arglocs
@@ -731,7 +733,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.store(value_loc.value, addr_loc.value, 0)
         """
 
-    def emit_finish(self, op, arglocs, regalloc):
+    def emit_op_finish(self, op, arglocs, regalloc):
         pass
         """
         base_ofs = self.cpu.get_baseofs_of_frame_field()
@@ -774,7 +776,7 @@ class AssemblerMu(BaseAssembler):
         self._call_footer()
         """
 
-    def emit_jump(self, op, arglocs, regalloc):
+    def emit_op_jump(self, op, arglocs, regalloc):
         pass
         """
         # The backend's logic assumes that the target code is in a piece of
@@ -802,13 +804,13 @@ class AssemblerMu(BaseAssembler):
             self.regalloc_mov(argloc, resloc)
         """
 
-    emit_same_as_i = _genop_same_as
-    emit_same_as_r = _genop_same_as
-    emit_same_as_f = _genop_same_as
-    emit_cast_ptr_to_int = _genop_same_as
-    emit_cast_int_to_ptr = _genop_same_as
+    emit_op_same_as_i = _genop_same_as
+    emit_op_same_as_r = _genop_same_as
+    emit_op_same_as_f = _genop_same_as
+    emit_op_cast_ptr_to_int = _genop_same_as
+    emit_op_cast_int_to_ptr = _genop_same_as
 
-    def emit_guard_no_exception(self, op, arglocs, regalloc):
+    def emit_op_guard_no_exception(self, op, arglocs, regalloc):
         pass
         """
         self.mc.load_from_addr(r.SCRATCH2, r.SCRATCH2, self.cpu.pos_exception())
@@ -825,7 +827,7 @@ class AssemblerMu(BaseAssembler):
             pmc.overwrite()
         """
 
-    def emit_save_exc_class(self, op, arglocs, regalloc):
+    def emit_op_save_exc_class(self, op, arglocs, regalloc):
         pass
         """
         [resloc] = arglocs
@@ -833,20 +835,20 @@ class AssemblerMu(BaseAssembler):
         self.mc.load(resloc.value, r.r2.value, diff)
         """
 
-    def emit_save_exception(self, op, arglocs, regalloc):
+    def emit_op_save_exception(self, op, arglocs, regalloc):
         pass
         """
         [resloc] = arglocs
         self._store_and_reset_exception(self.mc, resloc)
         """
 
-    def emit_restore_exception(self, op, arglocs, regalloc):
+    def emit_op_restore_exception(self, op, arglocs, regalloc):
         pass
         """
         self._restore_exception(self.mc, arglocs[1], arglocs[0])
         """
 
-    def emit_guard_exception(self, op, arglocs, regalloc):
+    def emit_op_guard_exception(self, op, arglocs, regalloc):
         pass
         """
         loc, resloc = arglocs[:2]
@@ -877,7 +879,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.load_from_addr(rD, rT, addr)
         """
 
-    def emit_load_from_gc_table(self, op, arglocs, regalloc):
+    def emit_op_load_from_gc_table(self, op, arglocs, regalloc):
         pass
         """
         index = op.getarg(0).getint()
@@ -920,10 +922,10 @@ class AssemblerMu(BaseAssembler):
         self._emit_call(op, arglocs)
         """
 
-    emit_call_i = _genop_call
-    emit_call_r = _genop_call
-    emit_call_f = _genop_call
-    emit_call_n = _genop_call
+    emit_op_call_i = _genop_call
+    emit_op_call_r = _genop_call
+    emit_op_call_f = _genop_call
+    emit_op_call_n = _genop_call
 
     def _genop_call_may_force(self, op, arglocs, regalloc):
         pass
@@ -932,10 +934,10 @@ class AssemblerMu(BaseAssembler):
         self._emit_call(op, arglocs)
         """
 
-    emit_call_may_force_i = _genop_call_may_force
-    emit_call_may_force_r = _genop_call_may_force
-    emit_call_may_force_f = _genop_call_may_force
-    emit_call_may_force_n = _genop_call_may_force
+    emit_op_call_may_force_i = _genop_call_may_force
+    emit_op_call_may_force_r = _genop_call_may_force
+    emit_op_call_may_force_f = _genop_call_may_force
+    emit_op_call_may_force_n = _genop_call_may_force
 
     def _genop_call_release_gil(self, op, arglocs, regalloc):
         pass
@@ -944,9 +946,9 @@ class AssemblerMu(BaseAssembler):
         self._emit_call(op, arglocs, is_call_release_gil=True)
         """
 
-    emit_call_release_gil_i = _genop_call_release_gil
-    emit_call_release_gil_f = _genop_call_release_gil
-    emit_call_release_gil_n = _genop_call_release_gil
+    emit_op_call_release_gil_i = _genop_call_release_gil
+    emit_op_call_release_gil_f = _genop_call_release_gil
+    emit_op_call_release_gil_n = _genop_call_release_gil
 
     def _store_force_index(self, guard_op):
         pass
@@ -966,7 +968,7 @@ class AssemblerMu(BaseAssembler):
         return regalloc.operations[regalloc.rm.position + delta]
         """
 
-    def emit_cond_call(self, op, arglocs, regalloc):
+    def emit_op_cond_call(self, op, arglocs, regalloc):
         pass
         """
         fcond = self.guard_success_cc
@@ -1050,7 +1052,7 @@ class AssemblerMu(BaseAssembler):
             assert 0, "size not supported"
         """
 
-    def emit_gc_store(self, op, arglocs, regalloc):
+    def emit_op_gc_store(self, op, arglocs, regalloc):
         pass
         """
         value_loc, base_loc, ofs_loc, size_loc = arglocs
@@ -1072,7 +1074,7 @@ class AssemblerMu(BaseAssembler):
         return index_loc
         """
 
-    def emit_gc_store_indexed(self, op, arglocs, regalloc):
+    def emit_op_gc_store_indexed(self, op, arglocs, regalloc):
         pass
         """
         base_loc, index_loc, value_loc, ofs_loc, size_loc = arglocs
@@ -1140,9 +1142,9 @@ class AssemblerMu(BaseAssembler):
         self._load_from_mem(res_loc, base_loc, ofs_loc, size_loc, sign_loc)
         """
 
-    emit_gc_load_i = _genop_gc_load
-    emit_gc_load_r = _genop_gc_load
-    emit_gc_load_f = _genop_gc_load
+    emit_op_gc_load_i = _genop_gc_load
+    emit_op_gc_load_r = _genop_gc_load
+    emit_op_gc_load_f = _genop_gc_load
 
     def _genop_gc_load_indexed(self, op, arglocs, regalloc):
         pass
@@ -1152,9 +1154,9 @@ class AssemblerMu(BaseAssembler):
         self._load_from_mem(res_loc, base_loc, index_loc, size_loc, sign_loc)
         """
 
-    emit_gc_load_indexed_i = _genop_gc_load_indexed
-    emit_gc_load_indexed_r = _genop_gc_load_indexed
-    emit_gc_load_indexed_f = _genop_gc_load_indexed
+    emit_op_gc_load_indexed_i = _genop_gc_load_indexed
+    emit_op_gc_load_indexed_r = _genop_gc_load_indexed
+    emit_op_gc_load_indexed_f = _genop_gc_load_indexed
 
     SIZE2SCALE = dict([(1 << _i, _i) for _i in range(32)])
 
@@ -1162,7 +1164,7 @@ class AssemblerMu(BaseAssembler):
         pass
         """
         # XXX should die together with _apply_scale() but can't because
-        # of emit_zero_array() and malloc_cond_varsize() at the moment
+        # of emit_op_zero_array() and malloc_cond_varsize() at the moment
         assert loc.is_reg()
         if multiply_by == 1:
             return loc
@@ -1194,7 +1196,7 @@ class AssemblerMu(BaseAssembler):
         return r.SCRATCH2
         """
 
-    # RPythonic workaround for emit_zero_array()
+    # RPythonic workaround for emit_op_zero_array()
     def eza_stXux(self, a, b, c, itemsize):
         pass
         """
@@ -1213,7 +1215,7 @@ class AssemblerMu(BaseAssembler):
         else:                             self.mc.stdu(a, b, c)
         """
 
-    def emit_zero_array(self, op, arglocs, regalloc):
+    def emit_op_zero_array(self, op, arglocs, regalloc):
         pass
         """
         base_loc, startindex_loc, length_loc, ofs_loc = arglocs
@@ -1306,13 +1308,13 @@ class AssemblerMu(BaseAssembler):
         pmc.overwrite()
         """
 
-    def emit_copystrcontent(self, op, arglocs, regalloc):
+    def emit_op_copystrcontent(self, op, arglocs, regalloc):
         pass
         """
         self._emit_copycontent(arglocs, is_unicode=False)
         """
 
-    def emit_copyunicodecontent(self, op, arglocs, regalloc):
+    def emit_op_copyunicodecontent(self, op, arglocs, regalloc):
         pass
         """
         self._emit_copycontent(arglocs, is_unicode=True)
@@ -1373,14 +1375,14 @@ class AssemblerMu(BaseAssembler):
         self.mc.raw_call()
         """
 
-    def emit_call_malloc_gc(self, op, arglocs, regalloc):
+    def emit_op_call_malloc_gc(self, op, arglocs, regalloc):
         pass
         """
         self._emit_call(op, arglocs)
         self.propagate_memoryerror_if_r3_is_null()
         """
 
-    def emit_call_malloc_nursery(self, op, arglocs, regalloc):
+    def emit_op_call_malloc_nursery(self, op, arglocs, regalloc):
         pass
         """
         # registers r.RES and r.RSZ are allocated for this call
@@ -1395,7 +1397,7 @@ class AssemblerMu(BaseAssembler):
             size, gcmap)
         """
 
-    def emit_call_malloc_nursery_varsize_frame(self, op, arglocs, regalloc):
+    def emit_op_call_malloc_nursery_varsize_frame(self, op, arglocs, regalloc):
         pass
         """
         # registers r.RES and r.RSZ are allocated for this call
@@ -1408,7 +1410,7 @@ class AssemblerMu(BaseAssembler):
             sizeloc, gcmap)
         """
 
-    def emit_call_malloc_nursery_varsize(self, op, arglocs, regalloc):
+    def emit_op_call_malloc_nursery_varsize(self, op, arglocs, regalloc):
         pass
         """
         # registers r.RES and r.RSZ are allocated for this call
@@ -1428,19 +1430,19 @@ class AssemblerMu(BaseAssembler):
             lengthloc, itemsize, maxlength, gcmap, arraydescr)
         """
 
-    def emit_debug_merge_point(self, op, arglocs, regalloc):
+    def emit_op_debug_merge_point(self, op, arglocs, regalloc):
         pass
 
-    emit_jit_debug = emit_debug_merge_point
-    emit_keepalive = emit_debug_merge_point
+    emit_op_jit_debug = emit_op_debug_merge_point
+    emit_op_keepalive = emit_op_debug_merge_point
 
-    def emit_enter_portal_frame(self, op, arglocs, regalloc):
+    def emit_op_enter_portal_frame(self, op, arglocs, regalloc):
         pass
         """
         self.enter_portal_frame(op)
         """
 
-    def emit_leave_portal_frame(self, op, arglocs, regalloc):
+    def emit_op_leave_portal_frame(self, op, arglocs, regalloc):
         pass
         """
         self.leave_portal_frame(op)
@@ -1523,7 +1525,7 @@ class AssemblerMu(BaseAssembler):
             pmc.bne(currpos - js_location)
             pmc.overwrite()
             #
-            # case GCFLAG_CARDS_SET: emit a few instructions to do
+            # case GCFLAG_CARDS_SET: emit_op a few instructions to do
             # directly the card flag setting
             loc_index = arglocs[1]
             if loc_index.is_reg():
@@ -1573,20 +1575,20 @@ class AssemblerMu(BaseAssembler):
         pmc.overwrite()
         """
 
-    def emit_cond_call_gc_wb(self, op, arglocs, regalloc):
+    def emit_op_cond_call_gc_wb(self, op, arglocs, regalloc):
         pass
         """
         self._write_barrier_fastpath(self.mc, op.getdescr(), arglocs, regalloc)
         """
 
-    def emit_cond_call_gc_wb_array(self, op, arglocs, regalloc):
+    def emit_op_cond_call_gc_wb_array(self, op, arglocs, regalloc):
         pass
         """
         self._write_barrier_fastpath(self.mc, op.getdescr(), arglocs, regalloc,
                                      array=True)
         """
 
-    def emit_force_token(self, op, arglocs, regalloc):
+    def emit_op_force_token(self, op, arglocs, regalloc):
         pass
         """
         res_loc = arglocs[0]
@@ -1606,10 +1608,10 @@ class AssemblerMu(BaseAssembler):
         self.call_assembler(op, argloc, vloc, result_loc, r.r3)
         """
 
-    emit_call_assembler_i = _genop_call_assembler
-    emit_call_assembler_r = _genop_call_assembler
-    emit_call_assembler_f = _genop_call_assembler
-    emit_call_assembler_n = _genop_call_assembler
+    emit_op_call_assembler_i = _genop_call_assembler
+    emit_op_call_assembler_r = _genop_call_assembler
+    emit_op_call_assembler_f = _genop_call_assembler
+    emit_op_call_assembler_n = _genop_call_assembler
 
     # imm = staticmethod(imm)   # for call_assembler()
 
@@ -1737,3 +1739,16 @@ class AssemblerMu(BaseAssembler):
 
     def nop(self):
         pass
+
+
+def notimplemented_op(self, op, arglocs, regalloc, fcond):
+    print "[MU/vm] %s not implemented" % op.getopname()
+    raise NotImplementedError(op)
+
+asm_operations = [notimplemented_op] * (rop._LAST + 1)
+
+for name, value in AssemblerMu.__dict__.iteritems():
+    if name.startswith('emit_op_'):
+        opname = name[len('emit_op_'):]
+        num = getattr(rop, opname.upper())
+        asm_operations[num] = value
