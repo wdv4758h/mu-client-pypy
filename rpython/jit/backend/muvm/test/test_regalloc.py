@@ -3,7 +3,12 @@
 """
 
 import py
+###########################################################################################
+# XXX: This is JUST to get Mu to work - taking out ASAP once a better solution is presented
+import os
+os.environ["MU"] = "/home/ben/Research/Dev/microvm-refimpl2"
 
+###########################################################################################
 from rpython.jit.metainterp.history import (BasicFailDescr,
                                         BasicFinalDescr,
                                         JitCellToken,

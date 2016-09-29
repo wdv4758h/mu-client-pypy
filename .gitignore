@@ -1,8 +1,8 @@
 .hg
 .svn
 .idea
+*.log
 
-# VIM
 *.swp
 *.swo
 
