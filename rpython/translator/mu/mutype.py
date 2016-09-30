@@ -5,19 +5,88 @@ from rpython.rlib import rarithmetic
 from rpython.rtyper.lltypesystem import lltype, rffi
 
 
-class MuType(lltype.LowLevelType):
-    def _allocate(self, initialization, parent=None, parentindex=None):
-        assert initialization == 'new'
+def _setup_consistent_methods(cls):
+    tmpcls, mtds = cls._template
+    for mtd in mtds:
+        setattr(cls, mtd, tmpcls.__dict__[mtd])
+
+
+class MuType(object):
+    _template = (lltype.LowLevelType, (
+        '__eq__',
+        '__ne__',
+        '_is_compatible',
+        '__hash__',
+        '__hash_is_not_constant__',
+        '__repr__',
+        '__str__',
+        '_short_name',
+        '_defl',
+        '_freeze_',
+        '_is_varsize',
+    ))
+    __slots__ = ('__dict__', '__cached_hash')
+
+    def __setattr__(self, attr, nvalue):
+        try:
+            MuType.__cached_hash.__get__(self)
+        except AttributeError:
+            pass
+        else:
+            try:
+                reprself = repr(self)
+            except:
+                try:
+                    reprself = str(self)
+                except:
+                    reprself = object.__repr__(self)
+            raise AssertionError("%s: changing the field %r but we already "
+                                 "computed the hash" % (reprself, attr))
+        object.__setattr__(self, attr, nvalue)
+
+    def _enforce(self, value):
+        if mutypeOf(value) != self:
+            raise TypeError
+        return value
+
+    def _note_inlined_into(self, parent, last=False):
+        pass
+
+    def _allocate(self, parent=None, parentindex=None):
+        raise NotImplementedError
+_setup_consistent_methods(MuType)
 
 
 # ----------------------------------------------------------
-class MuPrimitive(MuType, lltype.Primitive):
-    def _allocate(self, initialization='new', parent=None, parentindex=None):
+class MuPrimitive(MuType):
+    _template = (lltype.Primitive, (
+        '__str__',
+        '_defl',
+        '_example'
+    ))
+
+    def __init__(self, name, default):
+        self._name = self.__name__ = name
+        self._default = default
+
+    def _allocate(self, parent=None, parentindex=None):
         return self._default
+_setup_consistent_methods(MuPrimitive)
 
 
-class MuNumber(MuPrimitive, lltype.Number):
+class MuNumber(MuPrimitive):
+    _template = (lltype.Number, (
+        'normalized',
+    ))
     _mu_numbertypes = {}
+
+    def __init__(self, name, type, cast=None):
+        MuPrimitive.__init__(self, name, type())
+        self._type = type
+        if cast is None:
+            self._cast = type
+        else:
+            self._cast = cast
 
     @staticmethod
     def build_number(name, type_cls, value_type_cls, *args):   # modification of lltype.build_number
@@ -38,20 +107,24 @@ class MuNumber(MuPrimitive, lltype.Number):
         MuNumber._mu_numbertypes[(type_cls, value_type_cls)] = num_type
         return num_type
 
-    def _val_type(self):
+    def _get_val_type(self):
         return self._val_t
+    _val_type = property(_get_val_type)
+_setup_consistent_methods(MuNumber)
 
 
 class MuIntType(MuNumber):
     def __init__(self, name, value_type_cls):
-        lltype.Number.__init__(self, name, value_type_cls)
+        MuNumber.__init__(self, name, value_type_cls)
         self.BITS = value_type_cls.BITS
         self._val_t = value_type_cls
 
 
 class MuFloatType(MuNumber):
     def __init__(self, name, value_type_cls, bits):
-        lltype.Primitive.__init__(self, name, value_type_cls(0.0))
+        MuPrimitive.__init__(self, name, value_type_cls(0.0))
+        self._type = value_type_cls
+        self._cast = value_type_cls
         self.BITS = bits
         self._val_t = value_type_cls
 
@@ -78,7 +151,7 @@ MU_VOID = MuPrimitive("MU_VOID", None)
 class MuBigIntType(MuIntType):
     def __init__(self, name, bits):
         val_cls = rarithmetic.build_int('r_uint%d' % bits, False, bits, True)
-        # TODO: Fix, dynamically add this method in the val_cls
+
         def get_uint64s(self):
             """
             Convert the number into a list of uint64s (see rmu.MuCtx.handle_from_uint64s)
@@ -86,7 +159,7 @@ class MuBigIntType(MuIntType):
             """
             lst = []
             val = long(self)
-            int64_t = MU_INT64.get_value_type()
+            int64_t = MU_INT64._val_type
             while(val != 0):
                 lst.append(int64_t(val & 0xFFFFFFFFFFFFFFFF))
                 val >>= 64
@@ -97,32 +170,43 @@ class MuBigIntType(MuIntType):
         MuIntType.__init__(self, name, val_cls)
 
 MU_INT128 = MuBigIntType("MU_INT128", 128)
-mu_int128 = MU_INT128.get_value_type()
+mu_int128 = MU_INT128._val_type
+
 
 # ----------------------------------------------------------
 # Container types
-class MuContainerType(MuType, lltype.ContainerType):
-    _gckind = None  # all
+class MuContainerType(MuType):
+    _template = (lltype.ContainerType, (
+        '_install_extras',
+        '_nofield',
+        '_container_example'
+    ))
+
+    def _note_inlined_into(self, parent, last=False):
+        raise TypeError("%r cannot be inlined in %r" % (
+            self.__class__.__name__, parent.__class__.__name__))
+
+    def __getattr__(self, name):
+        self._nofield(name)
+_setup_consistent_methods(MuContainerType)
 
 
-class MuForwardReference(MuContainerType, lltype.ForwardReference):
+class MuForwardReference(MuContainerType):
+    _template = (lltype.ForwardReference, (
+        '__hash__',
+    ))
+
     def become(self, realcontainertype):
         if not isinstance(realcontainertype, MuContainerType):
             raise TypeError("MuForwardReference can only be to a MuContainer, "
                             "not %r" % (realcontainertype,))
-        lltype.ForwardReference.become(self, realcontainertype)
-
-
-def _setup_consistent_methods(cls):
-    tmpcls, mtds = cls._template
-    for mtd in mtds:
-        setattr(cls, mtd, tmpcls.__dict__[mtd])
+        self.__class__ = realcontainertype.__class__
+        self.__dict__ = realcontainertype.__dict__
+_setup_consistent_methods(MuForwardReference)
 
 
 class MuStruct(MuContainerType):
     _template = (lltype.Struct, (
-        '_first_struct',
-        '__getattr__',
         '_nofield',
         '_str_fields',
         '__str__',
@@ -145,16 +229,9 @@ class MuStruct(MuContainerType):
             if name in flds:
                 raise TypeError("%s: repeated field name" % self._name)
 
+            typ._note_inlined_into(self)
             names.append(name)
             flds[name] = typ
-
-        # check field type inlining
-        first = True
-        for name, typ in fields[:-1]:
-            typ._note_inlined_into(self, first=first, last=False)
-            first = False
-        name, typ = fields[-1]
-        typ._note_inlined_into(self, first=first, last=True)
 
         self._flds = lltype.frozendict(flds)
         self._names = tuple(names)
@@ -164,18 +241,32 @@ class MuStruct(MuContainerType):
     def _is_varsize(self):
         return False    # struct in Mu is always fixed size
 
+    def _first_struct(self):
+        if self._names:
+            first = self._names[0]
+            FIRSTTYPE = self._flds[first]
+            if isinstance(FIRSTTYPE, MuStruct):
+                return first, FIRSTTYPE
+        return None, None
+
+    def __getattr__(self, name):
+        try:
+            return self._flds[name]
+        except KeyError:
+            return MuContainerType.__getattr__(self, name)
+
     def __getitem__(self, idx):     # support indexing into a struct
         return self._flds[self._names[idx]]
 
-    def _allocate(self, initialization='new', parent=None, parentindex=None):
-        return _mustruct(self, initialization=initialization,
-                       parent=parent, parentindex=parentindex)
+    def _allocate(self, parent=None, parentindex=None):
+        return _mustruct(self, parent=parent, parentindex=parentindex)
 
     def _container_example(self):
         return _mustruct(self)
 
-    def _note_inlined_into(self, parent, first, last):
+    def _note_inlined_into(self, parent, last=False):
         pass
+_setup_consistent_methods(MuStruct)
 
 
 class _mustruct(lltype._parentable):
@@ -189,7 +280,7 @@ class _mustruct(lltype._parentable):
 
     __slots__ = ('_hash_cache_', '_compilation_info')
 
-    def __new__(self, TYPE, initialization=None, parent=None, parentindex=None):
+    def __new__(self, TYPE, parent=None, parentindex=None):
         def _struct_variety(flds, cache={}):
             flds = list(flds)
             flds.sort()
@@ -207,11 +298,10 @@ class _mustruct(lltype._parentable):
         variety = _struct_variety(TYPE._names)
         return object.__new__(variety)
 
-    def __init__(self, TYPE, initialization=None, parent=None, parentindex=None):
+    def __init__(self, TYPE, parent=None, parentindex=None):
         lltype._parentable.__init__(self, TYPE)
         for fld, typ in TYPE._flds.items():
-            value = typ._allocate(initialization=initialization,
-                                  parent=self, parentindex=fld)
+            value = typ._allocate(parent=self, parentindex=fld)
             setattr(self, fld, value)
 
         if parent is not None:
@@ -219,8 +309,6 @@ class _mustruct(lltype._parentable):
 
     def __getitem__(self, idx):     # support indexing into fields
         return getattr(self, self._TYPE._names[idx])
-
-_setup_consistent_methods(MuStruct)
 _setup_consistent_methods(_mustruct)
 
 
@@ -238,6 +326,7 @@ class _MuMemArray(MuContainerType):
 
     def __init__(self, OF, **kwds):
         self.OF = OF
+        OF._note_inlined_into(self)
         self._install_extras(**kwds)
 
     def _str_fields(self):
@@ -253,18 +342,19 @@ class _MuMemArray(MuContainerType):
     def _container_example(self):
         return _mumemarray(self, 1)
 
-    def _note_inlined_into(self, parent, first, last):
+    def _note_inlined_into(self, parent, last=False):
         if not isinstance(parent, MuHybrid):
             raise TypeError("_MuMemArray can only be inlined into MuHybrid")
 
         if not last:
             raise TypeError("_MuMemArray can only be the last field of MuHybrid")
+_setup_consistent_methods(_MuMemArray)
+
 
 class _mumemarray(lltype._parentable):
     __slots__ = ('items',)
 
     _template = (lltype._array, (
-        '__init__',
         '__repr__',
         '_check_range',
         '__str__',
@@ -273,6 +363,18 @@ class _mumemarray(lltype._parentable):
         'getbounds',
         'getitem',
     ))
+
+    def __init__(self, TYPE, n, parent=None, parentindex=None):
+        if not lltype.is_valid_int(n):
+            raise TypeError("array length must be an int")
+        if n < 0:
+            raise ValueError("negative array length")
+        lltype._parentable.__init__(self, TYPE)
+        myrange = self._check_range(n)
+        self.items = [TYPE.OF._allocate(parent=self, parentindex=j)
+                      for j in myrange]
+        if parent is not None:
+            self._setparentstructure(parent, parentindex)
 
     def setitem(self, index, value):
         assert mutypeOf(value) == self._TYPE.OF
@@ -284,12 +386,17 @@ class _mumemarray(lltype._parentable):
     def __setitem__(self, idx, value):
         self.setitem(idx, value)
 
-_setup_consistent_methods(_MuMemArray)
+    def _str_item(self, item):
+        if isinstance(self._TYPE.OF, MuStruct):
+            of = self._TYPE.OF
+            return "%s {%s}" % (of._name, item._str_fields())
+        else:
+            return repr(item)
 _setup_consistent_methods(_mumemarray)
 
 
 class MuHybrid(MuContainerType):
-    _template = (lltype.Struct, (
+    _template = (MuStruct, (
         '_first_struct',
         '__getattr__',
         '_nofield',
@@ -311,7 +418,7 @@ class MuHybrid(MuContainerType):
         names = []
         self._arrayfld = None
 
-        for name, typ in fields:
+        for name, typ in fields[:-1]:
             if name.startswith('_'):
                 raise NameError("%s: field name %r should not start with "
                                 "an underscore" % (self._name, name,))
@@ -320,15 +427,17 @@ class MuHybrid(MuContainerType):
 
             if name in flds:
                 raise TypeError("%s: repeated field name" % self._name)
-
+            typ._note_inlined_into(self)
             names.append(name)
             flds[name] = typ
 
         name, var_t = fields[-1]
+        var_t._note_inlined_into(self, last=True)
+        names.append(name)
+        self._vartype = _MuMemArray(var_t)  # wrap with _MuMemArray
+        flds[name] = self._vartype
         self._arrayfld = name
         self._varfld = self._arrayfld
-        self._vartype = _MuMemArray(var_t)      # wrap with _MuMemArray
-        flds[self._varfld] = self._vartype    # correct field dictionary
 
         self._flds = lltype.frozendict(flds)
         self._names = tuple(names)
@@ -344,8 +453,9 @@ class MuHybrid(MuContainerType):
     def _container_example(self):
         return _muhybrid(self, 1)
 
-    def _note_inlined_into(self, parent, first, last):
+    def _note_inlined_into(self, parent, last=False):
         raise TypeError("MuHybrid can not be inlined")
+_setup_consistent_methods(MuHybrid)
 
 
 class _muhybrid(lltype._parentable):
@@ -359,7 +469,7 @@ class _muhybrid(lltype._parentable):
 
     __slots__ = ('_hash_cache_', '_compilation_info')
 
-    def __new__(self, TYPE, n, initialization=None, parent=None, parentindex=None):
+    def __new__(self, TYPE, n, parent=None, parentindex=None):
         def _hybrid_variety(flds, cache={}):
             flds = list(flds)
             flds.sort()
@@ -377,21 +487,17 @@ class _muhybrid(lltype._parentable):
         variety = _hybrid_variety(TYPE._names)
         return object.__new__(variety)
 
-    def __init__(self, TYPE, n, initialization=None, parent=None, parentindex=None):
+    def __init__(self, TYPE, n, parent=None, parentindex=None):
         lltype._parentable.__init__(self, TYPE)
         for fld, typ in TYPE._flds.items():
             if fld == TYPE._varfld:
-                value = _mumemarray(typ, n, initialization=initialization,
-                                    parent=self, parentindex=fld)
+                value = _mumemarray(typ, n, parent=self, parentindex=fld)
             else:
-                value = typ._allocate(initialization=initialization,
-                                      parent=self, parentindex=fld)
+                value = typ._allocate(parent=self, parentindex=fld)
             setattr(self, fld, value)
 
         if parent is not None:
             self._setparentstructure(parent, parentindex)
-
-_setup_consistent_methods(MuHybrid)
 _setup_consistent_methods(_muhybrid)
 
 
@@ -405,17 +511,18 @@ class MuArray(MuContainerType):
 
     def __init__(self, OF, length, **kwds):
         self.OF = OF
+        OF._note_inlined_into(self)
         self.length = length
 
     def _is_varsize(self):
         return False    # arrays in Mu have fixed size
 
-    def _allocate(self, initialization='new', parent=None, parentindex=None):
-        return _muarray(self, initialization=initialization,
-                        parent=parent, parentindex=parentindex)
+    def _allocate(self, parent=None, parentindex=None):
+        return _muarray(self, parent=parent, parentindex=parentindex)
 
-    def _note_inlined_into(self, parent, first, last):
+    def _note_inlined_into(self, parent, last=False):
         pass
+_setup_consistent_methods(MuArray)
 
 
 class _muarray(lltype._parentable):
@@ -426,15 +533,13 @@ class _muarray(lltype._parentable):
         'setitem',
     ))
 
-    def __init__(self, TYPE, initialization=None, parent=None,
-                 parentindex=None):
+    def __init__(self, TYPE, parent=None, parentindex=None):
         lltype._parentable.__init__(self, TYPE)
 
         typ = TYPE.OF
         storage = []
         for i in range(TYPE.length):
-            value = typ._allocate(initialization=initialization,
-                                  parent=self, parentindex=i)
+            value = typ._allocate(parent=self, parentindex=i)
             storage.append(value)
         self._items = storage
         if parent is not None:
@@ -446,8 +551,6 @@ class _muarray(lltype._parentable):
 
     def __setitem__(self, idx, value):
         self.setitem(idx, value)
-
-_setup_consistent_methods(MuArray)
 _setup_consistent_methods(_muarray)
 
 
@@ -458,14 +561,15 @@ class MuOpaqueType(MuType):     # note this is not a container type
         "__str__",
     ))
 
-    def _note_inlined_into(self, parent, first, last):
+    def _note_inlined_into(self, parent, last=False):
         raise TypeError("%s can not be inlined" % self.__class__.__name__)
 
     def _example(self):
         return _muopaque(self)
 
-    def _allocate(self, initialization='new', parent=None, parentindex=None):
+    def _allocate(self, parent=None, parentindex=None):
         return _muopaque(self)
+_setup_consistent_methods(MuOpaqueType)
 
 
 class _muopaque(object):
@@ -479,8 +583,6 @@ class _muopaque(object):
     def __init__(self, TYPE, **attrs):
         self._name = "?"
         self.__dict__.update(attrs)
-
-_setup_consistent_methods(MuOpaqueType)
 _setup_consistent_methods(_muopaque)
 
 
@@ -515,8 +617,8 @@ class MuFuncType(MuContainerType):
         def f(*args):
             return tuple(T._defl() for T in self.RESULTS)
         return _mufunc(self, _callable=f)
-
 _setup_consistent_methods(MuFuncType)
+
 
 class _mufunc(lltype._func):
     pass
@@ -527,49 +629,51 @@ class MuReferenceType(MuType):
     _template = (lltype.Ptr, (
 
     ))
-    __suffix = None     # child class must specify
-    __symbol = None     # child class must specify
+    _suffix = 'OpqRef'     # child class must specify
+    _symbol = '@?'     # child class must specify
+    _val_type = property(lambda self: _mugeneral_reference)
 
-    __name__ = property(lambda self: '%s%s' % (self.TO.__name__, self.__suffix))
-
+    __name__ = property(lambda self: '%s%s' % (self.TO.__name__, self._suffix))
     _cache = lltype.WeakValueDictionary()
+
     def __new__(cls, TO, use_cache=True):
+        if (cls is not MuReferenceType) and isinstance(TO, MuOpaqueType):
+            raise TypeError("Can not construct %(cls)s to opaque type %(TO)s" % locals())
+
         if not use_cache:
             obj = MuType.__new__(cls)
         else:
             try:
-                return MuReferenceType._cache[TO]
+                return MuReferenceType._cache[(cls, TO)]
             except KeyError:
-                obj = MuReferenceType._cache[TO] = MuType.__new__(cls)
+                obj = MuReferenceType._cache[(cls, TO)] = MuType.__new__(cls)
             except TypeError:
                 obj = MuType.__new__(cls)
         obj.TO = TO
         return obj
 
     def __str__(self):
-        return '%s %s' % (self.__symbol, self.TO)
+        return '%s %s' % (self._symbol, self.TO)
 
     def _short_name(self):
-        return '%s %s' % (self.__suffix, self.TO._short_name())
-
-    def _val_type(self):
-        return self._val_t
+        return '%s %s' % (self._suffix, self.TO._short_name())
 
     def _defl(self, parent=None, parentindex=None):
-        return self._val_type()(self, None)
+        return self._val_type(self, None)
 
-    def _allocate(self, initialization='new', parent=None, parentindex=None):
-        return self._defl()
+    def _allocate(self, parent=None, parentindex=None):
+        return self._defl(parent, parentindex)
 
     def _example(self):
         if isinstance(self.TO, MuContainerType):
             o = self.TO._container_example()
         else:
             o = self.TO._example()
-        return self._val_type()(self, o)
+        return self._val_type(self, o)
+_setup_consistent_methods(MuReferenceType)
 
 
-class _muabstract_reference(object):
+class _mugeneral_reference(object):
     __slots__ = ('_T', '_TYPE', '_obj0')
 
     _template = (lltype._abstract_ptr, (
@@ -578,22 +682,82 @@ class _muabstract_reference(object):
         '_same_obj',
         '__nonzero__',
         '__repr__',
+        '_lookup_adtmeth'
     ))
 
+    def __init__(self, TYPE, pointing_to):
+        self._set_TYPE(TYPE)
+        self._set_T(TYPE.TO)
+        self._setobj(pointing_to)
+
     def _set_T(self, T):
-        self._T = T
+        _mugeneral_reference._T.__set__(self, T)
 
     def _set_TYPE(self, TYPE):
-        self._TYPE = TYPE
+        _mugeneral_reference._TYPE.__set__(self, TYPE)
 
     def _set_obj0(self, obj):
-        self.__obj = obj
+        _mugeneral_reference._obj0.__set__(self, obj)
+
+    def _setobj(self, pointing_to):
+        self._set_obj0(pointing_to)
+
+    def _getobj(self, check=True):
+        obj = self._obj0
+        if obj is not None:
+            if isinstance(obj, lltype._container):
+                if check:
+                    obj._check()
+        return obj
+    _obj = property(_getobj, _setobj)
+
+    def _become(self, other):
+        assert self._TYPE == other._TYPE
+        self._setobj(other._obj)
 
     def __str__(self):
         try:
-            return '%s %s' % (self._TYPE.__symbol, self.__obj)
+            return '%s %s' % (type(self._TYPE)._symbol, self._obj0)
         except RuntimeError:
-            return '%s DEAD %s' % (self._TYPE.__symbol, self._T)
+            return '%s DEAD %s' % (type(self._TYPE)._symbol, self._T)
+
+    def _cast_to(self, REFTYPE):
+        CURTYPE = self._TYPE
+        down_or_up = castable(REFTYPE, CURTYPE)
+        if down_or_up == 0:
+            return self
+
+        if not self:    # null pointer cast
+            return REFTYPE._defl()
+
+        cls = type(self)
+
+        if isinstance(self._obj, int):
+            return cls(REFTYPE, self._obj)
+
+        if down_or_up > 0:
+            p = self
+            while down_or_up:
+                p = getattr(p, mutypeOf(p).TO._names[0])
+                down_or_up -= 1
+            return cls(REFTYPE, p._obj)
+
+        u = -down_or_up
+        struc = self._obj
+        PARENTTYPE = None
+        while u:
+            parent = struc._parentstructure()
+            if parent is None:
+                raise RuntimeError("widening to trash: %r" % self)
+            PARENTTYPE = struc._parent_type
+            if getattr(parent, PARENTTYPE._names[0]) != struc:
+                raise lltype.InvalidCast(CURTYPE, REFTYPE)
+            struc = parent
+            u -= 1
+        if PARENTTYPE != REFTYPE.TO:
+            raise RuntimeError("widening %r inside %r instead of %r" %
+                               (CURTYPE, PARENTTYPE, REFTYPE.TO))
+        return cls(REFTYPE, struc)
 
     def __call__(self, *args):
         if isinstance(self._T, MuFuncType):
@@ -626,25 +790,221 @@ class _muabstract_reference(object):
                 raise RuntimeError("calling undefined function")
             return callb(*args)     # call the callbale
         raise TypeError("%r instance is not a function" % (self._T,))
+_setup_consistent_methods(_mugeneral_reference)
 
-_setup_consistent_methods(MuReferenceType)
-_setup_consistent_methods(_muabstract_reference)
 
 class MuRef(MuReferenceType):
-    __suffix = 'Ref'
-    __symbol = '@'
+    _suffix = 'Ref'
+    _symbol = '@'
+    _val_type = property(lambda self: _muref)
 
-    def _defl(self, parent=None, parentindex=None):
-        return _muref(self, None)
 
-    def _allocate(self, initialization='new', parent=None, parentindex=None):
-        return self._defl(parent, parentindex)
+class MuIRef(MuReferenceType):
+    _suffix = 'IRef'
+    _symbol = '&'
+    _val_type = property(lambda self: _muiref)
 
-    def _example(self):
-        o = self.TO._allocate()
-        return _muref(self, o, solid=True)
 
-# TODO: _muref type
+class MuUPtr(MuReferenceType):
+    _suffix = 'UPtr'
+    _symbol = '*'
+    _val_type = property(lambda self: _muuptr)
+
+
+class _muref(_mugeneral_reference):
+    __slots__ = ('_pin_count', )
+    _template = (lltype._ptr, (
+    ))
+
+    def __init__(self, TYPE, pointing_to):
+        _mugeneral_reference.__init__(self, TYPE, pointing_to)
+        type(self)._pin_count.__set__(self, 0)
+
+    def _getiref(self):
+        return _muiref(MuIRef(self._T), self._obj, self, [])
+
+    def _pin(self):
+        type(self)._pin_count.__set__(self, self._pin_count + 1)
+        self._pin_count += 1
+        return _muuptr(MuUPtr(self._T), self._obj, self, [])
+
+    def _unpin(self):
+        if not self._ispinned():
+            raise RuntimeError("can not unpin %s that is not pinned." % self)
+        self._pin_count -= 1
+
+    def _ispinned(self):
+        return self._pin_count > 0
+_setup_consistent_methods(_muref)
+
+
+class _muiref(_mugeneral_reference):
+    __slots__ = ('_root_ref', '_offsets')
+    _template = (_muref, (
+    ))
+
+    def __init__(self, TYPE, pointing_to, root_ref, offsets):
+        _mugeneral_reference.__init__(self, TYPE, pointing_to)
+        type(self)._root_ref.__set__(self, root_ref)
+        type(self)._offsets.__set__(self, offsets)
+
+    def _pin(self):
+        uptr = self._root_ref._pin()    # pin the root ref
+
+        # move uptr to this field
+        for o in self._offsets:
+            if isinstance(o, str):
+                uptr = getattr(uptr, o)
+            else:
+                uptr = uptr[o]
+        return uptr
+
+    def _unpin(self):
+        self._root_ref.unpin()
+
+    def _expose(self, offset, val):
+        T = mutypeOf(val)
+        return _muiref(MuIRef(T), val, self._root_ref, self._offsets + [offset])
+
+    def __getattr__(self, field_name):
+        if field_name.startswith('_'):
+            return getattr(_mugeneral_reference, field_name)
+
+        if isinstance(self._T, (MuStruct, MuHybrid)):
+            if field_name in self._T._flds:
+                o = self._obj._getattr(field_name)
+                return self._expose(field_name, o)
+        raise AttributeError("%r instance has no field %r" % (self._T,
+                                                                  field_name))
+
+    def __setattr__(self, field_name, val):
+        if field_name.startswith('_'):
+            return setattr(_mugeneral_reference, field_name, val)
+
+        if isinstance(self._T, (MuStruct, MuHybrid)):
+            if field_name in self._T._flds:
+                T1 = self._T._flds[field_name]
+                T2 = mutypeOf(val)
+                if T1 != T2:
+                    raise TypeError(
+                        "%r instance field %r:\nexpects %r\n    got %r" %
+                        (self._T, field_name, T1, T2))
+                setattr(self._obj, field_name, val)
+        raise AttributeError("%r instance has no field %r" %
+                             (self._T, field_name))
+
+    def __getitem__(self, i):
+        if isinstance(self._T, (_MuMemArray, MuArray)):
+            start, stop = self._obj.getbounds()
+            if not (start <= i < stop):
+                if isinstance(i, slice):
+                    raise TypeError("array slicing not supported")
+                raise IndexError("array index out of bounds")
+            o = self._obj.getitem(i)
+            return self._expose(i, o)
+        raise TypeError("%r instance is not an array" % (self._T,))
+
+    def __setitem__(self, i, val):
+        if isinstance(self._T, (_MuMemArray, MuArray)):
+            T1 = self._T.OF
+            if isinstance(T1, MuContainerType):
+                raise TypeError("cannot directly assign to container array items")
+            T2 = mutypeOf(val)
+            if T2 != T1:
+                from rpython.rtyper.lltypesystem import rffi
+                if T1.TO is MU_VOID and type(T1) == type(T2):
+                    # same type of reference is castable to void ref
+                    # val = rffi.cast(rffi.VOIDP, val)
+                    raise NotImplementedError
+                else:
+                    raise TypeError("%r items:\n"
+                                    "expect %r\n"
+                                    "   got %r" % (self._T, T1, T2))
+            start, stop = self._obj.getbounds()
+            if not (start <= i < stop):
+                if isinstance(i, slice):
+                    raise TypeError("array slicing not supported")
+                raise IndexError("array index out of bounds")
+            self._obj.setitem(i, val)
+            return
+        raise TypeError("%r instance is not an array" % (self._T,))
+
+    def _store(self, value):
+        raise NotImplementedError
+
+    def _load(self):
+        raise NotImplementedError
+
+    def __len__(self):
+        if isinstance(self._T, (_MuMemArray, MuArray)):
+            # if self._T._hints.get('nolength', False):
+            #     raise TypeError("%r instance has no length attribute" %
+            #                         (self._T,))
+            return self._obj.getlength()
+        raise TypeError("%r instance is not an array" % (self._T,))
+_setup_consistent_methods(_muiref)
+
+
+class _muuptr(_mugeneral_reference):
+    __slots__ = ('_root_ref', '_offsets')
+
+    _template = (_muiref, (
+        '__init__',
+        '__getattr__',
+        '__setattr__',
+        '__getitem__',
+        '__setitem__',
+        '__len__'
+    ))
+
+    def _expose(self, offset, val):
+        T = mutypeOf(val)
+        if isinstance(T, (MuRef, MuIRef)):
+            raise TypeError("can not expose a GC ref via untraced pointer")
+
+        return _muuptr(MuUPtr(T), val, self._root_ref, self._offsets + [offset])
+_setup_consistent_methods(_muuptr)
+
+
+def _castdepth(OUTSIDE, INSIDE):
+    if OUTSIDE == INSIDE:
+        return 0
+    dwn = 0
+    while isinstance(OUTSIDE, MuStruct):
+        first, FIRSTTYPE = OUTSIDE._first_struct()
+        if first is None:
+            break
+        dwn += 1
+        if FIRSTTYPE == INSIDE:
+            return dwn
+        OUTSIDE = getattr(OUTSIDE, first)
+    return -1
+
+
+def castable(REFTYPE, CURTYPE):
+    if type(REFTYPE) != type(CURTYPE):
+        raise TypeError("can not cast across reference types: %s to %s" %
+                        (CURTYPE, REFTYPE))
+
+    if CURTYPE == REFTYPE:
+        return 0
+
+    # can only cast between reference to structs
+    if (not isinstance(CURTYPE.TO, MuStruct) or
+        not isinstance(REFTYPE.TO, MuStruct)):
+        raise lltype.InvalidCast(CURTYPE, REFTYPE)
+
+    CURSTRUC = CURTYPE.TO
+    REFSTRUC = REFTYPE.TO
+
+    d = _castdepth(CURSTRUC, REFSTRUC)
+    if d >= 0:
+        return d
+    u = _castdepth(REFSTRUC, CURSTRUC)
+    if u == -1:
+        raise lltype.InvalidCast(CURTYPE, REFTYPE)
+    return -u
+
 
 # ----------------------------------------------------------
 _prim_val_type_map = {
@@ -669,3 +1029,22 @@ def mutypeOf(val):
             return _prim_val_type_map[tp]
 
         raise TypeError("mutypeOf(%r object)" % (tp.__name__,))
+
+
+def new(T):
+    if isinstance(T, MuStruct):
+        o = _mustruct(T)
+    elif isinstance(T, MuArray):
+        o = _muarray(T)
+    return _muref(MuRef(T), o)
+
+
+def newhybrid(T, n):
+    if not isinstance(T, MuHybrid):
+        raise TypeError("newhybrid can only allocate MuHybrid type")
+
+    o = _muhybrid(T, n)
+    return _muref(MuRef(T), o)
+
+isCompatibleType = lltype.isCompatibleType
+enforce = lltype.enforce
