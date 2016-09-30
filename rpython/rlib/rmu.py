@@ -77,6 +77,8 @@ MuFlag = rffi.UINT
 MuFlagPtr = rffi.CArrayPtr(MuFlag)
 MuTrapHandlerResult = MuFlag
 MuTrapHandlerResultPtr = rffi.CArrayPtr(MuTrapHandlerResult)
+MuBinOpStatus = MuFlag
+MuBinOpStatusPtr = rffi.CArrayPtr(MuBinOpStatus)
 MuTypeNode = MuID
 MuTypeNodePtr = rffi.CArrayPtr(MuTypeNode)
 MuFuncSigNode = MuID
@@ -129,6 +131,11 @@ class MuTrapHandlerResult:
     THREAD_EXIT = rffi.cast(MuFlag, 0x00)
     REBIND_PASS_VALUES = rffi.cast(MuFlag, 0x01)
     REBIND_THROW_EXC = rffi.cast(MuFlag, 0x02)
+class MuBinOpStatus:
+    BOS_N = rffi.cast(MuFlag, 0x01)
+    BOS_Z = rffi.cast(MuFlag, 0x02)
+    BOS_C = rffi.cast(MuFlag, 0x04)
+    BOS_V = rffi.cast(MuFlag, 0x08)
 class MuBinOptr:
     ADD = rffi.cast(MuFlag, 0x01)
     SUB = rffi.cast(MuFlag, 0x02)
@@ -299,42 +306,45 @@ class MuCommInst:
     IRBUILDER_NEW_NSC_PASS_VALUES = rffi.cast(MuFlag, 0x328)
     IRBUILDER_NEW_NSC_THROW_EXC = rffi.cast(MuFlag, 0x329)
     IRBUILDER_NEW_BINOP = rffi.cast(MuFlag, 0x32a)
-    IRBUILDER_NEW_CMP = rffi.cast(MuFlag, 0x32b)
-    IRBUILDER_NEW_CONV = rffi.cast(MuFlag, 0x32c)
-    IRBUILDER_NEW_SELECT = rffi.cast(MuFlag, 0x32d)
-    IRBUILDER_NEW_BRANCH = rffi.cast(MuFlag, 0x32e)
-    IRBUILDER_NEW_BRANCH2 = rffi.cast(MuFlag, 0x32f)
-    IRBUILDER_NEW_SWITCH = rffi.cast(MuFlag, 0x330)
-    IRBUILDER_NEW_CALL = rffi.cast(MuFlag, 0x331)
-    IRBUILDER_NEW_TAILCALL = rffi.cast(MuFlag, 0x332)
-    IRBUILDER_NEW_RET = rffi.cast(MuFlag, 0x333)
-    IRBUILDER_NEW_THROW = rffi.cast(MuFlag, 0x334)
-    IRBUILDER_NEW_EXTRACTVALUE = rffi.cast(MuFlag, 0x335)
-    IRBUILDER_NEW_INSERTVALUE = rffi.cast(MuFlag, 0x336)
-    IRBUILDER_NEW_EXTRACTELEMENT = rffi.cast(MuFlag, 0x337)
-    IRBUILDER_NEW_INSERTELEMENT = rffi.cast(MuFlag, 0x338)
-    IRBUILDER_NEW_SHUFFLEVECTOR = rffi.cast(MuFlag, 0x339)
-    IRBUILDER_NEW_NEW = rffi.cast(MuFlag, 0x33a)
-    IRBUILDER_NEW_NEWHYBRID = rffi.cast(MuFlag, 0x33b)
-    IRBUILDER_NEW_ALLOCA = rffi.cast(MuFlag, 0x33c)
-    IRBUILDER_NEW_ALLOCAHYBRID = rffi.cast(MuFlag, 0x33d)
-    IRBUILDER_NEW_GETIREF = rffi.cast(MuFlag, 0x33e)
-    IRBUILDER_NEW_GETFIELDIREF = rffi.cast(MuFlag, 0x33f)
-    IRBUILDER_NEW_GETELEMIREF = rffi.cast(MuFlag, 0x340)
-    IRBUILDER_NEW_SHIFTIREF = rffi.cast(MuFlag, 0x341)
-    IRBUILDER_NEW_GETVARPARTIREF = rffi.cast(MuFlag, 0x342)
-    IRBUILDER_NEW_LOAD = rffi.cast(MuFlag, 0x343)
-    IRBUILDER_NEW_STORE = rffi.cast(MuFlag, 0x344)
-    IRBUILDER_NEW_CMPXCHG = rffi.cast(MuFlag, 0x345)
-    IRBUILDER_NEW_ATOMICRMW = rffi.cast(MuFlag, 0x346)
-    IRBUILDER_NEW_FENCE = rffi.cast(MuFlag, 0x347)
-    IRBUILDER_NEW_TRAP = rffi.cast(MuFlag, 0x348)
-    IRBUILDER_NEW_WATCHPOINT = rffi.cast(MuFlag, 0x349)
-    IRBUILDER_NEW_WPBRANCH = rffi.cast(MuFlag, 0x34a)
-    IRBUILDER_NEW_CCALL = rffi.cast(MuFlag, 0x34b)
-    IRBUILDER_NEW_NEWTHREAD = rffi.cast(MuFlag, 0x34c)
-    IRBUILDER_NEW_SWAPSTACK = rffi.cast(MuFlag, 0x34d)
-    IRBUILDER_NEW_COMMINST = rffi.cast(MuFlag, 0x34e)
+    IRBUILDER_NEW_BINOP_WITH_STATUS = rffi.cast(MuFlag, 0x32b)
+    IRBUILDER_NEW_CMP = rffi.cast(MuFlag, 0x32c)
+    IRBUILDER_NEW_CONV = rffi.cast(MuFlag, 0x32d)
+    IRBUILDER_NEW_SELECT = rffi.cast(MuFlag, 0x32e)
+    IRBUILDER_NEW_BRANCH = rffi.cast(MuFlag, 0x32f)
+    IRBUILDER_NEW_BRANCH2 = rffi.cast(MuFlag, 0x330)
+    IRBUILDER_NEW_SWITCH = rffi.cast(MuFlag, 0x331)
+    IRBUILDER_NEW_CALL = rffi.cast(MuFlag, 0x332)
+    IRBUILDER_NEW_TAILCALL = rffi.cast(MuFlag, 0x333)
+    IRBUILDER_NEW_RET = rffi.cast(MuFlag, 0x334)
+    IRBUILDER_NEW_THROW = rffi.cast(MuFlag, 0x335)
+    IRBUILDER_NEW_EXTRACTVALUE = rffi.cast(MuFlag, 0x336)
+    IRBUILDER_NEW_INSERTVALUE = rffi.cast(MuFlag, 0x337)
+    IRBUILDER_NEW_EXTRACTELEMENT = rffi.cast(MuFlag, 0x338)
+    IRBUILDER_NEW_INSERTELEMENT = rffi.cast(MuFlag, 0x339)
+    IRBUILDER_NEW_SHUFFLEVECTOR = rffi.cast(MuFlag, 0x33a)
+    IRBUILDER_NEW_NEW = rffi.cast(MuFlag, 0x33b)
+    IRBUILDER_NEW_NEWHYBRID = rffi.cast(MuFlag, 0x33c)
+    IRBUILDER_NEW_ALLOCA = rffi.cast(MuFlag, 0x33d)
+    IRBUILDER_NEW_ALLOCAHYBRID = rffi.cast(MuFlag, 0x33e)
+    IRBUILDER_NEW_GETIREF = rffi.cast(MuFlag, 0x33f)
+    IRBUILDER_NEW_GETFIELDIREF = rffi.cast(MuFlag, 0x340)
+    IRBUILDER_NEW_GETELEMIREF = rffi.cast(MuFlag, 0x341)
+    IRBUILDER_NEW_SHIFTIREF = rffi.cast(MuFlag, 0x342)
+    IRBUILDER_NEW_GETVARPARTIREF = rffi.cast(MuFlag, 0x343)
+    IRBUILDER_NEW_LOAD = rffi.cast(MuFlag, 0x344)
+    IRBUILDER_NEW_STORE = rffi.cast(MuFlag, 0x345)
+    IRBUILDER_NEW_CMPXCHG = rffi.cast(MuFlag, 0x346)
+    IRBUILDER_NEW_ATOMICRMW = rffi.cast(MuFlag, 0x347)
+    IRBUILDER_NEW_FENCE = rffi.cast(MuFlag, 0x348)
+    IRBUILDER_NEW_TRAP = rffi.cast(MuFlag, 0x349)
+    IRBUILDER_NEW_WATCHPOINT = rffi.cast(MuFlag, 0x34a)
+    IRBUILDER_NEW_WPBRANCH = rffi.cast(MuFlag, 0x34b)
+    IRBUILDER_NEW_CCALL = rffi.cast(MuFlag, 0x34c)
+    IRBUILDER_NEW_NEWTHREAD = rffi.cast(MuFlag, 0x34d)
+    IRBUILDER_NEW_SWAPSTACK = rffi.cast(MuFlag, 0x34e)
+    IRBUILDER_NEW_COMMINST = rffi.cast(MuFlag, 0x34f)
+    EXT_PRINT_STATS = rffi.cast(MuFlag, 0xc001)
+    EXT_CLEAR_STATS = rffi.cast(MuFlag, 0xc002)
 
 MU_NO_ID = rffi.cast(MuID, 0)
 
@@ -1515,6 +1525,16 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
+    def new_binop_with_status(self, id, result_id, status_result_ids, optr, status_flags, ty, opnd1, opnd2, exc_clause=MU_NO_ID):
+        # type: (MuID, MuID, [MuID], MuFlag, MuBinOpStatus, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
+        status_result_ids_arr, status_result_ids_sz = lst2arr(MuID, status_result_ids)
+        self._bldr.c_new_binop_with_status(self._bldr, id, result_id, status_result_ids_arr, status_result_ids_sz, optr, status_flags, ty, opnd1, opnd2, exc_clause)
+        muerrno = self._mu.get_errno()
+        if muerrno:
+            raise MuRuntimeError(muerrno)
+        if status_result_ids_arr:
+            lltype.free(status_result_ids_arr, flavor='raw')
+
     def new_cmp(self, id, result_id, optr, ty, opnd1, opnd2):
         # type: (MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode) -> None
         self._bldr.c_new_cmp(self._bldr, id, result_id, optr, ty, opnd1, opnd2)
@@ -1733,10 +1753,10 @@ class MuIRBuilder:
         if muerrno:
             raise MuRuntimeError(muerrno)
 
-    def new_atomicrmw(self, id, result_id, is_ptr, ord, optr, refTy, loc, opnd, exc_clause=MU_NO_ID):
+    def new_atomicrmw(self, id, result_id, is_ptr, ord, optr, ref_ty, loc, opnd, exc_clause=MU_NO_ID):
         # type: (MuID, MuID, bool, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause) -> None
         is_ptr_c = rffi.cast(MuBool, is_ptr)
-        self._bldr.c_new_atomicrmw(self._bldr, id, result_id, is_ptr_c, ord, optr, refTy, loc, opnd, exc_clause)
+        self._bldr.c_new_atomicrmw(self._bldr, id, result_id, is_ptr_c, ord, optr, ref_ty, loc, opnd, exc_clause)
         muerrno = self._mu.get_errno()
         if muerrno:
             raise MuRuntimeError(muerrno)
@@ -1985,6 +2005,7 @@ _MuIRBuilder.become(rffi.CStruct(
     ('new_nsc_pass_values', rffi.CCallback([_MuIRBuilderPtr, MuID, MuTypeNodePtr, MuVarNodePtr, MuArraySize], lltype.Void)),
     ('new_nsc_throw_exc', rffi.CCallback([_MuIRBuilderPtr, MuID, MuVarNode], lltype.Void)),
     ('new_binop', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause], lltype.Void)),
+    ('new_binop_with_status', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuIDPtr, MuArraySize, MuFlag, MuFlag, MuTypeNode, MuVarNode, MuVarNode, MuExcClause], lltype.Void)),
     ('new_cmp', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuFlag, MuTypeNode, MuVarNode, MuVarNode], lltype.Void)),
     ('new_conv', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuFlag, MuTypeNode, MuTypeNode, MuVarNode], lltype.Void)),
     ('new_select', rffi.CCallback([_MuIRBuilderPtr, MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode, MuVarNode], lltype.Void)),
