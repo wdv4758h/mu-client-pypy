@@ -583,6 +583,10 @@ LL_OPERATIONS = {
 
     # __________ instrumentation _________
     'instrument_count':     LLOp(),
+
+    # __________ Mu backend __________
+    'mu_threadlocalref_init': LLOp(canrun=True),
+    'mu_thread_exit': LLOp(canrun=True)
 }
 # ***** Run test_lloperation after changes. *****
 
