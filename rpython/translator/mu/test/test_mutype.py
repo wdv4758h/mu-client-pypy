@@ -166,54 +166,138 @@ def test_new_newhybrid():
     ref_s = newhybrid(String, 5)
     iref_s = ref_s._getiref()
     assert isinstance(iref_s.chars._obj, mutype._mumemarray)
+    assert len(iref_s.chars) == 5
 
 
 def test_ref():
+    # Spec of what ref can do
     S = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
+    ref_S = new(S)
 
-    r = new(S)
-    RefS = MuRef(S)
-    print RefS
-    assert RefS.TO is S
+    # can't store or load,
+    # but can access the object via _obj attribute for internal use
+    with pytest.raises(AttributeError):
+        o = ref_S._load()
+    with pytest.raises(AttributeError):
+        ref_S._store(mu_int64(10))
+    assert isinstance(ref_S._obj, mutype._mustruct)
+
+    # can get iref from ref
+    i = ref_S._getiref()
+    assert isinstance(i, mutype._muiref)
+    assert i._obj is ref_S._obj
+
+    # pin & unpin
+    p = ref_S._pin()
+    assert ref_S._ispinned()
+    assert isinstance(p, mutype._muuptr)
+    assert p._obj is ref_S._obj
+    ref_S._unpin()
+    assert not ref_S._ispinned()
+    with pytest.raises(RuntimeError):
+        o = p._obj      # after unpin the derived uptr becomes invalid
+    with pytest.raises(RuntimeError):
+        ref_S._unpin()      # can not unpin an unpinned ref
 
 
-def test_store():
+def test_iref():
     Point = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
-    r = new(Point)
-    i = r._getiref()
-    p = r._pin()
+    PointArr5 = MuArray(Point, 5)
+    String = MuHybrid("String", ("length", MU_INT64), ("chars", MU_INT8))
 
-    i.x._store(mu_int64(10))
-    assert i.x._obj == i.x._load() == mu_int64(10)
-    assert p.x._obj == p.x._load() == mu_int64(10)
+    # derive iref from ref
+    refP = new(Point)
+    irefP = refP._getiref()
+
+    assert isinstance(irefP.x, mutype._muiref)   # accessing an attribute gives back an iref
+    assert irefP.x._obj is refP._obj.x  # the iref points to the same object
+
+    # load & store
+    a = mu_int64(42)
+    irefP.x._store(a)
+    assert irefP.x._load() is a
+    assert refP._obj.x is a      # store in to the iref also affects the root ref
+
+    # array
+    refA = new(PointArr5)
+    irefA = refA._getiref()
+    assert isinstance(irefA[0], mutype._muiref)     # accessing an array item gives back an iref
+    assert irefA[0]._obj is irefA._obj._items[0]
+    irefA[0]._store(irefP._obj)
+    assert irefA[0]._load() is irefP._obj
+
+    # hybrid
+    refS = newhybrid(String, 5)
+    irefS = refS._getiref()
+    with pytest.raises(TypeError):
+        irefS._load()       # can not load a hybrid type
+    # memarray load & store
+    irefS.chars[0]._store(a)
+    assert irefS.chars[0]._load() is a
+    assert refS._obj.chars[0] is a
+
+
+def test_globalcell():
+    assert issubclass(MuGlobalCell, MuIRef)
+    assert issubclass(mutype._muglocalcell, mutype._muiref)
+
+    Point = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
+    RefPoint = MuRef(Point)
+    G = MuGlobalCell(RefPoint)
+    gcl = new(G)
+    assert isinstance(gcl, mutype._muglobalcell)
+    assert isinstance(gcl._obj, mutype._muref)
+    assert not gcl._obj     # default is NULL
+
+    refP = new(Point)
+    gcl._store(refP)
+    assert gcl._load() is refP
 
     String = MuHybrid("String", ("length", MU_INT64), ("chars", MU_INT8))
-    ref_s = newhybrid(String, 5)
-    iref_s = ref_s._getiref()
-    iref_s.chars[0] = mu_int8(ord('c'))
-    assert iref_s.chars[0] == mu_int8(ord('c'))
+    with pytest.raises(TypeError):
+        MuGlobalCell(String)        # global cell can only contain fixed sized things
 
+
+def test_uptr():
+    Point = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
     PointArr5 = MuArray(Point, 5)
-    ref_a = new(PointArr5)
-    iref_a = ref_a._getiref()
-    iref_a[0].x._store(mu_int64(20))
-    assert iref_a[0].x._obj == iref_a[0].x._load() == mu_int64(20)
+    String = MuHybrid("String", ("length", MU_INT64), ("chars", MU_INT8))
 
+    # derive uptr from ref using pinning
+    refP = new(Point)
+    ptrP = refP._pin()
+    assert isinstance(ptrP.x, mutype._muuptr)
+    # load & store
+    a = mu_int64(42)
+    ptrP.x._store(a)
+    assert ptrP.x._load() is a
 
-def test_pinning():
-    S = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
-    r = new(S)
-    p = r._pin()
+    # array
+    refA = new(PointArr5)
+    ptrA = refA._pin()
+    assert isinstance(ptrA[0], mutype._muuptr)  # accessing an array item gives back an iref
+    assert ptrA[0]._obj is ptrA._obj._items[0]
+    ptrA[0]._store(ptrP._obj)
+    assert ptrA[0]._load() is ptrP._obj
 
-    assert isinstance(p, mutype._muuptr)
-    assert p._obj is r._obj
-    assert r._ispinned()
+    # hybrid
+    refS = newhybrid(String, 5)
+    ptrS = refS._pin()
+    with pytest.raises(TypeError):
+        ptrS._load()  # can not load a hybrid type
+    # memarray load & store
+    ptrS.chars[0]._store(a)
+    assert ptrS.chars[0]._load() is a
+    assert refS._obj.chars[0] is a
 
-    r._unpin()
-    assert not r._ispinned()
-
+    StructWithRef = MuStruct('StructRefPoint', ('point', MuRef(Point)))
+    refSWR = new(StructWithRef)
+    irfSWR = refSWR._getiref()
+    irfSWR.point._store(refP)
+    ptrSWR = refSWR._pin()
     with pytest.raises(RuntimeError):
-        p.x  # after unpin, the derived pointer becomes invalid
+        ptrSWR.point._load()    # can not load an object reference through an unsafe pointer
+
 
 if __name__ == '__main__':
     test_new_newhybrid()
