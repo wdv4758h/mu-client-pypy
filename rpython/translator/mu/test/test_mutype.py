@@ -227,7 +227,7 @@ def test_iref():
     assert irefA[0]._obj is irefA._obj._items[0]
     irefA[0]._store(irefP._obj)
     assert irefA[0]._load() is irefP._obj
-    refA._obj[0] is irefP._obj
+    assert refA._obj[0] is irefP._obj
 
     # hybrid
     refS = newhybrid(String, 5)
@@ -235,10 +235,11 @@ def test_iref():
     with pytest.raises(TypeError):
         irefS._load()       # can not load a hybrid type
     # memarray load & store
-    irefS.chars[0]._store(a)
-    assert irefS.chars[0]._load() is a
-    assert refS._obj.chars[0] is a
-
+    c = mu_int8(ord('c'))
+    irefS.chars[0]._store(c)
+    assert irefS.chars[0]._load() is c
+    assert refS._obj.chars[0] is c
+    assert len(irefS.chars) == 5
 
 def test_globalcell():
     assert issubclass(MuGlobalCell, MuIRef)

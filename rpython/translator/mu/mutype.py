@@ -810,7 +810,7 @@ class MuUPtr(MuObjectRef):
     _val_type = property(lambda self: _muuptr)
 
 
-class _muref(_mugeneral_reference):
+class _muref(_muobject_reference):
     __slots__ = ('_TYPE', '_T', '_obj', '_pin_count')
     _template = (lltype._ptr, (
     ))
@@ -822,7 +822,7 @@ class _muref(_mugeneral_reference):
         self._pin_count = 0
 
     def _getiref(self):
-        return _muiref(MuIRef(self._T), self._obj, self, [])
+        return _muiref(MuIRef(self._T), self, [])
 
     def _pin(self):
         self._pin_count += 1
@@ -837,18 +837,28 @@ class _muref(_mugeneral_reference):
         return self._pin_count > 0
 _setup_consistent_methods(_muref)
 
+def _getobjfield(obj, offsets):
+    for o in offsets:
+        if isinstance(o, str):
+            assert isinstance(obj, (_mustruct, _muhybrid))
+            obj = obj._getattr(o)
+        else:
+            assert isinstance(obj, (_muarray, _mumemarray))
+            obj = obj[o]
+    return obj
 
-class _muiref(_mugeneral_reference):
-    __slots__ = ('_TYPE', '_T', '_obj', '_root_ref', '_offsets')
+class _muiref(_muobject_reference):
+    __slots__ = ('_TYPE', '_T', '_root_ref', '_offsets')
     _template = (_muref, (
     ))
 
-    def __init__(self, TYPE, pointing_to, root_ref, offsets):
-        self._TYPE = TYPE
-        self._T = TYPE.TO
-        self._obj = pointing_to
-        self._root_ref = root_ref
-        self._offsets = offsets
+    def __init__(self, TYPE, root_ref, offsets):
+        _muiref._TYPE.__set__(self, TYPE)
+        _muiref._T.__set__(self, TYPE.TO)
+        if not isinstance(mutypeOf(root_ref), MuRef):
+            raise TypeError("root reference of iref must be ref, not %s" % root_ref)
+        _muiref._root_ref.__set__(self, root_ref)
+        _muiref._offsets.__set__(self, offsets)
 
     def _pin(self):
         uptr = self._root_ref._pin()    # pin the root ref
@@ -861,17 +871,41 @@ class _muiref(_mugeneral_reference):
                 uptr = uptr[o]
         return uptr
 
+    def _getobj(self):
+        return _getobjfield(self._root_ref._obj, self._offsets)
+
+    def _setobj(self, value):
+        if mutypeOf(value) != self._T:
+            raise TypeError("storing %s of type %s to %s" %
+                            (value, mutypeOf(value), mutypeOf(self)))
+
+        if len(self._offsets) == 0:
+            self._root_ref._obj = value
+        else:
+            obj = _getobjfield(self._root_ref._obj, self._offsets[:-1])
+            ofs = self._offsets[-1]
+            if isinstance(mutypeOf(obj), (MuStruct, MuHybrid)):
+                setattr(obj, ofs, value)
+            else:
+                obj[ofs] = value
+
+    _obj = property(_getobj, _setobj)
+    _store = _setobj
+
+    def _load(self):
+        obj = self._obj
+        if isinstance(mutypeOf(obj), MuHybrid):
+            raise TypeError("can not load a MuHybrid type %s" % mutypeOf(obj))
+        return obj
+
     def _unpin(self):
         self._root_ref.unpin()
 
     def _expose(self, offset, val):
         T = mutypeOf(val)
-        return _muiref(MuIRef(T), val, self._root_ref, self._offsets + [offset])
+        return _muiref(MuIRef(T), self._root_ref, self._offsets + [offset])
 
     def __getattr__(self, field_name):
-        if field_name.startswith('_'):
-            return getattr(_mugeneral_reference, field_name)
-        print "self._T =", self._T
         if isinstance(self._T, (MuStruct, MuHybrid)):
             if field_name in self._T._flds:
                 o = self._obj._getattr(field_name)
@@ -880,9 +914,6 @@ class _muiref(_mugeneral_reference):
                                                               field_name))
 
     def __setattr__(self, field_name, val):
-        if field_name.startswith('_'):
-            return setattr(_mugeneral_reference, field_name, val)
-
         if isinstance(self._T, (MuStruct, MuHybrid)):
             if field_name in self._T._flds:
                 T1 = self._T._flds[field_name]
@@ -931,30 +962,6 @@ class _muiref(_mugeneral_reference):
             return
         raise TypeError("%r instance is not an array" % (self._T,))
 
-    def _store(self, value):
-        if mutypeOf(value) != self._T:
-            raise TypeError("can not store value %r of type %s to %s" % (value, mutypeOf(value), self))
-
-        if len(self._offsets) == 0:
-            self._root_ref._obj = value
-            self._obj = value
-        else:
-            obj = self._root_ref._obj
-            for o in self._offsets[:-1]:
-                if isinstance(o, str):
-                    obj = obj._getattr(o)
-                else:
-                    obj = obj[o]
-            o = self._offsets[-1]
-            if isinstance(o, str):
-                setattr(obj, o, value)
-            else:
-                obj.setitem(o, value)
-            self._obj = value
-
-    def _load(self):
-        return self._obj
-
     def __len__(self):
         if isinstance(self._T, (_MuMemArray, MuArray)):
             # if self._T._hints.get('nolength', False):
@@ -965,7 +972,7 @@ class _muiref(_mugeneral_reference):
 _setup_consistent_methods(_muiref)
 
 
-class _muuptr(_mugeneral_reference):
+class _muuptr(_muobject_reference):
     __slots__ = ('_root_ref', '_offsets')
 
     _template = (_muiref, (
