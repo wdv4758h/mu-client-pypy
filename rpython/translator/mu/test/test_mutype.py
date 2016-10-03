@@ -108,17 +108,15 @@ def test_opaquereference():
     with pytest.raises(TypeError):
         MuUPtr(IRNode)
 
-    IRNodeRef = MuReferenceType(IRNode)     # opaque reference type
-    assert IRNodeRef._val_type is mutype._mugeneral_reference
+    with pytest.raises(TypeError):
+        MuOpaqueRef(MU_INT64)  # opaque reference can only refer to MuOpaque type
 
-    refnode = IRNodeRef._allocate()
-    assert not refnode  # NULL reference, (__nonzero__ method)
-    assert mutypeOf(refnode) == IRNodeRef   # has _TYPE
-
-    node = IRNode._example()
-    refnode._obj = node     # set reference to an opaque object
-    assert refnode._obj is node
-    assert refnode  # not NULL
+    IRNodeRef = MuOpaqueRef(IRNode)
+    refNULL = IRNodeRef._allocate()
+    assert not refNULL  # NULL reference
+    assert mutypeOf(refNULL) == IRNodeRef  # has _TYPE
+    with pytest.raises(AttributeError):
+        refNULL._cast_to(MuRef(MU_INT64))   # can not cast opaque reference
 
 
 def test_castable():
@@ -133,7 +131,7 @@ def test_castable():
     UPtr3 = MuUPtr(Point3)
 
     IRNode = MuOpaqueType("IRNode")
-    OpqRef = MuReferenceType(IRNode)
+    OpqRef = MuOpaqueRef(IRNode)
 
     with pytest.raises(TypeError):
         castable(Ref2, IRef2)
@@ -148,25 +146,26 @@ def test_new_newhybrid():
     Point = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
     PointArr5 = MuArray(Point, 5)
     String = MuHybrid("String", ("length", MU_INT64), ("chars", MU_INT8))
+    IRNode = MuOpaqueType("IRNode")
 
     ref_p = new(Point)
     assert ref_p
     assert mutypeOf(ref_p) == MuRef(Point)
-    iref_p = ref_p._getiref()
-    assert iref_p._obj is ref_p._obj
-    assert isinstance(iref_p.x, mutype._muiref)
-    assert mutypeOf(iref_p.x) == MuIRef(MU_INT64)
+    assert isinstance(ref_p._obj, mutype._mustruct)
 
     ref_a = new(PointArr5)
-    iref_a = ref_a._getiref()
     assert ref_a
-    assert isinstance(iref_a._obj, mutype._muarray)
-    assert len(iref_a) == 5
+    assert isinstance(ref_a._obj, mutype._muarray)
+    assert len(ref_a._obj) == 5
 
     ref_s = newhybrid(String, 5)
-    iref_s = ref_s._getiref()
-    assert isinstance(iref_s.chars._obj, mutype._mumemarray)
-    assert len(iref_s.chars) == 5
+    assert ref_s
+    assert isinstance(ref_s._obj.chars, mutype._mumemarray)
+    assert len(ref_s._obj.chars) == 5
+
+    refN = new(IRNode)
+    assert refN
+    assert isinstance(refN, mutype._muopqref)
 
 
 def test_ref():
@@ -213,6 +212,9 @@ def test_iref():
     assert irefP.x._obj is refP._obj.x  # the iref points to the same object
 
     # load & store
+    x = mu_float(0.2)
+    with pytest.raises(TypeError):
+        irefP.x._store(x)       # can not store values of different type
     a = mu_int64(42)
     irefP.x._store(a)
     assert irefP.x._load() is a
@@ -225,6 +227,7 @@ def test_iref():
     assert irefA[0]._obj is irefA._obj._items[0]
     irefA[0]._store(irefP._obj)
     assert irefA[0]._load() is irefP._obj
+    refA._obj[0] is irefP._obj
 
     # hybrid
     refS = newhybrid(String, 5)
@@ -268,9 +271,13 @@ def test_uptr():
     ptrP = refP._pin()
     assert isinstance(ptrP.x, mutype._muuptr)
     # load & store
+    x = mu_float(0.2)
+    with pytest.raises(TypeError):
+        ptrP.x._store(x)  # can not store values of different type
     a = mu_int64(42)
     ptrP.x._store(a)
     assert ptrP.x._load() is a
+    assert refP._obj.x is a
 
     # array
     refA = new(PointArr5)
@@ -279,6 +286,7 @@ def test_uptr():
     assert ptrA[0]._obj is ptrA._obj._items[0]
     ptrA[0]._store(ptrP._obj)
     assert ptrA[0]._load() is ptrP._obj
+    refA._obj[0] is ptrP._obj
 
     # hybrid
     refS = newhybrid(String, 5)

@@ -386,6 +386,9 @@ class _mumemarray(lltype._parentable):
     def __setitem__(self, idx, value):
         self.setitem(idx, value)
 
+    def __len__(self):
+        return self.getlength()
+
     def _str_item(self, item):
         if isinstance(self._TYPE.OF, MuStruct):
             of = self._TYPE.OF
@@ -551,6 +554,9 @@ class _muarray(lltype._parentable):
 
     def __setitem__(self, idx, value):
         self.setitem(idx, value)
+
+    def __len__(self):
+        return self.getlength()
 _setup_consistent_methods(_muarray)
 
 
@@ -637,9 +643,6 @@ class MuReferenceType(MuType):
     _cache = lltype.WeakValueDictionary()
 
     def __new__(cls, TO, use_cache=True):
-        if (cls is not MuReferenceType) and isinstance(TO, MuOpaqueType):
-            raise TypeError("Can not construct %(cls)s to opaque type %(TO)s" % locals())
-
         if not use_cache:
             obj = MuType.__new__(cls)
         else:
@@ -649,7 +652,6 @@ class MuReferenceType(MuType):
                 obj = MuReferenceType._cache[(cls, TO)] = MuType.__new__(cls)
             except TypeError:
                 obj = MuType.__new__(cls)
-        obj.TO = TO
         return obj
 
     def __str__(self):
@@ -674,53 +676,52 @@ _setup_consistent_methods(MuReferenceType)
 
 
 class _mugeneral_reference(object):
-    __slots__ = ('_T', '_TYPE', '_obj0')
-
     _template = (lltype._abstract_ptr, (
         '__eq__',
         '__ne__',
         '_same_obj',
+        '__hash__',
         '__nonzero__',
         '__repr__',
         '_lookup_adtmeth'
     ))
 
-    def __init__(self, TYPE, pointing_to):
-        self._set_TYPE(TYPE)
-        self._set_T(TYPE.TO)
-        self._setobj(pointing_to)
-
-    def _set_T(self, T):
-        _mugeneral_reference._T.__set__(self, T)
-
-    def _set_TYPE(self, TYPE):
-        _mugeneral_reference._TYPE.__set__(self, TYPE)
-
-    def _set_obj0(self, obj):
-        _mugeneral_reference._obj0.__set__(self, obj)
-
-    def _setobj(self, pointing_to):
-        self._set_obj0(pointing_to)
-
-    def _getobj(self, check=True):
-        obj = self._obj0
-        if obj is not None:
-            if isinstance(obj, lltype._container):
-                if check:
-                    obj._check()
-        return obj
-    _obj = property(_getobj, _setobj)
-
-    def _become(self, other):
-        assert self._TYPE == other._TYPE
-        self._setobj(other._obj)
+    # assumes one can access _T, _TYPE, _expose and _obj
 
     def __str__(self):
         try:
-            return '%s %s' % (type(self._TYPE)._symbol, self._obj0)
+            return '%s %s' % (type(self._TYPE)._symbol, self._obj)
         except RuntimeError:
             return '%s DEAD %s' % (type(self._TYPE)._symbol, self._T)
+_setup_consistent_methods(_mugeneral_reference)
 
+
+class MuOpaqueRef(MuReferenceType):
+    _suffix = 'OpqRef'
+    _symbol = '@?'
+    _val_type = property(lambda self: _muopqref)
+
+    def __init__(self, TO):
+        if not isinstance(TO, MuOpaqueType):
+            raise TypeError("MuOpaqueRef can only point to MuOpaqueType, not %r" % TO)
+
+        self.TO = TO
+
+
+class _muopqref(_mugeneral_reference):
+    def __init__(self, TYPE, opqobj):
+        self._TYPE = TYPE
+        self._obj = opqobj
+
+
+class MuObjectRef(MuReferenceType):
+    def __init__(self, TO):
+        if isinstance(TO, MuOpaqueType):
+            raise TypeError("%s can not point to %s" % (type(self), TO))
+        self.TO = TO
+
+
+class _muobject_reference(_mugeneral_reference):
     def _cast_to(self, REFTYPE):
         CURTYPE = self._TYPE
         down_or_up = castable(REFTYPE, CURTYPE)
@@ -768,7 +769,7 @@ class _mugeneral_reference(object):
                 if mutypeOf(a) != ARG:
                     # be either None or 0 (MuUPtr)
                     if isinstance(ARG, MuReferenceType):
-                        if a == ARG._defl()._obj0:
+                        if a == ARG._defl()._obj:
                             pass
 
                         # Any ref is convertible to ref<void> of same ref type
@@ -790,41 +791,40 @@ class _mugeneral_reference(object):
                 raise RuntimeError("calling undefined function")
             return callb(*args)     # call the callbale
         raise TypeError("%r instance is not a function" % (self._T,))
-_setup_consistent_methods(_mugeneral_reference)
 
-
-class MuRef(MuReferenceType):
+class MuRef(MuObjectRef):
     _suffix = 'Ref'
     _symbol = '@'
     _val_type = property(lambda self: _muref)
 
 
-class MuIRef(MuReferenceType):
+class MuIRef(MuObjectRef):
     _suffix = 'IRef'
     _symbol = '&'
     _val_type = property(lambda self: _muiref)
 
 
-class MuUPtr(MuReferenceType):
+class MuUPtr(MuObjectRef):
     _suffix = 'UPtr'
     _symbol = '*'
     _val_type = property(lambda self: _muuptr)
 
 
 class _muref(_mugeneral_reference):
-    __slots__ = ('_pin_count', )
+    __slots__ = ('_TYPE', '_T', '_obj', '_pin_count')
     _template = (lltype._ptr, (
     ))
 
     def __init__(self, TYPE, pointing_to):
-        _mugeneral_reference.__init__(self, TYPE, pointing_to)
-        type(self)._pin_count.__set__(self, 0)
+        self._TYPE = TYPE
+        self._T = TYPE.TO
+        self._obj = pointing_to
+        self._pin_count = 0
 
     def _getiref(self):
         return _muiref(MuIRef(self._T), self._obj, self, [])
 
     def _pin(self):
-        type(self)._pin_count.__set__(self, self._pin_count + 1)
         self._pin_count += 1
         return _muuptr(MuUPtr(self._T), self._obj, self, [])
 
@@ -839,14 +839,16 @@ _setup_consistent_methods(_muref)
 
 
 class _muiref(_mugeneral_reference):
-    __slots__ = ('_root_ref', '_offsets')
+    __slots__ = ('_TYPE', '_T', '_obj', '_root_ref', '_offsets')
     _template = (_muref, (
     ))
 
     def __init__(self, TYPE, pointing_to, root_ref, offsets):
-        _mugeneral_reference.__init__(self, TYPE, pointing_to)
-        type(self)._root_ref.__set__(self, root_ref)
-        type(self)._offsets.__set__(self, offsets)
+        self._TYPE = TYPE
+        self._T = TYPE.TO
+        self._obj = pointing_to
+        self._root_ref = root_ref
+        self._offsets = offsets
 
     def _pin(self):
         uptr = self._root_ref._pin()    # pin the root ref
@@ -869,13 +871,13 @@ class _muiref(_mugeneral_reference):
     def __getattr__(self, field_name):
         if field_name.startswith('_'):
             return getattr(_mugeneral_reference, field_name)
-
+        print "self._T =", self._T
         if isinstance(self._T, (MuStruct, MuHybrid)):
             if field_name in self._T._flds:
                 o = self._obj._getattr(field_name)
                 return self._expose(field_name, o)
         raise AttributeError("%r instance has no field %r" % (self._T,
-                                                                  field_name))
+                                                              field_name))
 
     def __setattr__(self, field_name, val):
         if field_name.startswith('_'):
@@ -930,10 +932,28 @@ class _muiref(_mugeneral_reference):
         raise TypeError("%r instance is not an array" % (self._T,))
 
     def _store(self, value):
-        raise NotImplementedError
+        if mutypeOf(value) != self._T:
+            raise TypeError("can not store value %r of type %s to %s" % (value, mutypeOf(value), self))
+
+        if len(self._offsets) == 0:
+            self._root_ref._obj = value
+            self._obj = value
+        else:
+            obj = self._root_ref._obj
+            for o in self._offsets[:-1]:
+                if isinstance(o, str):
+                    obj = obj._getattr(o)
+                else:
+                    obj = obj[o]
+            o = self._offsets[-1]
+            if isinstance(o, str):
+                setattr(obj, o, value)
+            else:
+                obj.setitem(o, value)
+            self._obj = value
 
     def _load(self):
-        raise NotImplementedError
+        return self._obj
 
     def __len__(self):
         if isinstance(self._T, (_MuMemArray, MuArray)):
@@ -1036,6 +1056,9 @@ def new(T):
         o = _mustruct(T)
     elif isinstance(T, MuArray):
         o = _muarray(T)
+    elif isinstance(T, MuOpaqueType):
+        o = _muopaque(T)
+        return _muopqref(MuOpaqueRef(T), o)
     return _muref(MuRef(T), o)
 
 
