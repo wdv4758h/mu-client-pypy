@@ -9,6 +9,7 @@ from rpython.mutyper.muts import mutype, muops
 from rpython.mutyper.tools.textgraph import print_graph
 from rpython.rlib import rmu
 from rpython.translator.mu.hail import HAILGenerator
+from rpython.translator.mu import jitpatch
 from StringIO import StringIO
 import zipfile
 import json
@@ -159,6 +160,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         self.bdr = self.ctx.new_ir_builder()
 
         self.gen_types()
+        jitpatch.patch_jit_typeinfo(self.db, self)
         self.gen_consts()
         self.gen_gcells()
         self.gen_graphs()

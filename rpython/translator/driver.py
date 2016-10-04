@@ -597,8 +597,9 @@ class TranslationDriver(SimpleTaskEngine):
     @taskdef(["optimise_mu"], "Collect global defs into a database.")
     def task_database_mu(self):
         self.log.info("Task database_mu")
-        self.mudb = MuDatabase(self.translator.graphs, self.mutyper, self.translator.entry_point_graph)
+        self.mudb = MuDatabase(self.translator, self.mutyper)
         self.mudb.collect_gbldefs()
+        raise NotImplementedError
 
     @taskdef(["database_mu"], "MuIR Code Generation")
     def task_compile_mu(self):

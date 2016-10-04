@@ -489,7 +489,7 @@ class GcRewriterAssembler(object):
         if self.gen_malloc_nursery(size, op):
             self.gen_initialize_tid(op, descr.tid)
         else:
-            self.gen_malloc_fixedsize(size, descr.tid, op)
+            self.gen_malloc_fixedsize(size, descr.tid, descr.mu_tid, op)
         self.clear_gc_fields(descr, op)
 
     def handle_new_array(self, arraydescr, op, kind=FLAG_ARRAY):
@@ -723,7 +723,7 @@ class GcRewriterAssembler(object):
         # In general, don't add v_result to write_barrier_applied:
         # v_result might be a large young array.
 
-    def gen_malloc_fixedsize(self, size, typeid, v_result):
+    def gen_malloc_fixedsize(self, size, typeid, mu_typeid, v_result):
         """Generate a CALL_MALLOC_GC(malloc_fixedsize_fn, ...).
         Used on Boehm, and on the framework GC for large fixed-size
         mallocs.  (For all I know this latter case never occurs in
@@ -731,7 +731,7 @@ class GcRewriterAssembler(object):
         """
         if self.gc_ll_descr.kind == 'mu':
             self.emitting_an_operation_that_can_collect()
-            args = [ConstInt(typeid)]
+            args = [ConstInt(mu_typeid)]
             op = ResOperation(rop.MU_NEW, args, descr=self.gc_ll_descr.malloc_fixedsize_descr)
             self.replace_op_with(v_result, op)
             self.emit_op(op)

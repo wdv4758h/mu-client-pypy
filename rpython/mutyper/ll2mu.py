@@ -1416,5 +1416,8 @@ def _llop2mu_debug_offset(res, llopname='debug_offset'):
 def _llop2mu_debug_fatalerror(msg, res, llopname='debug_fatalerror'):
     return [], res
 
+def _llop2mu_have_debug_prints(res, llopname='have_debug_prints'):
+    return [], _newprimconst(res.mu_type, 0)
+
 
 # TODO: rest of the operations

@@ -16,15 +16,16 @@ class MuDatabase:
     BUNDLE_ENTRY_NAME = '_mu_bundle_entry'
     bundle_suffix = '.mu'
 
-    def __init__(self, graphs, mutyper, entry_graph):
+    def __init__(self, tl, mutyper):
+        self.translator = tl
         self.mutyper = mutyper
-        self.prog_entry = entry_graph
+        self.prog_entry = tl.entry_point_graph
         self.gbltypes = {}      # type -> set(Mutype)
         self.gblcnsts = set()
         self.externfncs = set()
         self.dylibs = None
         self.objtracer = HeapObjectTracer()
-        self.graphs = graphs
+        self.graphs = tl.graphs
         self.log = AnsiLogger(self.__class__.__name__)
 
     def collect_gbldefs(self):

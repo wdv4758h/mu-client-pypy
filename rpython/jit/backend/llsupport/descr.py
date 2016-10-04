@@ -61,6 +61,7 @@ class SizeDescr(AbstractDescr):
     tid = llop.combine_ushort(lltype.Signed, 0, 0)
     vtable = lltype.nullptr(rclass.OBJECT_VTABLE)
     immutable_flag = False
+    mu_tid = 0      # used by Mu backend
 
     def __init__(self, size, gc_fielddescrs=None, all_fielddescrs=None,
                  vtable=lltype.nullptr(rclass.OBJECT_VTABLE),
@@ -271,6 +272,7 @@ def get_field_arraylen_descr(gccache, ARRAY_OR_STRUCT):
 
 class ArrayDescr(ArrayOrFieldDescr):
     tid = 0
+    mu_tid = 0
     basesize = 0       # workaround for the annotator
     itemsize = 0
     lendescr = None
