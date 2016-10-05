@@ -132,10 +132,10 @@ class MuTrapHandlerResult:
     REBIND_PASS_VALUES = rffi.cast(MuFlag, 0x01)
     REBIND_THROW_EXC = rffi.cast(MuFlag, 0x02)
 class MuBinOpStatus:
-    BOS_N = rffi.cast(MuFlag, 0x01)
-    BOS_Z = rffi.cast(MuFlag, 0x02)
-    BOS_C = rffi.cast(MuFlag, 0x04)
-    BOS_V = rffi.cast(MuFlag, 0x08)
+    N = rffi.cast(MuFlag, 0x01)
+    Z = rffi.cast(MuFlag, 0x02)
+    C = rffi.cast(MuFlag, 0x04)
+    V = rffi.cast(MuFlag, 0x08)
 class MuBinOptr:
     ADD = rffi.cast(MuFlag, 0x01)
     SUB = rffi.cast(MuFlag, 0x02)
