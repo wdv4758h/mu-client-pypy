@@ -100,7 +100,7 @@ def gen_enums(db, fp):
     for enum in db['enums']:
         if len(enum['defs']) == 0:
             continue
-        _removable_prefixes = ['BINOP', 'CMP', 'CONV', 'ORD', 'ARMW', 'CC', 'CI_UVM']
+        _removable_prefixes = ['BINOP', 'BOS', 'CMP', 'CONV', 'ORD', 'ARMW', 'CC', 'CI_UVM']
 
         fp.write('class %(name)s:\n' % enum)
         enum_types.add(enum['name'])
