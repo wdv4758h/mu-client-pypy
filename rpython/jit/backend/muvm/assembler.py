@@ -17,7 +17,7 @@ from rpython.rlib.debug import debug_print, debug_start, debug_stop
 from rpython.rlib.jit import AsmInfo
 from rpython.rlib.objectmodel import we_are_translated
 from rpython.rlib.rarithmetic import r_uint
-from rpython.rlib.rmu import Mu, MuBinOptr, MuCmpOptr, MuConvOptr, MuDestKind
+from rpython.rlib.rmu import MuVM, MuBinOptr, MuCmpOptr, MuConvOptr
 from rpython.rtyper.lltypesystem import rffi
 
 
@@ -63,7 +63,7 @@ class AssemblerMu(BaseAssembler):
         self.current_clt = None
         self.pending_guard_tokens = None
         self.pending_guard_tokens_recovered = 0
-        self.mu = Mu()
+        self.mu = MuVM()
         self.datablockwrapper = None
         self.target_tokens_currently_compiling = None
         self.frame_depth_to_patch = None
