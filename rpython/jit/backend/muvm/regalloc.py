@@ -104,12 +104,14 @@ class MuVMRegisterManager(RegisterManager):
         self.type_bindings  = {}              # Map (type_str, width) to Type
 
 
-    def return_constant(self, v, forbidden_vars=[], selected_reg=None):
+    def return_constant(self, v, forbidden_vars=None, selected_reg=None):
         """ Need to determine what this will do in our new model."""
         #TODO: what is v, and what do we want to return here? what is v?
         # ASSUMPTION: v is ConstLocation
         # Question: Do we bind this?
         self._check_type(v)
+        if not forbidden_vars:
+            forbidden_vars = []
         if isinstance(v, Const):
             if v.type == INT:
                 tp = INT_DEFAULT
@@ -124,9 +126,9 @@ class MuVMRegisterManager(RegisterManager):
                 tp = REF64
                 val = v.getref()
 
-            if (tp, val) in global_constant_loc_bindings:
+            if (tp, val) in global_const_loc_bindings:
                 c = global_const_loc_bindings[(tp, val)]
-            elif (tp, val) in local_constant_loc_bindings:
+            elif (tp, val) in local_const_loc_bindings:
                 c = local_const_loc_bindings[(tp, val)]
             else:
                 c = ConstLocation(tp, val)
