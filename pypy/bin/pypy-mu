@@ -1,0 +1,2 @@
+#!/bin/bash
+PYTHONPATH=$MU/pythonbinding LD_LIBRARY_PATH=$MU/cbinding:$LD_LIBRARYPATH python $PYPY_MU/rpython/mucli/murpy.py --noSourceInfo --vmLog=ERROR --sosSize=780M --losSize=780M $PYPY_MU/pypy/bin/pypy-mu.mu -- "$@"
