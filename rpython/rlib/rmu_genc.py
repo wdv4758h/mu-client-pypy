@@ -428,8 +428,8 @@ class MuCtx:
         apilog.log(CCall('make_boot_image', [self._ctx,
                                              whitelist_arr, whitelist_sz,
                                              primordial_func,
-                                             primordial_stack if primordial_stack else NULL,
-                                             primordial_stack if primordial_threadlocal else NULL,
+                                             primordial_stack,
+                                             primordial_stack,
                                              sym_fields_arr, sym_strings_arr, sym_strings_sz,
                                              reloc_fields_arr, reloc_strings_arr, reloc_strings_sz, CStr(output_file)],
                          None, self._ctx))
@@ -569,7 +569,7 @@ class MuIRBuilder:
 # -------------------------------------------------------------------------------------------------------
 # Helpers
 def null(rmu_t):
-    return lltype.nullptr(rmu_t.TO)
+    return NULL
 
 def lst2arr(c_elm_t, lst):
     sz = len(lst)
