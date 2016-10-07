@@ -10,8 +10,12 @@ OR:
 from rpython.rlib.rmu_genc import *
 
 fac_bundle = """
-.typedef @i64 = int<64>
 .typedef @i1 = int<1>
+.typedef @i8 = int<8>
+.typedef @i32 = int<32>
+.typedef @i64 = int<64>
+.typedef @uptri8 = uptr<@i8>
+.typedef @uptruptri8 = uptr<@uptri8>
 
 .const @0_i64 <@i64> = 0
 .const @1_i64 <@i64> = 1
@@ -36,9 +40,9 @@ fac_bundle = """
         RET (%v11)
 }
 
-.funcsig @sig__ = () -> ()
-.funcdef @main VERSION %v1 <@sig__> {
-    %blk0():
+.funcsig @sig_i32uptruptri8_ = (@i32 @uptruptri8) -> ()
+.funcdef @main VERSION %v1 <@sig_i32uptruptri8_> {
+    %blk0(<@i32> %argc <@uptruptri8> %argv):
         %res = CALL <@sig_i64_i64> @fac (@10_i64)
         STORE <@i64> @gblresult %res
         COMMINST @uvm.thread_exit
@@ -46,7 +50,7 @@ fac_bundle = """
 """
 
 
-def main_load(argv):
+def main_load(args):
     # Load the bundle and run, verify its correctness
     mu = MuVM("vmLog=ERROR")
     ctx = mu.new_context()
@@ -68,15 +72,24 @@ def main_load(argv):
     print "fac(10) = %d" % res
     return 0
 
-def main_build(argv):
+def main_build(args):
     mu = MuVM("vmLog=ERROR")
     ctx = mu.new_context()
     bldr = ctx.new_ir_builder()
 
-    i64 = bldr.gen_sym("@i64")
-    bldr.new_type_int(i64, 64)
     i1 = bldr.gen_sym("@i1")
     bldr.new_type_int(i1, 1)
+    i8 = bldr.gen_sym("@i8")
+    bldr.new_type_int(i8, 8)
+    i32 = bldr.gen_sym("@i32")
+    bldr.new_type_int(i32, 32)
+    i64 = bldr.gen_sym("@i64")
+    bldr.new_type_int(i64, 64)
+
+    uptri8 = bldr.gen_sym("@uptri8")
+    bldr.new_type_uptr(uptri8, i8)
+    uptruptri8 = bldr.gen_sym("@uptruptri8")
+    bldr.new_type_uptr(uptruptri8, uptri8)
 
     c_0_i64 = bldr.gen_sym("@0_i64")
     bldr.new_const_int(c_0_i64, i64, 0)
@@ -146,11 +159,11 @@ def main_build(argv):
 
     # ----
     # main
-    sig__ = bldr.gen_sym("@sig__")
+    sig_i32uptruptri8_ = bldr.gen_sym("@sig_i32uptruptri8_")
     main = bldr.gen_sym("@main")
     main_v1 = bldr.gen_sym("@main_v1")
-    bldr.new_funcsig(sig__, [], [])
-    bldr.new_func(main, sig__)
+    bldr.new_funcsig(sig_i32uptruptri8_, [i32, uptruptri8], [])
+    bldr.new_func(main, sig_i32uptruptri8_)
     blk0 = bldr.gen_sym()
     bldr.new_func_ver(main_v1, main, [blk0])
 
@@ -160,7 +173,9 @@ def main_build(argv):
     blk0_call = bldr.gen_sym()
     blk0_store = bldr.gen_sym()
     blk0_comminst = bldr.gen_sym()
-    bldr.new_bb(blk0, [], [], MU_NO_ID, [blk0_call, blk0_store, blk0_comminst])
+    argc = bldr.gen_sym()
+    argv = bldr.gen_sym()
+    bldr.new_bb(blk0, [argc, argv], [i32, uptruptri8], MU_NO_ID, [blk0_call, blk0_store, blk0_comminst])
     bldr.new_call(blk0_call, [res], sig_i64_i64, fac, [c_10_i64])
     bldr.new_store(blk0_store, False, MuMemOrd.NOT_ATOMIC, i64, gblres, res)
     bldr.new_comminst(blk0_comminst, [], MuCommInst.THREAD_EXIT, [], [], [], [])
@@ -168,19 +183,29 @@ def main_build(argv):
     bldr.load()
 
     main_h = ctx.handle_from_func(main)
-    stack_h = ctx.new_stack(main_h)
-    thread_h = ctx.new_thread_nor(stack_h, lltype.nullptr(MuValue.TO), [])
 
-    mu.execute()
+    # execute bundle
+    # stack_h = ctx.new_stack(main_h)
+    # thread_h = ctx.new_thread_nor(stack_h, lltype.nullptr(MuValue.TO), [])
+    #
+    # mu.execute()
+    #
+    # # Load result from global cell
+    # gbl_h = ctx.handle_from_global(gblres)
+    # res_h = ctx.load(MuMemOrd.NOT_ATOMIC, gbl_h)
+    # res = ctx.handle_to_sint64(res_h)
+    #
+    # print "fac(10) = %d" % res
 
-    # Load result from global cell
-    gbl_h = ctx.handle_from_global(gblres)
-    res_h = ctx.load(MuMemOrd.NOT_ATOMIC, gbl_h)
-    res = ctx.handle_to_sint64(res_h)
-
-    print "fac(10) = %d" % res
+    # make boot image
+    ctx.make_boot_image([i1, i8, i32, i64, uptri8, uptruptri8,
+                         c_0_i64, c_1_i64, c_10_i64, gblres,
+                         sig_i32uptruptri8_, sig_i64_i64, fac, main],
+                        main_h, null(MuStackRefValue), null(MuRefValue), [], [], [], [], args[1])
 
     mu.close()    # Don't forget to close it
+    import sys
+    apilog.dump(sys.stdout)
     return 0
 
 
