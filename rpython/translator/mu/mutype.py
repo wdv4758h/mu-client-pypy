@@ -826,7 +826,7 @@ class _muref(_muobject_reference):
 
     def _pin(self):
         self._pin_count += 1
-        return _muuptr(MuUPtr(self._T), self._obj, self, [])
+        return _muuptr(MuUPtr(self._T), self, [])
 
     def _unpin(self):
         if not self._ispinned():
@@ -973,10 +973,9 @@ _setup_consistent_methods(_muiref)
 
 
 class _muuptr(_muobject_reference):
-    __slots__ = ('_root_ref', '_offsets')
+    __slots__ = ('_TYPE', '_T', '_root_ref', '_offsets')
 
     _template = (_muiref, (
-        '__init__',
         '__getattr__',
         '__setattr__',
         '__getitem__',
@@ -984,12 +983,62 @@ class _muuptr(_muobject_reference):
         '__len__'
     ))
 
+    def __init__(self, TYPE, root_ref, offsets):
+        """
+        NOTE: this assumes that the uptr is obtained through pinning a ref.
+        In the case of 'raw' malloc, we can fake it by creating a ref then pin it.
+        """
+        _muuptr._TYPE.__set__(self, TYPE)
+        _muuptr._T.__set__(self, TYPE.TO)
+        if not isinstance(mutypeOf(root_ref), MuRef):
+            raise TypeError("root reference of uptr must be ref, not %s" % root_ref)
+        _muuptr._root_ref.__set__(self, root_ref)
+        _muuptr._offsets.__set__(self, offsets)
+
+    def _getobj(self):
+        if not self._root_ref._ispinned():
+            raise RuntimeError("root reference of %s is not pinned" % self)
+        return _getobjfield(self._root_ref._obj, self._offsets)
+
+    def _setobj(self, value):
+        if mutypeOf(value) != self._T:
+            raise TypeError("storing %s of type %s to %s" %
+                            (value, mutypeOf(value), mutypeOf(self)))
+
+        if isinstance(mutypeOf(value), (MuRef, MuIRef)):
+            raise TypeError("can not store Mu memory reference %s of type %s to untraced pointer %s" %
+                            (value, mutypeOf(value), mutypeOf(self)))
+
+        if not self._root_ref._ispinned():
+            raise RuntimeError("root reference of %s is not pinned" % self)
+
+        if len(self._offsets) == 0:
+            self._root_ref._obj = value
+        else:
+            obj = _getobjfield(self._root_ref._obj, self._offsets[:-1])
+            ofs = self._offsets[-1]
+            if isinstance(mutypeOf(obj), (MuStruct, MuHybrid)):
+                setattr(obj, ofs, value)
+            else:
+                obj[ofs] = value
+
+    _obj = property(_getobj, _setobj)
+    _store = _setobj
+
+    def _load(self):
+        obj = self._obj
+        if not self._root_ref._ispinned():
+            raise RuntimeError("root reference of %s is not pinned" % self)
+        if isinstance(mutypeOf(obj), MuHybrid):
+            raise TypeError("can not load a MuHybrid type %s" % mutypeOf(obj))
+        if isinstance(mutypeOf(obj), (MuRef, MuIRef)):
+            raise TypeError("can not load Mu memory reference %s from %s" %
+                            (mutypeOf(obj), mutypeOf(self)))
+        return obj
+
     def _expose(self, offset, val):
         T = mutypeOf(val)
-        if isinstance(T, (MuRef, MuIRef)):
-            raise TypeError("can not expose a GC ref via untraced pointer")
-
-        return _muuptr(MuUPtr(T), val, self._root_ref, self._offsets + [offset])
+        return _muuptr(MuIRef(T), self._root_ref, self._offsets + [offset])
 _setup_consistent_methods(_muuptr)
 
 

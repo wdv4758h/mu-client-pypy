@@ -196,6 +196,8 @@ def test_ref():
     with pytest.raises(RuntimeError):
         o = p._obj      # after unpin the derived uptr becomes invalid
     with pytest.raises(RuntimeError):
+        o = p._load()   # after unpin the derived uptr becomes invalid
+    with pytest.raises(RuntimeError):
         ref_S._unpin()      # can not unpin an unpinned ref
 
 
@@ -295,16 +297,17 @@ def test_uptr():
     with pytest.raises(TypeError):
         ptrS._load()  # can not load a hybrid type
     # memarray load & store
-    ptrS.chars[0]._store(a)
-    assert ptrS.chars[0]._load() is a
-    assert refS._obj.chars[0] is a
+    c = mu_int8(ord('c'))
+    ptrS.chars[0]._store(c)
+    assert ptrS.chars[0]._load() is c
+    assert refS._obj.chars[0] is c
 
     StructWithRef = MuStruct('StructRefPoint', ('point', MuRef(Point)))
     refSWR = new(StructWithRef)
     irfSWR = refSWR._getiref()
     irfSWR.point._store(refP)
     ptrSWR = refSWR._pin()
-    with pytest.raises(RuntimeError):
+    with pytest.raises(TypeError):
         ptrSWR.point._load()    # can not load an object reference through an unsafe pointer
 
 
