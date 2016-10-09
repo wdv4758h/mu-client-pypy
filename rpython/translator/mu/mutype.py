@@ -661,7 +661,10 @@ class MuReferenceType(MuType):
         return '%s %s' % (self._suffix, self.TO._short_name())
 
     def _defl(self, parent=None, parentindex=None):
-        return self._val_type(self, None)
+        return self._val_type._null(self)
+
+    def _null(self):
+        return self._defl()
 
     def _allocate(self, parent=None, parentindex=None):
         return self._defl(parent, parentindex)
@@ -693,6 +696,14 @@ class _mugeneral_reference(object):
             return '%s %s' % (type(self._TYPE)._symbol, self._obj)
         except RuntimeError:
             return '%s DEAD %s' % (type(self._TYPE)._symbol, self._T)
+
+    @staticmethod
+    def _null(TYPE):
+        raise NotImplementedError
+
+    def _is_null(self):
+        raise NotImplementedError
+
 _setup_consistent_methods(_mugeneral_reference)
 
 
@@ -713,6 +724,12 @@ class _muopqref(_mugeneral_reference):
         self._TYPE = TYPE
         self._obj = opqobj
 
+    @staticmethod
+    def _null(TYPE):
+        return _muopqref(TYPE, None)
+
+    def _is_null(self):
+        return self._obj is None
 
 class MuObjectRef(MuReferenceType):
     def __init__(self, TO):
@@ -835,6 +852,13 @@ class _muref(_muobject_reference):
 
     def _ispinned(self):
         return self._pin_count > 0
+
+    @staticmethod
+    def _null(TYPE):
+        return _muref(TYPE, None)
+
+    def _is_null(self):
+        return self._obj is None
 _setup_consistent_methods(_muref)
 
 def _getobjfield(obj, offsets):
@@ -900,6 +924,13 @@ class _muiref(_muobject_reference):
 
     def _unpin(self):
         self._root_ref.unpin()
+
+    @staticmethod
+    def _null(TYPE):
+        return _muiref(TYPE, _muref._null(MuRef(TYPE.TO)), [])
+
+    def _is_null(self):
+        return self._root_ref._is_null()
 
     def _expose(self, offset, val):
         T = mutypeOf(val)
@@ -976,6 +1007,8 @@ class _muuptr(_muobject_reference):
     __slots__ = ('_TYPE', '_T', '_root_ref', '_offsets')
 
     _template = (_muiref, (
+        '_null',
+        '_is_null',
         '__getattr__',
         '__setattr__',
         '__getitem__',
@@ -1040,6 +1073,16 @@ class _muuptr(_muobject_reference):
         T = mutypeOf(val)
         return _muuptr(MuIRef(T), self._root_ref, self._offsets + [offset])
 _setup_consistent_methods(_muuptr)
+
+
+class MuGlobalCell(MuIRef):
+    _suffix = 'Glb'
+    _symbol = '&g'
+    _val_type = property(lambda self: _muglobalcell)
+
+
+class _muglobalcell(_muiref):
+    pass
 
 
 def _castdepth(OUTSIDE, INSIDE):
@@ -1108,13 +1151,22 @@ def mutypeOf(val):
 
 
 def new(T):
+    if isinstance(T, MuOpaqueType):
+        o = _muopaque(T)
+        return _muopqref(MuOpaqueRef(T), o)
+
+    elif isinstance(T, MuGlobalCell):
+        if isinstance(T.TO, (MuRef, MuIRef)):
+            o = T.TO._defl()
+
+        ref = new(T.TO)
+
     if isinstance(T, MuStruct):
         o = _mustruct(T)
     elif isinstance(T, MuArray):
         o = _muarray(T)
-    elif isinstance(T, MuOpaqueType):
-        o = _muopaque(T)
-        return _muopqref(MuOpaqueRef(T), o)
+    elif isinstance(T, MuNumber):
+        o = T._defl()
     return _muref(MuRef(T), o)
 
 

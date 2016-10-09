@@ -167,6 +167,28 @@ def test_new_newhybrid():
     assert refN
     assert isinstance(refN, mutype._muopqref)
 
+def test_null():
+    Point2 = MuStruct('Point2', ('x', MU_INT64), ('y', MU_INT64))
+    Ref2 = MuRef(Point2)
+    IRef2 = MuIRef(Point2)
+    UPtr2 = MuUPtr(Point2)
+
+    nullRef2 = Ref2._null()
+    nullIRef2 = IRef2._null()
+    nullUPtr2 = UPtr2._null()
+    assert not nullRef2     # null ref should evaluate to False
+    assert nullRef2._is_null()
+    assert not nullIRef2  # null ref should evaluate to False
+    assert nullIRef2._is_null()
+    assert not nullUPtr2  # null ref should evaluate to False
+    assert nullUPtr2._is_null()
+
+
+    IRNode = MuOpaqueType("IRNode")
+    OpqRef = MuOpaqueRef(IRNode)
+    nullOpqRef = OpqRef._null()
+    assert not nullOpqRef
+    assert nullOpqRef._is_null()
 
 def test_ref():
     # Spec of what ref can do
