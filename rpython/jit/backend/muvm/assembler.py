@@ -99,14 +99,14 @@ class AssemblerMu(BaseAssembler):
         self.datablockwrapper = MachineDataBlockWrapper(self.cpu.asmmemmgr,
                                                         allblocks)
         self.mc = self.mu.new_context()
-        self.bndl = self.mc.new_bundle()
-        self.type_i32 = self.mc.new_type_int(self.bndl, 32)
-        self.type_i64 = self.mc.new_type_int(self.bndl, 64)
-        self.type_float = self.mc.new_type_float(self.bndl)
-        self.sig = self.mc.new_funcsig(self.bndl, [], [])
-        self.func = self.mc.new_func(self.bndl, self.sig)
-        self.fv = self.mc.new_func_ver(self.bndl, self.func)
-        self.bb = self.mc.new_bb(self.fv)
+        self.irb = self.mc.new_ir_builder()
+        self.type_i32 = self.irb.new_type_int(self.bndl, 32)
+        self.type_i64 = self.irb.new_type_int(self.bndl, 64)
+        self.type_float = self.irb.new_type_float(self.bndl)
+        self.sig = self.irb.new_funcsig(self.bndl, [], [])
+        self.func = self.irb.new_func(self.bndl, self.sig)
+        self.fv = self.irb.new_func_ver(self.bndl, self.func)
+        self.bb = self.irb.new_bb(self.fv)
         self.target_tokens_currently_compiling = {}
         self.frame_depth_to_patch = []
         self.const_i0 = self.mc.new_const_int(self.bndl, self.type_i32, 0)
