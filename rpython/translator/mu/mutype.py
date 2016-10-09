@@ -1080,6 +1080,11 @@ class MuGlobalCell(MuIRef):
     _symbol = '&g'
     _val_type = property(lambda self: _muglobalcell)
 
+    def __init__(self, TO):
+        if isinstance(TO, MuHybrid):
+            raise TypeError("%s can not be contained in global cell")
+        super(MuGlobalCell, self).__init__(TO)
+
 
 class _muglobalcell(_muiref):
     pass
@@ -1154,12 +1159,9 @@ def new(T):
     if isinstance(T, MuOpaqueType):
         o = _muopaque(T)
         return _muopqref(MuOpaqueRef(T), o)
-
-    elif isinstance(T, MuGlobalCell):
-        if isinstance(T.TO, (MuRef, MuIRef)):
-            o = T.TO._defl()
-
+    if isinstance(T, MuGlobalCell):
         ref = new(T.TO)
+        return _muglobalcell(T, ref, [])
 
     if isinstance(T, MuStruct):
         o = _mustruct(T)
@@ -1167,6 +1169,10 @@ def new(T):
         o = _muarray(T)
     elif isinstance(T, MuNumber):
         o = T._defl()
+    elif isinstance(T, MuReferenceType):
+        o = T._null()
+    else:
+        raise TypeError("do know how to new %s" % T)
     return _muref(MuRef(T), o)
 
 

@@ -267,7 +267,7 @@ def test_iref():
 
 def test_globalcell():
     assert issubclass(MuGlobalCell, MuIRef)
-    assert issubclass(mutype._muglocalcell, mutype._muiref)
+    assert issubclass(mutype._muglobalcell, mutype._muiref)
 
     Point = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
     RefPoint = MuRef(Point)
