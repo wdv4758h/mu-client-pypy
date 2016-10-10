@@ -16,11 +16,17 @@ from rpython.jit.backend.muvm import registers as r
 from rpython.rlib.objectmodel import we_are_translated
 
 #from rpython.jit.backend.arm import conditions as c
-from rpython.jit.backend.muvm.locations import (Type, SSALocation,
+from rpython.jit.backend.muvm.locations import (SSALocation,
                                                     LocalSSALocation,
                                                     GlobalSSALocation,
                                                     #ImmLocation,
                                                     ConstLocation)
+from rpython.jit.backend.muvm.mutypes import ( get_type, DOUBLE, IREF, WEAKREF,
+                                               HYBRID, ARRAY, FUNCREF,
+                                               THREADREF, FRAMECURSORREF,
+                                               TAGREF64, UPTR, UFUNCPTR,
+                                               INT_DEFAULT, INT32_t, INT64_t,
+                                               FLOAT_t, DOUBLE_t, VOID_t, MuType)
 #from rpython.jit.backend.arm.locations import imm, get_fp_offset
 from rpython.jit.backend.muvm.helper.regalloc import (prepare_op_by_helper_call,
                                                    prepare_unary_cmp,
@@ -80,9 +86,9 @@ class MuVMRegisterManager(RegisterManager):
         self.assembler = assembler
 
         # MuVM Specific variables
-        self.local_const_loc_bindings = {}    # Map (Type,val) to ConstLocation
-        self.global_const_loc_bindings = {}    # Map (Type,val) to ConstLocation
-        self.type_bindings  = {}               # Map (type_str, width) to Type
+        self.local_const_loc_bindings = {}     # Map (MuType,val) to ConstLocation
+        self.global_const_loc_bindings = {}    # Map (MuType,val) to ConstLocation
+        self.type_bindings  = {}               # Map (type_str, width) to MuType
 
     def reset(self, longevity, frame_manager=None, assembler=None):
         ''' Reset our register manager. Currently just copies __init__()'''
@@ -99,9 +105,9 @@ class MuVMRegisterManager(RegisterManager):
         self.assembler = assembler
 
         # MuVM Specific variables
-        self.local_const_loc_bindings = {}    # Map (Type,val) to ConstLocation
-        self.global_const_loc_bindings = {}   # Map (Type,val) to ConstLocation
-        self.type_bindings  = {}              # Map (type_str, width) to Type
+        self.local_const_loc_bindings = {}    # Map (MuType,val) to ConstLocation
+        self.global_const_loc_bindings = {}   # Map (MuType,val) to ConstLocation
+        self.type_bindings  = {}              # Map (type_str, width) to MuType
 
 
     def return_constant(self, v, forbidden_vars=None, selected_reg=None):
@@ -174,17 +180,17 @@ class MuVMRegisterManager(RegisterManager):
     def try_allocate_reg(self, t, selected_reg=None, need_lower_byte=False):
         """ Override from RegisterManager. This will always succeed.
         INPUTS:
-            t: Type()
+            t: MuType()
             selected_reg:    Ignore
             need_lower_byte: Ignored
         OUTPUTS:
             self.register's location of `v`
-        NOTE: right now t is instance of Type() class. It may be better
+        NOTE: right now t is instance of MuType() class. It may be better
         to split t into (t,width) variables.
         """
         ### OVERRIDE
         ### Scratch Method
-        assert isinstance(t, Type)
+        assert isinstance(t, MuType)
         assert selectedReg == None
         v = len(self.all_regs)      # Position
         ssa = SSALocation(v, t)     # SSA variable, to be appended

@@ -11,6 +11,7 @@ from rpython.jit.backend.model import CompiledLoopToken
 from rpython.jit.backend.muvm import conditions as c, regalloc
 from rpython.jit.backend.muvm.arch import JITFRAME_FIXED_SIZE
 from rpython.jit.backend.muvm.regalloc import Regalloc
+from rpython.jit.backend.muvm.mutypes import get_type, get_func_sig, INT64_t, INT32_t, FLOAT_t, DOUBLE_t, VOID_t
 from rpython.jit.codewriter.effectinfo import EffectInfo
 from rpython.jit.metainterp.resoperation import rop
 from rpython.rlib.debug import debug_print, debug_start, debug_stop
@@ -100,18 +101,36 @@ class AssemblerMu(BaseAssembler):
                                                         allblocks)
         self.mc = self.mu.new_context()
         self.irb = self.mc.new_ir_builder()
-        self.type_i32 = self.irb.new_type_int(self.bndl, 32)
-        self.type_i64 = self.irb.new_type_int(self.bndl, 64)
-        self.type_float = self.irb.new_type_float(self.bndl)
-        self.sig = self.irb.new_funcsig(self.bndl, [], [])
-        self.func = self.irb.new_func(self.bndl, self.sig)
-        self.fv = self.irb.new_func_ver(self.bndl, self.func)
+
+        # Get name:MuID bindings - better solution?
+        muid_bindings = {}
+        for t in (INT32_t, INT64_t, FLOAT_t, DOUBLE_t):
+            muid_bindings[t] = self.irb.gen_sym(str(t))
+        sig0 = get_func_sig((), ())
+        muid_bindings[sig0] = self.irb.gen_sym(str(sig0))
+
+        self.type_i32 = self.irb.new_type_int(muid_bindings[INT32_t], 32)
+        self.type_i64 = self.irb.new_type_int(muid_bindings[INT64_t], 64)
+        self.type_float = self.irb.new_type_float(muid_bindings[FLOAT_t])
+        self.type_double = self.irb.new_type_double(muid_bindings[DOUBLE_t])
+
+        self.sig = self.irb.new_funcsig(muid_bindings[sig0], (), ())
+        func_id = self.irb.gen_sym('func')
+        self.func = self.irb.new_func(func_id, self.sig)
+        fv_id = self.irb.gen_sym('fv')
+        self.fv = self.irb.new_func_ver(fv_id, self.func)
         self.bb = self.irb.new_bb(self.fv)
+
         self.target_tokens_currently_compiling = {}
         self.frame_depth_to_patch = []
-        self.const_i0 = self.mc.new_const_int(self.bndl, self.type_i32, 0)
-        self.const_f0 = self.mc.new_const_float(self.bndl, self.type_float, 0.0)
-        self.const_int_neg = self.mc.new_const_int(self.bndl, self.type_i32, -1)
+
+        # For generating id's
+        consti32_0_id  = self.irb.gen_sym('i32_0')
+        constf_0_id  = self.irb.gen_sym('f_0')
+        consti32_n1_id = self.irb.gen_sym('i32_n1')
+        self.const_i0 = self.irb.new_const_int(consti32_0_id, self.type_i32, 0)
+        self.const_f0 = self.irb.new_const_float(constf_0_id, self.type_float, 0.0)
+        self.const_int_neg = self.irb.new_const_int(consti32_n1_id, self.type_i32, -1)
 
     def teardown(self):
         self.current_clt = None
