@@ -1,6 +1,7 @@
 """
 Mu API RPython binding with C backend.
 This file is auto-generated and then added a few minor modifications.
+NOTE: THIS FILE IS *NOT* RPYTHON.
 """
 
 from rpython.rtyper.lltypesystem import rffi
@@ -9,8 +10,9 @@ from rpython.translator.tool.cbuild import ExternalCompilationInfo
 from rpython.rlib.objectmodel import specialize
 import os
 
-class CCall:
-    __slots__ = ('fnc_name', 'args', 'rtn_var', 'context')
+class CCall(object):
+    __slots__ = ('fnc_name', 'args', 'rtn_var', 'context', 'check_err')
+
     def __init__(self, fnc_name, args, rtn_var, context=None, check_err=True):
         self.fnc_name = fnc_name
         self.args = args
@@ -31,18 +33,23 @@ class CCall:
 
     __repr__ = __str__
 
-class CStr:
+class CStr(object):
+    __slots__ = ('string', )
+
     def __init__(self, string):
         self.string = string
 
     def __str__(self):
         return '"%s"' % self.string
 
+    def __len__(self):
+        return len(self.string) - self.string.count('\\n')
+
     __repr__ = __str__
 
 NULL = 'NULL'
 
-class CArrayConst:
+class CArrayConst(object):
     def __init__(self, c_elm_t, lst):
         self.c_elm_t = c_elm_t
         self.lst = lst
@@ -53,7 +60,8 @@ class CArrayConst:
 
     __repr__ = __str__
 
-class CVar:
+class CVar(object):
+    __slots__ = ('type', 'name')
     _name_dic = {}
 
     @staticmethod
@@ -76,7 +84,6 @@ class CVar:
             self.name = CVar.new_name()
 
     def __str__(self):
-        # return '(%(type)s)%(name)s' % self.__dict__
         return self.name
 
     __repr__ = __str__
@@ -112,7 +119,7 @@ class APILogger:
         fp.write('int main(int argc, char** argv) {\n')
         idt = ' ' * 4
         for var in self.decl_vars:
-            fp.write(idt + '%(type)s %(name)s;\n' % var.__dict__)
+            fp.write(idt + '%s %s;\n' % (var.type, var.name))
 
         for ccall in self.ccalls:
             fp.write(idt + '%(ccall)s\n' % locals())
@@ -510,13 +517,13 @@ class MuCtx:
     def load_bundle(self, buf):
         # type: (str) -> None
         buf_cstr = CStr(buf) if buf else NULL
-        sz = len(buf)
+        sz = len(buf_cstr)
         _apilog.logcall('load_bundle', [self._ctx, buf_cstr, sz], None, self._ctx)
 
     def load_hail(self, buf):
         # type: (str) -> None
         buf_cstr = CStr(buf) if buf else NULL
-        sz = len(buf)
+        sz = len(buf_cstr)
         _apilog.logcall('load_hail', [self._ctx, buf_cstr, sz], None, self._ctx)
 
     def handle_from_sint8(self, num, len):

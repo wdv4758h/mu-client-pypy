@@ -133,29 +133,30 @@ class MuTextBundleGenerator(MuBundleGenerator):
 # NOTE: when rewriting, use visitor pattern for type generation
 class MuAPIBundleGenerator(MuBundleGenerator):
     _rmu_mod = rmu
+    _newline = '\n'
     def __init__(self, db):
-        def get_config_str():
-            libconfig = []
-
-            # extraLibs
-            extlibs = []
-            for lib in db.dylibs:
-                extlibs.append(lib._name)
-            libconfig.append("extraLibs=" + ":".join(extlibs))
-
-            # dumpBundle
-            libconfig.append("dumpBundle=%s" % False)
-
-            # silent
-            libconfig.append("vmLog=ERROR")
-            return "\n".join(libconfig)
-
         MuBundleGenerator.__init__(self, db)
         self.idmap = {}
-        self.mu = self.__class__._rmu_mod.MuVM(get_config_str())
+        self.mu = self.__class__._rmu_mod.MuVM(self.get_config_str(db))
         self.ctx = self.mu.new_context()
         self.bdr = None
         self._objhdl_map = {}   # used in heap initialisation; NOTE: referent -> handle (not reference)
+
+    def get_config_str(self, db):
+        libconfig = []
+
+        # extraLibs
+        extlibs = []
+        for lib in db.dylibs:
+            extlibs.append(lib._name)
+        libconfig.append("extraLibs=" + ":".join(extlibs))
+
+        # dumpBundle
+        libconfig.append("dumpBundle=%s" % False)
+
+        # silent
+        libconfig.append("vmLog=ERROR")
+        return self.__class__._newline.join(libconfig)
 
     def bundlegen(self, bdlpath):
         self.log.bundlegen("API Bundle generator")
@@ -183,6 +184,9 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
         self.mu.close()
 
+        self.extras(bdlpath)
+
+    def extras(self, bdlpath):
         mu_meta_set(str(bdlpath),
                     extra_libraries=":".join(map(lambda lib: lib._name, self.db.dylibs)))
 
@@ -194,16 +198,17 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
         # primitive types
         prelude = (
-            ".typedef {int1_t.mu_name} = int<1>\n"
-            ".typedef {int8_t.mu_name} = int<8>\n"
-            ".typedef {int16_t.mu_name} = int<16>\n"
-            ".typedef {int32_t.mu_name} = int<32>\n"
-            ".typedef {int64_t.mu_name} = int<64>\n"
-            ".typedef {int128_t.mu_name} = int<128>\n"
-            ".typedef {float_t.mu_name} = float\n"
-            ".typedef {double_t.mu_name} = double\n"
-            ".typedef {void_t.mu_name} = void\n"
-        ).format(**mutype.__dict__)
+            ".typedef {int1_t.mu_name} = int<1>%(newline)s"
+            ".typedef {int8_t.mu_name} = int<8>%(newline)s"
+            ".typedef {int16_t.mu_name} = int<16>%(newline)s"
+            ".typedef {int32_t.mu_name} = int<32>%(newline)s"
+            ".typedef {int64_t.mu_name} = int<64>%(newline)s"
+            ".typedef {int128_t.mu_name} = int<128>%(newline)s"
+            ".typedef {float_t.mu_name} = float%(newline)s"
+            ".typedef {double_t.mu_name} = double%(newline)s"
+            ".typedef {void_t.mu_name} = void%(newline)s"
+        ).format(**mutype.__dict__) % {'newline': self.__class__._newline}
+
         self.ctx.load_bundle(prelude)
         for t in (
                 mutype.int1_t,
@@ -637,34 +642,8 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
 class MuCSourceBundleGenerator(MuAPIBundleGenerator):
     _rmu_mod = rmu_genc
+    _newline = '\\n'
 
-    def bundlegen(self, bdlpath):
-        self.log.bundlegen("API C Souece Bundle generator")
-
-        self.bdr = self.ctx.new_ir_builder()
-
-        self.gen_types()
-        self.gen_consts()
-        self.gen_gcells()
-        self.gen_graphs()
-
-        self.log.bundlegen("load bundle into Mu")
-        self.bdr.load()
-
-        self.log.bundlegen("start initialise heap objects")
-        self.init_heap()
-
-        self.log.bundlegen("start making boot image")
-        self.log.bundlegen("%d top level nodes" % len(self.idmap))
-
-        hmain = self.ctx.handle_from_func(self.idmap[self.db.prog_entry])
-        self.ctx.make_boot_image(self.idmap.values(), hmain,
-                                 self.__class__._rmu_mod.null(self.__class__._rmu_mod.MuStackRefValue),
-                                 self.__class__._rmu_mod.null(self.__class__._rmu_mod.MuRefValue),
-                                 [], [], [], [], str(bdlpath))
-
-        self.mu.close()
-        # mu_meta_set(str(bdlpath),
-        #             extra_libraries=":".join(map(lambda lib: lib._name, self.db.dylibs)))
-        with bdlpath.open('w') as fp:
+    def extras(self, bdlpath):
+        with (bdlpath + '.c').open('w') as fp:
             rmu_genc.get_global_apilogger().genc(fp)
