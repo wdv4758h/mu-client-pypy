@@ -152,7 +152,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
         MuBundleGenerator.__init__(self, db)
         self.idmap = {}
-        self.mu = type(self)._rmu_mod.MuVM(get_config_str())
+        self.mu = self.__class__._rmu_mod.MuVM(get_config_str())
         self.ctx = self.mu.new_context()
         self.bdr = None
         self._objhdl_map = {}   # used in heap initialisation; NOTE: referent -> handle (not reference)
@@ -178,9 +178,10 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
         hmain = self.ctx.handle_from_func(self.idmap[self.db.prog_entry])
         self.ctx.make_boot_image(self.idmap.values(), hmain,
-                                 type(self)._rmu_mod.null(type(self)._rmu_mod.MuStackRefValue), type(self)._rmu_mod.null(type(self)._rmu_mod.MuRefValue),
+                                 self.__class__._rmu_mod.null(self.__class__._rmu_mod.MuStackRefValue), self.__class__._rmu_mod.null(self.__class__._rmu_mod.MuRefValue),
                                  [], [], [], [], str(bdlpath))
 
+        self.mu.close()
 
         mu_meta_set(str(bdlpath),
                     extra_libraries=":".join(map(lambda lib: lib._name, self.db.dylibs)))
@@ -322,7 +323,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             exc_prm_id = bdr.gen_sym(repr(blk.mu_excparam.mu_name))
             varmap[blk.mu_excparam] = exc_prm_id
         else:
-            exc_prm_id = type(self)._rmu_mod.MU_NO_ID
+            exc_prm_id = self.__class__._rmu_mod.MU_NO_ID
 
         # generate operations
         op_ids = []
@@ -330,7 +331,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             _id = bdr.gen_sym()
             op_ids.append(_id)
 
-            res = bdr.gen_sym(repr(op.result.mu_name)) if not op.result.mu_type is mutype.void_t else type(self)._rmu_mod.MU_NO_ID
+            res = bdr.gen_sym(repr(op.result.mu_name)) if not op.result.mu_type is mutype.void_t else self.__class__._rmu_mod.MU_NO_ID
             varmap[op.result] = res
 
             if op.exc.nor and op.exc.exc:
@@ -341,16 +342,16 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                 bdr.new_dest_clause(_exc, blkmap[op.exc.exc.blk], map(varmap.get, op.exc.exc.args))
                 bdr.new_exc_clause(exc, _nor, _exc)
             else:
-                exc = type(self)._rmu_mod.MU_NO_ID
+                exc = self.__class__._rmu_mod.MU_NO_ID
 
             if op.opname in muops.BINOPS:
-                bdr.new_binop(_id, res, getattr(type(self)._rmu_mod.MuBinOptr, op.opname), idmap[op.op1.mu_type],
+                bdr.new_binop(_id, res, getattr(self.__class__._rmu_mod.MuBinOptr, op.opname), idmap[op.op1.mu_type],
                                 varmap[op.op1], varmap[op.op2], exc)
             elif op.opname in muops.CMPOPS:
-                bdr.new_cmp(_id, res, getattr(type(self)._rmu_mod.MuCmpOptr, op.opname), idmap[op.op1.mu_type],
+                bdr.new_cmp(_id, res, getattr(self.__class__._rmu_mod.MuCmpOptr, op.opname), idmap[op.op1.mu_type],
                             varmap[op.op1], varmap[op.op2])
             elif op.opname in muops.CONVOPS:
-                bdr.new_conv(_id, res, getattr(type(self)._rmu_mod.MuConvOptr, op.opname),
+                bdr.new_conv(_id, res, getattr(self.__class__._rmu_mod.MuConvOptr, op.opname),
                                 idmap[op.opnd.mu_type], idmap[op.T2], varmap[op.opnd])
             else:
                 method = getattr(self, '_OP_' + op.opname, None)
@@ -408,7 +409,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
     def _OP_CALL(self, op_id, op, varmap, **kwargs):
         res = varmap[op.result]
-        self.bdr.new_call(op_id, [res] if not res is type(self)._rmu_mod.MU_NO_ID else [], varmap[op.callee.mu_type.Sig],
+        self.bdr.new_call(op_id, [res] if not res is self.__class__._rmu_mod.MU_NO_ID else [], varmap[op.callee.mu_type.Sig],
                           varmap[op.callee], map(varmap.get, op.args), exc_clause=kwargs['exc'])
 
     def _OP_TAILCALL(self, op_id, op, varmap, **kwargs):
@@ -468,11 +469,11 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
     def _OP_LOAD(self, op_id, op, varmap, **kwargs):
         self.bdr.new_load(op_id, varmap[op.result], isinstance(op.loc.mu_type, mutype.MuUPtr),
-                          type(self)._rmu_mod.MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc])
+                          self.__class__._rmu_mod.MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc])
 
     def _OP_STORE(self, op_id, op, varmap, **kwargs):
         self.bdr.new_store(op_id, isinstance(op.loc.mu_type, mutype.MuUPtr),
-                           type(self)._rmu_mod.MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc], varmap[op.val])
+                           self.__class__._rmu_mod.MuMemOrd.NOT_ATOMIC, varmap[op.loc.mu_type.TO], varmap[op.loc], varmap[op.val])
 
     def _OP_TRAP(self, op_id, op, varmap, **kwargs):
         # self.bdr.new_trap(op_id, varmap[op.T])
@@ -480,18 +481,18 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
     def _OP_CCALL(self, op_id, op, varmap, **kwargs):
         res = varmap[op.result]
-        self.bdr.new_ccall(op_id, [res] if not res is type(self)._rmu_mod.MU_NO_ID else [], type(self)._rmu_mod.MuCallConv.DEFAULT, varmap[op.callee.mu_type],
+        self.bdr.new_ccall(op_id, [res] if not res is self.__class__._rmu_mod.MU_NO_ID else [], self.__class__._rmu_mod.MuCallConv.DEFAULT, varmap[op.callee.mu_type],
                            varmap[op.callee.mu_type.Sig], varmap[op.callee], map(varmap.get, op.args))
 
     def _OP_COMMINST(self, op_id, op, varmap, **kwargs):
         cls = op.__class__
         if cls is muops.THREAD_EXIT:
-            self.bdr.new_comminst(op_id, [], type(self)._rmu_mod.MuCommInst.THREAD_EXIT, [], [], [], [])
+            self.bdr.new_comminst(op_id, [], self.__class__._rmu_mod.MuCommInst.THREAD_EXIT, [], [], [], [])
         elif cls is muops.NATIVE_PIN:
-            self.bdr.new_comminst(op_id, [varmap[op.result]], type(self)._rmu_mod.MuCommInst.NATIVE_PIN, [],
+            self.bdr.new_comminst(op_id, [varmap[op.result]], self.__class__._rmu_mod.MuCommInst.NATIVE_PIN, [],
                                          [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
         elif cls is muops.NATIVE_UNPIN:
-            self.bdr.new_comminst(op_id, [], type(self)._rmu_mod.MuCommInst.NATIVE_UNPIN, [],
+            self.bdr.new_comminst(op_id, [], self.__class__._rmu_mod.MuCommInst.NATIVE_UNPIN, [],
                                          [varmap[op.opnd.mu_type]], [], [varmap[op.opnd]])
         # elif cls is muops.NATIVE_EXPOSE:
         #     self.bdr.new_comminst(op_id, [], MuCommInst.NATIVE_EXPOSE, [],
@@ -500,9 +501,9 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         # elif cls is muops.NATIVE_UNEXPOSE:
         #     self.bdr.new_comminst(op_id, [], MuCommInst.NATIVE_UNEXPOSE, [], [], [], [varmap[op.value]])
         elif cls is muops.GET_THREADLOCAL:
-            self.bdr.new_comminst(op_id, [varmap[op.result]], type(self)._rmu_mod.MuCommInst.GET_THREADLOCAL, [], [], [], [])
+            self.bdr.new_comminst(op_id, [varmap[op.result]], self.__class__._rmu_mod.MuCommInst.GET_THREADLOCAL, [], [], [], [])
         elif cls is muops.SET_THREADLOCAL:
-            self.bdr.new_comminst(op_id, [], type(self)._rmu_mod.MuCommInst.SET_THREADLOCAL, [], [], [], [varmap[op.ref]])
+            self.bdr.new_comminst(op_id, [], self.__class__._rmu_mod.MuCommInst.SET_THREADLOCAL, [], [], [], [varmap[op.ref]])
         else:
             raise NotImplementedError("Building method for %s not implemented" % op)
 
@@ -522,7 +523,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             gcl_id = self.idmap[gcl]
             hgcl = self.ctx.handle_from_global(gcl_id)
             href = self._objhdl_map[self.db.objtracer.gcells[gcl]]  # object root in gcell -> handle
-            self.ctx.store(type(self)._rmu_mod.MuMemOrd.NOT_ATOMIC, hgcl, href)
+            self.ctx.store(self.__class__._rmu_mod.MuMemOrd.NOT_ATOMIC, hgcl, href)
 
     def _create_heap_objects(self):
         ctx = self.ctx
@@ -585,7 +586,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                     fld_iref = ctx.get_field_iref(hiref, obj._TYPE._index_of(fld_n))
                     fld_hdl = _init_obj(fld, fld_iref)
                     if fld_hdl:
-                        ctx.store(type(self)._rmu_mod.MuMemOrd.NOT_ATOMIC, fld_iref, fld_hdl)
+                        ctx.store(self.__class__._rmu_mod.MuMemOrd.NOT_ATOMIC, fld_iref, fld_hdl)
 
                 # var fields
                 arr = getattr(obj, obj._TYPE._varfld)
@@ -614,7 +615,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                 elm_irf = ctx.shift_iref(iref_root, idx_hdl)
                 elm_hdl = _init_obj(elm, elm_irf)
                 if elm_hdl:
-                    ctx.store(type(self)._rmu_mod.MuMemOrd.NOT_ATOMIC, elm_irf, elm_hdl)
+                    ctx.store(self.__class__._rmu_mod.MuMemOrd.NOT_ATOMIC, elm_irf, elm_hdl)
 
         def _init_struct(iref_root, stt):
             # ref = ctx.refcast(ref_root, ctx.id_of(str(stt._TYPE.mu_name)))    # pass in root ref, since substructs should be the first field.
@@ -627,7 +628,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
                 else:
                     fld_hdl = _init_obj(fld)
                     fld_iref = ctx.get_field_iref(iref, stt._TYPE._index_of(fld_n))
-                    ctx.store(type(self)._rmu_mod.MuMemOrd.NOT_ATOMIC, fld_iref, fld_hdl)
+                    ctx.store(self.__class__._rmu_mod.MuMemOrd.NOT_ATOMIC, fld_iref, fld_hdl)
 
 
         for obj in objtracer.objs:
@@ -637,3 +638,33 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 class MuCSourceBundleGenerator(MuAPIBundleGenerator):
     _rmu_mod = rmu_genc
 
+    def bundlegen(self, bdlpath):
+        self.log.bundlegen("API C Souece Bundle generator")
+
+        self.bdr = self.ctx.new_ir_builder()
+
+        self.gen_types()
+        self.gen_consts()
+        self.gen_gcells()
+        self.gen_graphs()
+
+        self.log.bundlegen("load bundle into Mu")
+        self.bdr.load()
+
+        self.log.bundlegen("start initialise heap objects")
+        self.init_heap()
+
+        self.log.bundlegen("start making boot image")
+        self.log.bundlegen("%d top level nodes" % len(self.idmap))
+
+        hmain = self.ctx.handle_from_func(self.idmap[self.db.prog_entry])
+        self.ctx.make_boot_image(self.idmap.values(), hmain,
+                                 self.__class__._rmu_mod.null(self.__class__._rmu_mod.MuStackRefValue),
+                                 self.__class__._rmu_mod.null(self.__class__._rmu_mod.MuRefValue),
+                                 [], [], [], [], str(bdlpath))
+
+        self.mu.close()
+        # mu_meta_set(str(bdlpath),
+        #             extra_libraries=":".join(map(lambda lib: lib._name, self.db.dylibs)))
+        with bdlpath.open('w') as fp:
+            rmu_genc.get_global_apilogger().genc(fp)

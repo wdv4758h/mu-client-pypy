@@ -618,7 +618,10 @@ class TranslationDriver(SimpleTaskEngine):
             bdlgen_api_c.bundlegen(target_name + '.c')
         else:
             if target_name.ext != MuDatabase.bundle_suffix:
-                bundle_name = target_name + MuDatabase.bundle_suffix
+                if self.config.translation.mucodegen == 'c':
+                    bundle_name = target_name + '.c'
+                else:
+                    bundle_name = target_name + MuDatabase.bundle_suffix
             else:
                 bundle_name = target_name
             cls = get_codegen_class()
