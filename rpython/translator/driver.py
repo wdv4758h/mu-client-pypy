@@ -14,7 +14,8 @@ from rpython.tool.ansi_print import AnsiLogger
 from rpython.tool.udir import udir
 from rpython.translator.goal import query
 from rpython.translator.goal.timing import Timer
-from rpython.translator.mu.genmu import get_codegen_class, MuTextBundleGenerator, MuAPIBundleGenerator
+from rpython.translator.mu.genmu import get_codegen_class, MuTextBundleGenerator, \
+    MuAPIBundleGenerator, MuCSourceBundleGenerator
 from rpython.translator.tool.taskengine import SimpleTaskEngine
 from rpython.translator.translator import TranslationContext
 from .mu.database import MuDatabase
@@ -605,13 +606,16 @@ class TranslationDriver(SimpleTaskEngine):
         self.log.info("Task compile_mu")
         target_name = self.compute_exe_name()
 
-        if self.config.translation.mucodegen == "both":
+        if self.config.translation.mucodegen == "all":
             self.log.info("generating bundle using text backend")
             bdlgen_text = MuTextBundleGenerator(self.mudb)
             bdlgen_text.bundlegen(target_name + '.mutxt')
             self.log.info("generating bundle using Mu API backend")
             bdlgen_api = MuAPIBundleGenerator(self.mudb)
             bdlgen_api.bundlegen(target_name + '.muapi')
+            self.log.info("generating bundle using Mu API C source backend")
+            bdlgen_api_c = MuCSourceBundleGenerator(self.mudb)
+            bdlgen_api_c.bundlegen(target_name + '.c')
         else:
             if target_name.ext != MuDatabase.bundle_suffix:
                 bundle_name = target_name + MuDatabase.bundle_suffix
