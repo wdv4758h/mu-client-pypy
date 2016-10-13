@@ -102,6 +102,10 @@ class AssemblerMu(BaseAssembler):
         self.mc = self.mu.new_context()
         self.irb = self.mc.new_ir_builder()
 
+        # XXX: Using the gen_sym() method of MuIRBuilder to generate MuIDs.
+        # This leads to some extra boot strapping code that may be extraneous
+        # Used just to stitch this method together
+
         # Get name:MuID bindings - better solution?
         muid_bindings = {}
         for t in (INT32_t, INT64_t, FLOAT_t, DOUBLE_t):
