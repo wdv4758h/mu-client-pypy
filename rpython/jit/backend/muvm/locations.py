@@ -2,59 +2,18 @@ from rpython.jit.metainterp.history import  (INT, FLOAT, VOID,
                                             STRUCT, REF, VECTOR)
 from rpython.jit.backend.muvm.arch import (WORD, DOUBLE_WORD, 
                                         JITFRAME_FIXED_SIZE, INT_WIDTH)
-
-# Type bindings 
-type_bindings = {}
-
-class Type(object):
-    ''' Type value for SSALocations. Includes type and width info.'''
-    def __init__(self, tp = INT, width = INT_WIDTH):
-        self.tp  = tp
-        self.width = width
-    
-    def prefix(self):
-        """Return type signature"""
-        res = self.tp
-        if self.tp == INT:
-            res += str(self.width)
-        return res
-
-    def __repr__(self):
-        return '@' + self.prefix() + '_t'
-    
-    def __eq__(self, other):
-        return self.tp == other.tp and self.width == other.width
-    def __ne__(self, other):
-        return not self.__eq__(other)
-    def __hash__(self):
-        return hash( (self.tp, self.width) )   # Just hash the tuple
-
-def get_type(tp, width):
-    if (tp, width) not in type_bindings:
-        type_bindings[ (tp, width) ] = Type(tp, width)
-    return type_bindings[ (tp, width) ]
-
-INT64   = get_type(INT,   64)
-INT32   = get_type(INT,   32)
-FLOAT32 = get_type(FLOAT, 32)
-FLOAT64 = get_type(FLOAT, 64)
-DOUBLE  = FLOAT64
-REF32   = get_type(REF,   32)
-REF64   = get_type(REF,   64)
-
-DEFAULT_CONSTS = []
-
-
-INT_DEFAULT = INT64
-if INT_WIDTH == 32:
-    INT_DEFAULT = INT32
-
+from rpython.jit.backend.muvm.mutypes import ( get_type, DOUBLE, IREF, WEAKREF,
+                                               HYBRID, ARRAY, FUNCREF,
+                                               THREADREF, FRAMECURSORREF,
+                                               TAGREF64, UPTR, UFUNCPTR,
+                                               INT_DEFAULT, INT32_t, INT64_t,
+                                               FLOAT_t, DOUBLE_t, VOID_t)
 
 
 class AssemblerLocation(object):
     _immutable_ = True
     value  = None
-    tp = Type(INT, INT_WIDTH)
+    tp = get_type(INT, INT_WIDTH)
     type = INT
 
     def is_imm(self):
@@ -159,7 +118,7 @@ class GlobalSSALocation(SSALocation):
         return '@{}_{}'.format(self.t.prefix(), self.value)
 
 class ConstLocation(SSALocation):
-    def __init__(self, tp=INT64, value = 0):
+    def __init__(self, tp=INT_DEFAULT, value = 0):
         ''' Constructor:
             tp: Type() instance
             value: literal value of the constant
@@ -257,10 +216,11 @@ def imm_int(i):
 
 """
 
+DEFAULT_CONSTS = []
 def get_fp_offset(base_ofs, position):
     return base_ofs + WORD * (position + JITFRAME_FIXED_SIZE)
 
-for t in (INT32, INT64, FLOAT32, DOUBLE):
+for t in (INT32_t, INT64_t, FLOAT_t, DOUBLE_t):
     for v in (-1,0,1,2,4,8,16,32,64,128,256,512,1024):
         DEFAULT_CONSTS.append(ConstLocation(t,v))
 

@@ -11,6 +11,7 @@ from rpython.jit.backend.model import CompiledLoopToken
 from rpython.jit.backend.muvm import conditions as c, regalloc
 from rpython.jit.backend.muvm.arch import JITFRAME_FIXED_SIZE
 from rpython.jit.backend.muvm.regalloc import Regalloc
+from rpython.jit.backend.muvm.mutypes import get_type, get_func_sig, INT64_t, INT32_t, FLOAT_t, DOUBLE_t, VOID_t
 from rpython.jit.codewriter.effectinfo import EffectInfo
 from rpython.jit.metainterp.resoperation import rop
 from rpython.rlib.debug import debug_print, debug_start, debug_stop
@@ -63,19 +64,19 @@ class AssemblerMu(BaseAssembler):
         self.current_clt = None
         self.pending_guard_tokens = None
         self.pending_guard_tokens_recovered = 0
-        self.mu = MuVM()
-        self.ctx = self.mu.new_context()
         self.datablockwrapper = None
         self.target_tokens_currently_compiling = None
         self.frame_depth_to_patch = None
         self.pending_guards = None
-
+        self.mu = MuVM()
+        self.ctx = self.mu.new_context()
         self.mc = None
         self.bndl = None
         self.vars = None
         self.type_i32 = None
         self.type_i64 = None
         self.type_float = None
+        self.type_double = None
         self.sig = None
         self.func = None
         self.fv = None
@@ -84,7 +85,7 @@ class AssemblerMu(BaseAssembler):
         # temporary constant declarations
         self.const_i0 = None
         self.const_f0 = None
-        self.const_int_neg = None
+        self.const_ineg1 = None
 
     def setup_once(self):
         BaseAssembler.setup_once(self)
@@ -99,14 +100,16 @@ class AssemblerMu(BaseAssembler):
         # implement mumemmgr?
         self.datablockwrapper = MachineDataBlockWrapper(self.cpu.asmmemmgr,
                                                         allblocks)
+        # self.ctx = self.mu.new_context()
         self.mc = self.ctx.new_ir_builder()
-        # TODO: new_type(ID, ...)
         self.type_i32 = self.mc.gen_sym('@i32')
         self.mc.new_type_int(self.type_i32, 32)
         self.type_i64 = self.mc.gen_sym('@i64')
         self.mc.new_type_int(self.type_i64, 64)
         self.type_float = self.mc.gen_sym('@float')
         self.mc.new_type_float(self.type_float)
+        self.type_double = self.mc.gen_sym('@double')
+        self.mc.new_type_double(self.type_double)
         self.bb = self.mc.gen_sym('@bb')
         exc_param_id = self.mc.gen_sym('@bb_exc_param_id')
         self.mc.new_bb(self.bb, [], [], exc_param_id, [])
@@ -122,8 +125,8 @@ class AssemblerMu(BaseAssembler):
         self.mc.new_const_int(self.const_i0, self.type_i32, 0)
         self.const_f0 = self.mc.gen_sym('@f0')
         self.mc.new_const_float(self.const_f0, self.type_float, 0.0)
-        self.const_int_neg = self.mc.gen_sym('@i_neg1')
-        self.mc.new_const_int(self.const_int_neg, self.type_i32, -1)
+        self.const_ineg1 = self.mc.gen_sym('@i_neg1')
+        self.mc.new_const_int(self.const_ineg1, self.type_i32, -1)
 
     def teardown(self):
         self.current_clt = None

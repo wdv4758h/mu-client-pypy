@@ -3,7 +3,7 @@ from rpython.jit.metainterp.test import test_ajit
 from rpython.rlib.jit import JitDriver
 
 
-class TestBasic(JitMuMixin, test_ajit.BaseLLtypeTests):
+class TestBasic(JitMuMixin):
     # for the individual tests see
     # ====> ../../../metainterp/test/test_ajit.py
     def test_bug(self):

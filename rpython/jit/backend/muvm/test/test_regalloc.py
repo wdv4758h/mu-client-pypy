@@ -1,9 +1,9 @@
-
 """ Tests for register allocation for common constructs
 """
 
 import py
 
+from rpython.jit.backend.muvm.test.support import JitMuMixin
 from rpython.jit.metainterp.history import (BasicFailDescr,
                                         BasicFinalDescr,
                                         JitCellToken,
@@ -78,12 +78,11 @@ class MockAssembler(object):
         self.lea.append(args)
 
 
-class RegAllocForTests(Regalloc):
+class RegAllocForTests(Regalloc, JitMuMixin):
     position = 0
 
     def _compute_next_usage(self, v, _):
         return -1
-
 
 def get_zero_division_error(self):
     # for tests, a random emulated ll_inst will do
@@ -96,7 +95,7 @@ def get_zero_division_error(self):
     return zer_vtable, zer_inst
 
 
-class CustomBaseTestRegalloc(BaseTestRegalloc):
+class CustomBaseTestRegalloc(BaseTestRegalloc, JitMuMixin):
     cpu = CPU(None, None)
     cpu.setup_once()
 
@@ -158,7 +157,7 @@ class CustomBaseTestRegalloc(BaseTestRegalloc):
     typesystem = 'lltype'
     namespace = locals().copy()
 
-class TestRegallocSimple(CustomBaseTestRegalloc):
+class TestRegallocSimple(CustomBaseTestRegalloc, JitMuMixin):
     def test_simple_loop(self):
         ops = '''
         [i0]
@@ -430,7 +429,7 @@ class TestRegallocSimple(CustomBaseTestRegalloc):
         assert len(regalloc.frame_manager.bindings) == 4
 
 
-class TestRegallocCompOps(CustomBaseTestRegalloc):
+class TestRegallocCompOps(CustomBaseTestRegalloc, JitMuMixin):
 
     def test_cmp_op_0(self):
         ops = '''
@@ -444,7 +443,7 @@ class TestRegallocCompOps(CustomBaseTestRegalloc):
         assert self.getint(0) == 1
 
 
-class TestRegallocMoreRegisters(CustomBaseTestRegalloc):
+class TestRegallocMoreRegisters(CustomBaseTestRegalloc, JitMuMixin):
 
     cpu = CustomBaseTestRegalloc.cpu
     targettoken = TargetToken()
@@ -568,7 +567,7 @@ class TestRegallocMoreRegisters(CustomBaseTestRegalloc):
         # FIXME: Verify that i19 - i23 are removed
 
 
-class TestRegallocFloats(CustomBaseTestRegalloc):
+class TestRegallocFloats(CustomBaseTestRegalloc, JitMuMixin):
     def test_float_add(self):
         if not self.cpu.supports_floats:
             py.test.skip("requires floats")
@@ -627,7 +626,7 @@ class TestRegallocFloats(CustomBaseTestRegalloc):
         assert self.getints(9) == [0, 1, 1, 1, 1, 1, 1, 1, 1]
 
 
-class TestRegAllocCallAndStackDepth(CustomBaseTestRegalloc):
+class TestRegAllocCallAndStackDepth(CustomBaseTestRegalloc, JitMuMixin):
     def expected_param_depth(self, num_args):
         # Assumes the arguments are all non-float
         return num_args
@@ -699,7 +698,7 @@ class TestRegAllocCallAndStackDepth(CustomBaseTestRegalloc):
         assert self.getint(0) == 29
 
 
-class TestJumps(TestRegallocSimple):
+class TestJumps(TestRegallocSimple, JitMuMixin):
     def test_jump_with_consts(self):
         loop = """
         [i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14]
@@ -778,7 +777,7 @@ class TestJumps(TestRegallocSimple):
         assert self.getint(0) == 2  # and not segfault()
 
 
-class TestStrOps(CustomBaseTestRegalloc):
+class TestStrOps(CustomBaseTestRegalloc, JitMuMixin):
     def test_newstr(self):
         ops = """
         [i0]
