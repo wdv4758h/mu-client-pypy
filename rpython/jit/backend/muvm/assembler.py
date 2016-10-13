@@ -64,6 +64,7 @@ class AssemblerMu(BaseAssembler):
         self.pending_guard_tokens = None
         self.pending_guard_tokens_recovered = 0
         self.mu = MuVM()
+        self.ctx = self.mu.new_context()
         self.datablockwrapper = None
         self.target_tokens_currently_compiling = None
         self.frame_depth_to_patch = None
@@ -98,20 +99,31 @@ class AssemblerMu(BaseAssembler):
         # implement mumemmgr?
         self.datablockwrapper = MachineDataBlockWrapper(self.cpu.asmmemmgr,
                                                         allblocks)
-        self.mc = self.mu.new_context()
-        self.bndl = self.mc.new_bundle()
-        self.type_i32 = self.mc.new_type_int(self.bndl, 32)
-        self.type_i64 = self.mc.new_type_int(self.bndl, 64)
-        self.type_float = self.mc.new_type_float(self.bndl)
-        self.sig = self.mc.new_funcsig(self.bndl, [], [])
-        self.func = self.mc.new_func(self.bndl, self.sig)
-        self.fv = self.mc.new_func_ver(self.bndl, self.func)
-        self.bb = self.mc.new_bb(self.fv)
+        self.mc = self.ctx.new_ir_builder()
+        # TODO: new_type(ID, ...)
+        self.type_i32 = self.mc.gen_sym('@i32')
+        self.mc.new_type_int(self.type_i32, 32)
+        self.type_i64 = self.mc.gen_sym('@i64')
+        self.mc.new_type_int(self.type_i64, 64)
+        self.type_float = self.mc.gen_sym('@float')
+        self.mc.new_type_float(self.type_float)
+        self.bb = self.mc.gen_sym('@bb')
+        exc_param_id = self.mc.gen_sym('@bb_exc_param_id')
+        self.mc.new_bb(self.bb, [], [], exc_param_id, [])
+        self.sig = self.mc.gen_sym('@func_sig')
+        self.mc.new_funcsig(self.sig, [], [])
+        self.func = self.mc.gen_sym('@func')
+        self.mc.new_func(self.func, self.sig)
+        self.fv = self.mc.gen_sym('@func.v1')
+        self.mc.new_func_ver(self.fv, self.func, [self.bb])
         self.target_tokens_currently_compiling = {}
         self.frame_depth_to_patch = []
-        self.const_i0 = self.mc.new_const_int(self.bndl, self.type_i32, 0)
-        self.const_f0 = self.mc.new_const_float(self.bndl, self.type_float, 0.0)
-        self.const_int_neg = self.mc.new_const_int(self.bndl, self.type_i32, -1)
+        self.const_i0 = self.mc.gen_sym('@i0')
+        self.mc.new_const_int(self.const_i0, self.type_i32, 0)
+        self.const_f0 = self.mc.gen_sym('@f0')
+        self.mc.new_const_float(self.const_f0, self.type_float, 0.0)
+        self.const_int_neg = self.mc.gen_sym('@i_neg1')
+        self.mc.new_const_int(self.const_int_neg, self.type_i32, -1)
 
     def teardown(self):
         self.current_clt = None
