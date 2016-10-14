@@ -132,6 +132,8 @@ class TranslationDriver(SimpleTaskEngine):
                             expose_task(explicit_task)
                     else:
                         expose_task(explicit_task)
+                elif task in ('mutype',):
+                    expose_task(task, explicit_task)
 
     def set_extra_goals(self, goals):
         self.extra_goals = goals
@@ -536,6 +538,22 @@ class TranslationDriver(SimpleTaskEngine):
                                              lambda: [])())
 
         log.llinterpret("result -> %s" % v)
+
+    @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
+    def task_mutype_mu(self):
+        raise NotImplementedError
+
+    @taskdef(["mutype_mu"], "Mu backend optimisations.")
+    def task_optimise_mu(self):
+        raise NotImplementedError
+
+    @taskdef(["optimise_mu"], "Collect global defs into a database.")
+    def task_database_mu(self):
+        raise NotImplementedError
+
+    @taskdef(["database_mu"], "MuIR Code Generation")
+    def task_compile_mu(self):
+        raise NotImplementedError
 
     def proceed(self, goals):
         if not goals:
