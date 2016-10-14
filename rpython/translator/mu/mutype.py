@@ -709,7 +709,7 @@ _setup_consistent_methods(_mugeneral_reference)
 
 class MuOpaqueRef(MuReferenceType):
     _suffix = 'OpqRef'
-    _symbol = '@?'
+    _symbol = '@pq'
     _val_type = property(lambda self: _muopqref)
 
     def __init__(self, TO):
@@ -825,6 +825,12 @@ class MuUPtr(MuObjectRef):
     _suffix = 'UPtr'
     _symbol = '*'
     _val_type = property(lambda self: _muuptr)
+
+
+class MuWeakRef(MuObjectRef):
+    _suffix = 'WkRef'
+    _symbol = '@wk'
+    _val_type = None    # not implemented
 
 
 class _muref(_muobject_reference):
