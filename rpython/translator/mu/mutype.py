@@ -78,7 +78,16 @@ class MuNumber(MuPrimitive):
     _template = (lltype.Number, (
         'normalized',
     ))
-    _mu_numbertypes = {}
+
+    _cache = {}
+
+    def __new__(cls, *args):
+        try:
+            return MuNumber._cache[args]
+        except KeyError:
+            num = super(MuNumber, cls).__new__(cls, *args)
+            MuNumber._cache[args] = num
+            return num
 
     def __init__(self, name, type, cast=None):
         MuPrimitive.__init__(self, name, type())
@@ -87,25 +96,6 @@ class MuNumber(MuPrimitive):
             self._cast = type
         else:
             self._cast = cast
-
-    @staticmethod
-    def build_number(name, type_cls, value_type_cls, *args):   # modification of lltype.build_number
-        """
-        Build a Mu number type
-        :param name: type name
-        :param type_cls: subclass of MuNumber that the new type class should belong to (MuIntType/MuFloatType)
-        :param value_type_cls: rffi/rarithmetic value type class
-        :param args: additional argument passed to type_class.__init__
-        """
-        try:
-            return MuNumber._mu_numbertypes[(type_cls, value_type_cls)]
-        except KeyError:
-            pass
-        if name is None:
-            raise ValueError('No matching mu type for %r with super class %r' % (value_type_cls, type_cls))
-        num_type = type_cls(name, value_type_cls, *args)
-        MuNumber._mu_numbertypes[(type_cls, value_type_cls)] = num_type
-        return num_type
 
     def _get_val_type(self):
         return self._val_t

@@ -2,7 +2,7 @@ from rpython.rtyper.lltypesystem import lltype, llmemory, rffi
 from rpython.translator.mu import mutype
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
-from rpython.rlib.rarithmetic import _inttypes
+from rpython.rlib import rarithmetic
 from rpython.flowspace.model import Constant, SpaceOperation
 from rpython.translator.c.node import needs_gcheader
 from random import randint
@@ -15,7 +15,7 @@ mdb = Driver()
 
 
 class LL2MuMapper:
-    GC_IDHASH_FIELD = ('__gc_idhash', mutype.MU_INT64)
+    GC_IDHASH_FIELD = ('gc_idhash', mutype.MU_INT64)
 
     def __init__(self):
         self._type_cache = {}
@@ -38,7 +38,7 @@ class LL2MuMapper:
         except KeyError:
             if LLT is llmemory.Address:
                 MuT = self.map_type_addr(LLT)
-            elif isinstance(LLT, lltype.Number):
+            elif isinstance(LLT, lltype.Primitive):
                 MuT = self.map_type_prim(LLT)
             elif isinstance(LLT, lltype.FixedSizeArray):
                 MuT = self.map_type_arrfix(LLT)
@@ -80,8 +80,10 @@ class LL2MuMapper:
             return type_map[LLT]
         except KeyError:
             if isinstance(LLT, lltype.Number) and \
-                            LLT._type in _inttypes.values():
-                return mutype.MuIntType("MU_INT%d" % LLT._type.BITS, LLT._type)
+                            LLT._type in rarithmetic._inttypes.values():
+                b = LLT._type.BITS
+                return mutype.MuIntType("MU_INT%d" % b,
+                                        rarithmetic.build_int('r_uint%d', False, b))    # unsigned
             raise NotImplementedError("Don't know how to specialise %s using MuTS." % LLT)
 
     def map_type_arrfix(self, LLT):
