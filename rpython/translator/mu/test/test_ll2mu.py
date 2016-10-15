@@ -63,3 +63,6 @@ def test_map_type_funcptr():
     Sig = FncRef.sig
     assert Sig.ARGS == ()
     assert Sig.RESULTS == (MuT, )
+
+# -----------------------------------------------------------------------------
+# TODO: write tests for mapping values
