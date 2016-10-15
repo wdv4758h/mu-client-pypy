@@ -332,6 +332,17 @@ def test_uptr():
     with pytest.raises(TypeError):
         ptrSWR.point._load()    # can not load an object reference through an unsafe pointer
 
+def test_funcref():
+    Sig = MuFuncSig([MU_INT64], [MU_INT64])
+    Fnr = MuFuncRef(Sig)
+    Fnp = MuUFuncPtr(Sig)
 
-if __name__ == '__main__':
-    test_new_newhybrid()
+    fnr_null = Fnr._val_type._null(Fnr)
+    assert fnr_null._is_null()
+    fnp_null = Fnp._val_type._null(Fnp)
+    assert fnp_null._is_null()
+
+    fakegraph = object()
+    fnr = mutype._mufuncref(Fnr, _name="test_fnc", graph=fakegraph)
+    assert not fnr._is_null()
+    assert fnr.graph is fakegraph

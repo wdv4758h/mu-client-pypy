@@ -966,7 +966,6 @@ class _muuptr(_muobject_reference):
     __slots__ = ('_TYPE', '_T', '_root_ref', '_offsets')
 
     _template = (_muiref, (
-        '_null',
         '_is_null',
         '__getattr__',
         '__setattr__',
@@ -1031,6 +1030,11 @@ class _muuptr(_muobject_reference):
     def _expose(self, offset, val):
         T = mutypeOf(val)
         return _muuptr(MuIRef(T), self._root_ref, self._offsets + [offset])
+
+    @staticmethod
+    def _null(TYPE):
+        nullref = _muref._null(MuRef(TYPE.TO))
+        return nullref._pin()   # hack!
 _setup_consistent_methods(_muuptr)
 
 
@@ -1077,28 +1081,85 @@ class MuFuncRef(MuReferenceType):
         "__name__",
     ))
     _suffix = 'FncRef'  # child class must specify
-    _symbol = '#'  # child class must specify
+    _symbol = '@#'  # child class must specify
     _val_type = property(lambda self: _mufuncref)
 
     def __init__(self, SIG):
         self.sig = SIG
 
     def __str__(self):
-        return "FncRef" + str(self.sig)
+        return self._suffix + str(self.sig)
 
     def _short_name(self):
-        return "Fnr" + self.sig._short_name()
+        return self._symbol + self.sig._short_name()
 
     def _example(self):
         def f(*args):
             return tuple(T._defl() for T in self.sig.RESULTS)
-        return _mufuncref(self, _callable=f)
+        return self._val_type(self, _callable=f)
 _setup_consistent_methods(MuFuncRef)
 
-
-class _mufuncref(lltype._func):
+class _mufunction_reference(_mugeneral_reference):
     pass
 
+class _mufuncref(_mufunction_reference):
+    _template = (lltype._func, (
+        '__repr__',
+        '__eq__',
+        '__ne__',
+        '__hash__',
+        '_getid'
+    ))
+
+    def __init__(self, TYPE, **attrs):
+        attrs.setdefault('_TYPE', TYPE)
+        attrs.setdefault('_name', '?')
+        attrs.setdefault('_callable', None)
+        self.__dict__.update(attrs)
+        if '_callable' in attrs and hasattr(attrs['_callable'],
+                                            '_compilation_info'):
+            self.__dict__['compilation_info'] = \
+                attrs['_callable']._compilation_info
+
+    def __str__(self):
+        return "%s %s" % (MuFuncRef._symbol, self._name)
+
+    @staticmethod
+    def _null(TYPE):
+        return _mufuncref(TYPE, _nullref=True)
+
+    def _is_null(self):
+        return hasattr(self, '_nullref') and self._nullref
+_setup_consistent_methods(_mufuncref)
+
+class MuUFuncPtr(MuReferenceType):
+    _template = (MuFuncRef, (
+        "__init__",
+        "__str__",
+        "_short_name",
+        "_example"
+    ))
+    _suffix = 'UFncPtr'  # child class must specify
+    _symbol = '*#'  # child class must specify
+    _val_type = property(lambda self: _muufuncptr)
+_setup_consistent_methods(MuUFuncPtr)
+
+class _muufuncptr(_mufunction_reference):
+    _template = (_mufuncref, (
+        "__init__",
+        "__str__",
+        "_is_null",
+        "__repr__",
+        "__eq__",
+        "__ne__",
+        "__hash__",
+        "_getid"
+    ))
+
+    @staticmethod
+    def _null(TYPE):
+        return _muufuncptr(TYPE, _nullref=True)
+_setup_consistent_methods(_muufuncptr)
 
 def _castdepth(OUTSIDE, INSIDE):
     if OUTSIDE == INSIDE:
