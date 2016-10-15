@@ -186,12 +186,13 @@ class MuForwardReference(MuContainerType):
         '__hash__',
     ))
 
-    def become(self, realcontainertype):
-        if not isinstance(realcontainertype, MuContainerType):
-            raise TypeError("MuForwardReference can only be to a MuContainer, "
-                            "not %r" % (realcontainertype,))
-        self.__class__ = realcontainertype.__class__
-        self.__dict__ = realcontainertype.__dict__
+    def become(self, realtype):
+        # NOTE: not limited to container types
+        if not isinstance(realtype, MuType):
+            raise TypeError("MuForwardReference can only be to a MuType, "
+                            "not %r" % (realtype,))
+        self.__class__ = realtype.__class__
+        self.__dict__ = realtype.__dict__
 _setup_consistent_methods(MuForwardReference)
 
 
@@ -580,44 +581,6 @@ class _muopaque(object):
         self._name = "?"
         self.__dict__.update(attrs)
 _setup_consistent_methods(_muopaque)
-
-
-# ----------------------------------------------------------
-class MuFuncType(MuContainerType):
-    _template = (lltype.FuncType, (
-        "__name__",
-    ))
-
-    def __init__(self, arg_ts, res_ts):
-        for arg in arg_ts + res_ts:
-            assert isinstance(arg, MuType)
-
-        self.ARGS = tuple(arg_ts)
-        self.RESULTS = tuple(res_ts)
-
-    def __str__(self):
-        return "Func ( %s ) -> ( %s )" % (
-            ", ".join(map(str, self.ARGS)),
-            ", ".join(map(str, self.RESULTS))
-        )
-    __str__ = lltype.saferecursive(__str__, '...')
-
-    def _short_name(self):
-        return "Func(%s)->(%s)" % (
-            ", ".join(map(str, self.ARGS)),
-            ", ".join(map(str, self.RESULTS))
-        )
-    _short_name = lltype.saferecursive(_short_name, '...')
-
-    def _container_example(self):
-        def f(*args):
-            return tuple(T._defl() for T in self.RESULTS)
-        return _mufunc(self, _callable=f)
-_setup_consistent_methods(MuFuncType)
-
-
-class _mufunc(lltype._func):
-    pass
 
 
 # ----------------------------------------------------------
@@ -1083,6 +1046,57 @@ class MuGlobalCell(MuIRef):
 
 
 class _muglobalcell(_muiref):
+    pass
+
+
+class MuFuncSig(MuContainerType):
+    def __init__(self, arg_ts, res_ts):
+        for arg in arg_ts + res_ts:
+            assert isinstance(arg, MuType)
+
+        self.ARGS = tuple(arg_ts)
+        self.RESULTS = tuple(res_ts)
+
+    def __str__(self):
+        return "( %s ) -> ( %s )" % (
+            ", ".join(map(str, self.ARGS)),
+            ", ".join(map(str, self.RESULTS))
+        )
+    __str__ = lltype.saferecursive(__str__, '...')
+
+    def _short_name(self):
+        return "(%s)->(%s)" % (
+            ", ".join(map(str, self.ARGS)),
+            ", ".join(map(str, self.RESULTS))
+        )
+    _short_name = lltype.saferecursive(_short_name, '...')
+
+
+class MuFuncRef(MuReferenceType):
+    _template = (lltype.FuncType, (
+        "__name__",
+    ))
+    _suffix = 'FncRef'  # child class must specify
+    _symbol = '#'  # child class must specify
+    _val_type = property(lambda self: _mufuncref)
+
+    def __init__(self, SIG):
+        self.sig = SIG
+
+    def __str__(self):
+        return "FncRef" + str(self.sig)
+
+    def _short_name(self):
+        return "Fnr" + self.sig._short_name()
+
+    def _example(self):
+        def f(*args):
+            return tuple(T._defl() for T in self.sig.RESULTS)
+        return _mufuncref(self, _callable=f)
+_setup_consistent_methods(MuFuncRef)
+
+
+class _mufuncref(lltype._func):
     pass
 
 
