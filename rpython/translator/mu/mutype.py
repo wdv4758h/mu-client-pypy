@@ -1085,17 +1085,17 @@ class MuFuncRef(MuReferenceType):
     _val_type = property(lambda self: _mufuncref)
 
     def __init__(self, SIG):
-        self.sig = SIG
+        self.Sig = SIG
 
     def __str__(self):
-        return self._suffix + str(self.sig)
+        return self._suffix + str(self.Sig)
 
     def _short_name(self):
-        return self._symbol + self.sig._short_name()
+        return self._symbol + self.Sig._short_name()
 
     def _example(self):
         def f(*args):
-            return tuple(T._defl() for T in self.sig.RESULTS)
+            return tuple(T._defl() for T in self.Sig.RESULTS)
         return self._val_type(self, _callable=f)
 _setup_consistent_methods(MuFuncRef)
 
@@ -1160,6 +1160,16 @@ class _muufuncptr(_mufunction_reference):
     def _null(TYPE):
         return _muufuncptr(TYPE, _nullref=True)
 _setup_consistent_methods(_muufuncptr)
+
+class MuWeakRef(MuRef):
+    _suffix = "WkRef"
+    _symbol = "~"
+    _val_type = property(lambda self: _muweakref)
+
+MU_WEAKREF_VOID = MuWeakRef(MU_VOID)
+
+class _muweakref(_muref):
+    pass
 
 def _castdepth(OUTSIDE, INSIDE):
     if OUTSIDE == INSIDE:
