@@ -249,6 +249,11 @@ class MuStruct(MuContainerType):
     def __getitem__(self, idx):     # support indexing into a struct
         return self._flds[self._names[idx]]
 
+    def _index_of(self, fld):
+        if fld not in self._names:
+            self._nofield(fld)
+        return self._names.index(fld)
+
     def _allocate(self, parent=None, parentindex=None):
         return _mustruct(self, parent=parent, parentindex=parentindex)
 

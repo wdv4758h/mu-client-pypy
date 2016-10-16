@@ -22,15 +22,16 @@ __prim_map = {
 def mu_sizeOf(mutype):
     if isinstance(mutype, MuHybrid):
         raise TypeError("Cannot get size of MuHybrid type.")
+    if mutype is MU_VOID:
+        return 0
 
     if not isinstance(mutype, MuContainerType):
         return mu_alignOf(mutype)
 
     if isinstance(mutype, MuStruct):
-        return _alignUp(reduce(lambda n, ty: _alignUp(n, mu_alignOf(ty)) + mu_sizeOf(ty),
-                              map(lambda fld: getattr(mutype, fld), mutype._names),
-                              0),
-                       mu_alignOf(mutype))
+        return reduce(lambda n, ty: _alignUp(n, mu_alignOf(ty)) + mu_sizeOf(ty),
+                               map(lambda fld: getattr(mutype, fld), mutype._names),
+                               0)
 
     if isinstance(mutype, MuArray):
         return _alignUp(mu_sizeOf(mutype.OF), mu_alignOf(mutype.OF)) * mutype.length
@@ -42,7 +43,7 @@ def mu_hybsizeOf(hyb_t, n):
     """
     fixstt = MuStruct('fix', *[(f, getattr(hyb_t, f)) for f in hyb_t._names[:-1]])
     fix_sz = mu_sizeOf(fixstt)
-    var_t = getattr(hyb_t, hyb_t._varfld)
+    var_t = getattr(hyb_t, hyb_t._varfld).OF
     var_align = mu_alignOf(var_t)
     var_sz = mu_offsetOf(MuArray(var_t, n), n)
     return _alignUp(fix_sz, var_align) + var_sz
@@ -56,6 +57,8 @@ def mu_alignOf(mutype):
         pass
 
     if isinstance(mutype, MuReferenceType):
+        if isinstance(mutype, MuIRef):
+            return 16
         return 8
 
     if isinstance(mutype, MuStruct):
@@ -69,6 +72,14 @@ def mu_alignOf(mutype):
     if isinstance(mutype, MuArray):
         return mu_alignOf(mutype.OF)
 
+    if mutype is MU_VOID:
+        return 1
+
+
+def mu_hybalignOf(hyb_t, n):
+    fldaligns = map(mu_alignOf, [getattr(hyb_t, n) for n in hyb_t._names[:-1]])
+    varalign = mu_alignOf(hyb_t._vartype.OF)
+    return reduce(max, fldaligns, varalign)
 
 def mu_offsetOf(mutype, fld):
     if isinstance(mutype, MuStruct):
@@ -85,6 +96,6 @@ def mu_offsetOf(mutype, fld):
     if isinstance(mutype, MuHybrid):
         fixstt = MuStruct('fix', *[(f, getattr(mutype, f)) for f in mutype._names[:-1]])
         if fld == mutype._varfld:
-            return _alignUp(mu_sizeOf(fixstt), mu_alignOf(getattr(mutype, fld)))
+            return _alignUp(mu_sizeOf(fixstt), mu_alignOf(getattr(mutype, fld).OF))
         else:
             return mu_offsetOf(fixstt, fld)
