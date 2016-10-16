@@ -136,7 +136,7 @@ class LL2MuTypeMapper:
         if LLT.OF is lltype.Void:
             return mutype.MuStruct(name, ('length', mutype.MU_INT64))
 
-        flds = ['items', self.map(LLT.OF)]
+        flds = [('items', self.map(LLT.OF))]
         if not LLT._hints.get('nolength', False):
             flds.insert(0, ('length', mutype.MU_INT64))
 
@@ -159,7 +159,8 @@ class LL2MuTypeMapper:
         return cls(MuObjT)
 
     def resolve_ptrs(self):
-        for LLObjT, MuObjT in self._referents_to_resolve:
+        while len(self._referents_to_resolve) > 0:
+            LLObjT, MuObjT = self._referents_to_resolve.pop()
             MuObjT.become(self.map(LLObjT))
 
     def map_addr(self, LLT):
@@ -257,7 +258,7 @@ class LL2MuValueMapper:
             else:
                 raise NotImplementedError("Don't know how to map primitive value %s" % llv)
 
-        return MuT._get_val_type(llv)
+        return MuT._get_val_type()(llv)
 
     def map_arrfix(self, llv):
         MuT = self.ll2mu_t.map(lltype.typeOf(llv))
@@ -274,7 +275,7 @@ class LL2MuValueMapper:
             stt = mutype._mustruct(MuT)
             self._val_cache[(LLT, llv)] = stt
 
-            gcidfld, gcidfld_T = self.ll2mu_t.GC_IDHASH_FLD
+            gcidfld, gcidfld_T = self.ll2mu_t.GC_IDHASH_FIELD
 
             if len(llv._TYPE._names) != 0:  # origional value struct is non-empty
                 for fld in filter(lambda n: n != gcidfld, MuT._names):
@@ -289,7 +290,7 @@ class LL2MuValueMapper:
             if llprnt and isinstance(llprnt_t, lltype.Struct):
                 key = (llprnt_t, llprnt)
                 assert key in self._val_cache
-                stt._setparent(self._val_cache[key], llv._parent_index)
+                stt._setparentstructure(self._val_cache[key], llv._parent_index)
         else:
             if LLT._is_varsize():
                 return self.map_varstt(llv)
@@ -320,11 +321,11 @@ class LL2MuValueMapper:
         LLT = lltype.typeOf(llv)
         MuT = self.ll2mu_t.map(LLT)
         arr = getattr(llv, LLT._arrayfld)
-        hyb = mutype._muhybrid(MuT, MuT.length(arr.getlength()))
+        hyb = mutype._muhybrid(MuT, MuT.length._get_val_type()(arr.getlength()))
 
-        gcidfld, gcidfld_T = self.ll2mu_t.GC_IDHASH_FLD
+        gcidfld, gcidfld_T = self.ll2mu_t.GC_IDHASH_FIELD
 
-        for fld in filter(lambda n: n != gcidfld, MuT._names[:-1]):
+        for fld in filter(lambda n: n != gcidfld and n != 'length', MuT._names[:-1]):
             setattr(hyb, fld, self.map(getattr(llv, fld)))
 
         if hasattr(hyb, gcidfld) and hasattr(llv, '_hash_cache_'):
@@ -335,7 +336,8 @@ class LL2MuValueMapper:
         for i in range(arr.getlength()):
             _memarr[i] = self.map(arr.getitem(i))
 
-        hyb.length = self.map(arr.getlength())
+        if hasattr(hyb, 'length'):
+            hyb.length = self.map(arr.getlength())
         return hyb
 
     def map_arr(self, llv):
@@ -377,9 +379,13 @@ class LL2MuValueMapper:
         return ref
 
     def resolve_ptrs(self):
-        for llv, ref in self._todoptrs:
+        while len(self._todoptrs) > 0:
+            llv, ref = self._todoptrs.pop()
             obj = self.map(llv)
-            ref._obj = obj
+            if isinstance(ref, mutype._muref):
+                ref._obj = obj  # directly set _obj in _muref
+            else:
+                ref._store(obj) # otherwise (iref, uptr) call _store
 
     def map_funcptr(self, llv):
         LLT = lltype.typeOf(llv)
@@ -415,7 +421,7 @@ class LL2MuValueMapper:
                 return layout.mu_offsetOf(MuT, llv.fldname)
             elif isinstance(llv, llmemory.ArrayItemsOffset):
                 MuT = self.ll2mu_t.map(llv.TYPE)
-                _ofs = 8 if self.ll2mu_t.GC_IDHASH_FLD[0] in MuT._names else 0  # __gc_idhash field
+                _ofs = 8 if self.ll2mu_t.GC_IDHASH_FIELD[0] in MuT._names else 0  # __gc_idhash field
                 if llv.TYPE._hints.get("nolength", False):
                     return _ofs
                 return _ofs + 8  # sizeof(i64)
