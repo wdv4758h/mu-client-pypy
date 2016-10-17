@@ -123,6 +123,7 @@ class APILogger:
 
         for ccall in self.ccalls:
             fp.write(idt + '%(ccall)s\n' % locals())
+        fp.write(idt + 'return 0;\n')
         fp.write('}\n')
 
 _apilog = APILogger()
