@@ -98,7 +98,7 @@ class APILogger:
         self.ccalls.append(CCall(fnc_name, args, rtn_var, context, check_err))
         if rtn_var:
             self.decl_vars.append(rtn_var)
-    def genc(self, fp):
+    def genc(self, fp, exitcode=0):
         fp.write('\n'
                  '// Compile with flag -std=c99\n'
                  '#include <stdio.h>\n'
@@ -123,7 +123,7 @@ class APILogger:
 
         for ccall in self.ccalls:
             fp.write(idt + '%(ccall)s\n' % locals())
-        fp.write(idt + 'return 0;\n')
+        fp.write(idt + 'return %(exitcode)s;\n' % locals())
         fp.write('}\n')
 
 _apilog = APILogger()
