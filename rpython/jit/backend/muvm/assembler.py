@@ -3,23 +3,19 @@ from __future__ import with_statement
 from rpython.jit.backend.arm import conditions as c
 from rpython.jit.backend.arm.arch import (JITFRAME_FIXED_SIZE)
 from rpython.jit.backend.arm.regalloc import (Regalloc)
-from rpython.jit.backend.llsupport import jitframe
-from rpython.jit.backend.llsupport.asmmemmgr import MachineDataBlockWrapper
 from rpython.jit.backend.llsupport.assembler import BaseAssembler, GuardToken
 from rpython.jit.backend.llsupport.gcmap import allocate_gcmap
 from rpython.jit.backend.model import CompiledLoopToken
-from rpython.jit.backend.muvm import conditions as c, regalloc
+from rpython.jit.backend.muvm import conditions as c
 from rpython.jit.backend.muvm.arch import JITFRAME_FIXED_SIZE
 from rpython.jit.backend.muvm.regalloc import Regalloc
-from rpython.jit.backend.muvm.mutypes import get_type, get_func_sig, INT64_t, INT32_t, FLOAT_t, DOUBLE_t, VOID_t
-from rpython.jit.codewriter.effectinfo import EffectInfo
 from rpython.jit.metainterp.resoperation import rop
 from rpython.rlib.debug import debug_print, debug_start, debug_stop
 from rpython.rlib.jit import AsmInfo
 from rpython.rlib.objectmodel import we_are_translated
 from rpython.rlib.rarithmetic import r_uint
-from rpython.rlib.rmu import MuVM, MuBinOptr, MuCmpOptr, MuConvOptr
-from rpython.rtyper.lltypesystem import rffi
+from rpython.rlib.rmu import MuBinOptr, MuCmpOptr, MuConvOptr, MuVM, \
+    MuBinOpStatus
 
 
 class MuGuardToken(GuardToken):
@@ -33,28 +29,30 @@ class MuGuardToken(GuardToken):
 def gen_emit_int_op(optr):
     def f(self, op, arglocs, regalloc):
         self.do_emit_int_op(arglocs, optr)
+    return f
 
+
+def gen_emit_int_op_with_flags(optr, flags):
+    def f(self, op, arglocs, regalloc):
+        self.do_emit_int_op_with_flags(arglocs, optr, flags)
     return f
 
 
 def gen_emit_cmp_op(condition):
     def f(self, op, arglocs, regalloc):
         self.do_emit_cmp_op(arglocs, condition)
-
     return f
 
 
 def gen_emit_float_op(optr):
     def f(self, op, arglocs, regalloc):
         self.do_emit_int_op(arglocs, optr)
-
     return f
 
 
 def gen_emit_fp_cmp_op(condition):
     def f(self, op, arglocs, regalloc):
         self.do_emit_fp_cmp_op(arglocs, condition)
-
     return f
 
 
@@ -64,12 +62,10 @@ class AssemblerMu(BaseAssembler):
         self.current_clt = None
         self.pending_guard_tokens = None
         self.pending_guard_tokens_recovered = 0
-        self.datablockwrapper = None
         self.target_tokens_currently_compiling = None
         self.frame_depth_to_patch = None
         self.pending_guards = None
-        self.mu = MuVM()
-        self.ctx = self.mu.new_context()
+        self.ctx = MuVM().new_context()
         self.mc = None
         self.bndl = None
         self.vars = None
@@ -77,30 +73,16 @@ class AssemblerMu(BaseAssembler):
         self.type_i64 = None
         self.type_float = None
         self.type_double = None
-        self.sig = None
-        self.func = None
-        self.fv = None
-        self.bb = None
 
         # temporary constant declarations
         self.const_i0 = None
         self.const_f0 = None
         self.const_ineg1 = None
 
+        self.loop_run_counters = []
+
     def setup_once(self):
         BaseAssembler.setup_once(self)
-
-    def setup(self, looptoken):
-        BaseAssembler.setup(self, looptoken)
-        assert self.memcpy_addr != 0, "setup_once() not called?"
-        self.current_clt = looptoken.compiled_loop_token
-        self.pending_guard_tokens = []
-        self.pending_guard_tokens_recovered = 0
-        allblocks = self.get_asmmemmgr_blocks(looptoken)
-        # implement mumemmgr?
-        self.datablockwrapper = MachineDataBlockWrapper(self.cpu.asmmemmgr,
-                                                        allblocks)
-        # self.ctx = self.mu.new_context()
         self.mc = self.ctx.new_ir_builder()
         self.type_i32 = self.mc.gen_sym('@i32')
         self.mc.new_type_int(self.type_i32, 32)
@@ -110,48 +92,55 @@ class AssemblerMu(BaseAssembler):
         self.mc.new_type_float(self.type_float)
         self.type_double = self.mc.gen_sym('@double')
         self.mc.new_type_double(self.type_double)
-        self.bb = self.mc.gen_sym('@bb')
-        exc_param_id = self.mc.gen_sym('@bb_exc_param_id')
-        self.mc.new_bb(self.bb, [], [], exc_param_id, [])
-        self.sig = self.mc.gen_sym('@func_sig')
-        self.mc.new_funcsig(self.sig, [], [])
-        self.func = self.mc.gen_sym('@func')
-        self.mc.new_func(self.func, self.sig)
-        self.fv = self.mc.gen_sym('@func.v1')
-        self.mc.new_func_ver(self.fv, self.func, [self.bb])
-        self.target_tokens_currently_compiling = {}
-        self.frame_depth_to_patch = []
         self.const_i0 = self.mc.gen_sym('@i0')
         self.mc.new_const_int(self.const_i0, self.type_i32, 0)
         self.const_f0 = self.mc.gen_sym('@f0')
         self.mc.new_const_float(self.const_f0, self.type_float, 0.0)
-        self.const_ineg1 = self.mc.gen_sym('@i_neg1')
         self.mc.new_const_int(self.const_ineg1, self.type_i32, -1)
+        self.mc.load()
+
+    def setup(self, looptoken):
+        BaseAssembler.setup(self, looptoken)
+        self.current_clt = looptoken.compiled_loop_token
+        self.pending_guard_tokens = []
+        self.pending_guard_tokens_recovered = 0
+        self.target_tokens_currently_compiling = {}
+        self.frame_depth_to_patch = []
+        self.mc = self.ctx.new_ir_builder()
 
     def teardown(self):
         self.current_clt = None
         self.mc = None
         self.pending_guards = None
 
+    # TODO: I think for each of these I need to create a basic block that
+    # implements the functionality
     def _build_cond_call_slowpath(self, supports_floats, callee_only):
+        print '_build_cond_call_slowpath called'
         pass
 
     def _build_failure_recovery(self, exc, withfloats=False):
+        print '_build_failure_recovery called'
         pass
 
     def _build_malloc_slowpath(self, kind):
+        print '_build_malloc_slowpath called'
         pass
 
     def _build_propagate_exception_path(self):
+        print '_build_propagate_exception_path called'
         pass
 
     def _build_stack_check_slowpath(self):
+        print '_build_stack_check_slowpath called'
         pass
 
     def _build_wb_slowpath(self, withcards, withfloats=False, for_frame=False):
+        print '_build_wb_slowpath called'
         pass
 
     def build_frame_realloc_slowpath(self):
+        print 'build_frame_realloc_slowpath called'
         pass
 
     def get_asmmemmgr_blocks(self, looptoken):
@@ -173,10 +162,11 @@ class AssemblerMu(BaseAssembler):
 
         self.setup(looptoken)
 
-        frame_info = self.datablockwrapper.malloc_aligned(
-            jitframe.JITFRAMEINFO_SIZE)
-        clt.frame_info = rffi.cast(jitframe.JITFRAMEINFOPTR, frame_info)
-        clt.frame_info.clear()  # for now
+        # set clt.frame_info to a newly allocated jitframe.JITFRAMEINFOPTR
+        # frame_info = self.datablockwrapper.malloc_aligned(
+        #         jitframe.JITFRAMEINFO_SIZE)
+        # clt.frame_info = rffi.cast(jitframe.JITFRAMEINFOPTR, frame_info)
+        # clt.frame_info.clear()  # for now
 
         if log:
             operations = self._inject_debugging_code(looptoken, operations,
@@ -186,7 +176,6 @@ class AssemblerMu(BaseAssembler):
         allgcrefs = []
         operations = regalloc.prepare_loop(inputargs, operations, looptoken,
                                            allgcrefs)
-        self.reserve_gcref_table(allgcrefs)
         functionpos = self.mc.get_relative_pos()
 
         self._call_header_with_stack_check()
@@ -218,6 +207,7 @@ class AssemblerMu(BaseAssembler):
         if logger is not None:
             logger.log_loop(inputargs, operations, 0, "rewritten",
                             name=loopname, ops_offset=ops_offset)
+        self.mc.load()
         self.teardown()
 
         debug_start("jit-backend-addr")
@@ -256,6 +246,8 @@ class AssemblerMu(BaseAssembler):
         # TODO
         pass
 
+    # TODO: change new_binop -> new form (id, result_id, status_result_ids,
+    # optr, status_flags, ty, opnd1, opnd2)
     def do_emit_int_op(self, arglocs, optr):
         l0, l1, res = arglocs
         v0 = self.get_int(l0)
@@ -265,12 +257,25 @@ class AssemblerMu(BaseAssembler):
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
 
+    def do_emit_int_op_with_flags(self, arglocs, optr, flags):
+        l0, l1, res = arglocs
+        v0 = self.get_int(l0)
+        v1 = self.get_int(l1)
+        inst = self.mc.new_binop_with_status(self.bb, optr, self.type_i32, v0,
+                                             v1)
+        inst_res = self.mc.get_inst_res(inst, 0)
+        self.mc.set_name(self.bndl, inst_res, res.__repr__())
+        self.vars[res] = inst_res
+
     emit_op_int_add = gen_emit_int_op(MuBinOptr.ADD)
     emit_op_int_sub = gen_emit_int_op(MuBinOptr.SUB)
     emit_op_int_mul = gen_emit_int_op(MuBinOptr.MUL)
-    emit_op_int_add_ovf = emit_op_int_add  # TODO: overflows need to be handled
-    emit_op_int_sub_ovf = emit_op_int_sub
-    emit_op_int_mul_ovf = emit_op_int_mul
+    emit_op_int_add_ovf = gen_emit_int_op_with_flags(MuBinOptr.ADD,
+                                                     [MuBinOpStatus.BOS_V])
+    emit_op_int_sub_ovf = gen_emit_int_op_with_flags(MuBinOptr.SUB,
+                                                     [MuBinOpStatus.BOS_V])
+    emit_op_int_mul_ovf = gen_emit_int_op_with_flags(MuBinOptr.MUL,
+                                                     [MuBinOpStatus.BOS_V])
     emit_op_int_floordiv = gen_emit_int_op(MuBinOptr.SDIV)
     emit_op_uint_floordiv = gen_emit_int_op(MuBinOptr.UDIV)
     emit_op_int_mod = gen_emit_int_op(MuBinOptr.SREM)
@@ -315,11 +320,10 @@ class AssemblerMu(BaseAssembler):
     emit_op_instance_ptr_ne = emit_op_ptr_ne
 
     def emit_op_int_neg(self, op, arglocs, regalloc):
-        pass
         l0, res = arglocs
-        v0 = self.get_int(l0)
+        i = self.get_int(l0)
         inst = self.mc.new_binop(self.bb, MuBinOptr.SUB, self.type_i32,
-                                 self.const_i0, v0)
+                                 self.const_i0, i)
         inst_res = self.mc.get_inst_res(inst, 0)
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
@@ -329,7 +333,7 @@ class AssemblerMu(BaseAssembler):
         l0, res = arglocs
         v0 = self.get_int(l0)
         inst = self.mc.new_binop(self.bb, MuBinOptr.SUB, self.type_i32,
-                                 self.const_int_neg, v0)
+                                 self.const_ineg1, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
@@ -491,9 +495,10 @@ class AssemblerMu(BaseAssembler):
             guard_block = self.mc.new_bb(
                     self.fv)  # TODO: Generate code for guard block, remove need
             # for guard tokens
-            self.mc.add_dest(branch2, MuDestKind.TRUE, norm_path,
-                             regalloc.get_live_vars())
-            # .add_dest(branch2, MuDestKind.FALSE, guard_block, guard_args)
+            # TODO: this was outdated
+            # self.mc.add_dest(branch2, MuDestKind.TRUE, norm_path,
+            # regalloc.get_live_vars()).add_dest(branch2, MuDestKind.FALSE,
+            # guard_block, guard_args)
             self.bb = norm_path
         else:
             pass

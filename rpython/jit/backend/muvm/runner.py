@@ -8,6 +8,7 @@ from rpython.rtyper.lltypesystem import lltype, llmemory
 
 jitframe.STATICSIZE = JITFRAME_FIXED_SIZE
 
+
 class MuCPU(AbstractLLCPU):
     IS_64_BIT = True
 
@@ -25,6 +26,7 @@ class MuCPU(AbstractLLCPU):
                  gcdescr=None):
         AbstractLLCPU.__init__(self, rtyper, stats, opts,
                                translate_support_code, gcdescr)
+        self.assembler = None
 
     def set_debug(self, flag):
         return self.assembler.set_debug(flag)
