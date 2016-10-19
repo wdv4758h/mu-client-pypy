@@ -199,7 +199,7 @@ def get_rpyparam_type(prm):
 def get_rpyreturn_type(ret_rmu_t):
     return _rmu2rpy_type_map.get(ret_rmu_t, ret_rmu_t)
 
-def _oogen_method(sttname, mtd, fp):
+def _oogen_method(opts, sttname, mtd, fp):
     for p in mtd['params']:
         p['rmu_type'] = get_rmu_def(p['type'])
         p['rpy_type'] = get_rpyparam_type(p)
@@ -289,13 +289,14 @@ def _oogen_method(sttname, mtd, fp):
         res_str = 'res = %(res_str)s' % locals()
     fp.write(cur_idt + res_str + '\n')
 
-    # Mu error handling
-    if mtd['name'] != 'get_mu_error_ptr':   # otherwise there will be infinite recursion...
-        fp.write(cur_idt + 'muerrno = %(mu)s.get_errno()\n' % {
-            'mu': 'self' if sttname == "MuVM" else "self._mu"
-        })
-        fp.write(cur_idt + 'if muerrno:\n')
-        fp.write(cur_idt + idt + 'raise MuRuntimeError(muerrno)\n')
+    if opts.impl == 'ref':
+    # Mu error handling in reference implementation
+        if mtd['name'] != 'get_mu_error_ptr':   # otherwise there will be infinite recursion...
+            fp.write(cur_idt + 'muerrno = %(mu)s.get_errno()\n' % {
+                'mu': 'self' if sttname == "MuVM" else "self._mu"
+            })
+            fp.write(cur_idt + 'if muerrno:\n')
+            fp.write(cur_idt + idt + 'raise MuRuntimeError(muerrno)\n')
 
     for arr in arrs:
         fp.write(cur_idt + 'if %(arr)s:\n' % locals())
@@ -307,69 +308,95 @@ def _oogen_method(sttname, mtd, fp):
     fp.write('\n')
 
 
-def _gen_struct_extras(stt, db, fp):
-    if stt['name'] == 'MuVM':
-        fp.write(
-            "    def get_errno(self):\n"
-            "        # type: () -> int\n"
-            "        return int(self._mu_errno_ptr[0])\n"
-            "\n"
-        )
-        fp.write(
-            "    def close(self):\n"
-            "        mu_close(self._mu)\n"
-            "\n"
-        )
+def _gen_struct_extras(opts, stt, db, fp):
+    if opts.impl == 'ref':
+        if stt['name'] == 'MuVM':
+            fp.write(
+                "    def get_errno(self):\n"
+                "        # type: () -> int\n"
+                "        return int(self._mu_errno_ptr[0])\n"
+                "\n"
+            )
+            fp.write(
+                "    def close(self):\n"
+                "        mu_close(self._mu)\n"
+                "\n"
+            )
 
-def gen_oowrapper(db, fp):
+def gen_oowrapper(opts, db, fp):
     fp.write(
         '# -------------------------------------------------------------------------------------------------------\n')
     fp.write('# OO wrappers\n')
-    init_funcs = {
-        'MuVM':
-            ("    def __init__(self, config_str=\"\"):\n"
-             "        with rffi.scoped_str2charp(config_str) as buf:\n"
-             "            self._mu = mu_new_ex(buf)\n"
-             "        self._mu_errno_ptr = rffi.cast(rffi.CArrayPtr(rffi.INT), self.get_mu_error_ptr())\n"
-             "\n"),
-        'MuCtx':
-            ("    def __init__(self, mu, rffi_ctx_ptr):\n"
-             "        self._mu = mu\n"
-             "        self._ctx = rffi_ctx_ptr\n"
-             "\n"),
-        'MuIRBuilder':
-            ("    def __init__(self, ctx, rffi_bldr_ptr):\n"
-             "        self._mu = ctx._mu\n"
-             "        self._bldr = rffi_bldr_ptr\n"
-             "\n")
-    }
-    fp.write(
-        "class MuRuntimeError(Exception):\n"
-        "    def __init__(self, muerrno):\n"
-        "        self.muerrno = muerrno\n"
-        "\n"
-        "    def __str__(self):\n"
-        "        return 'Error thrown in Mu: %d' % self.muerrno \n"
-        "\n"
-    )
+    if opts.impl == 'ref':
+        init_funcs = {
+            'MuVM':
+                ("    def __init__(self, config_str=\"\"):\n"
+                 "        with rffi.scoped_str2charp(config_str) as buf:\n"
+                 "            self._mu = mu_new_ex(buf)\n"
+                 "        self._mu_errno_ptr = rffi.cast(rffi.CArrayPtr(rffi.INT), self.get_mu_error_ptr())\n"
+                 "\n"),
+            'MuCtx':
+                ("    def __init__(self, mu, rffi_ctx_ptr):\n"
+                 "        self._mu = mu\n"
+                 "        self._ctx = rffi_ctx_ptr\n"
+                 "\n"),
+            'MuIRBuilder':
+                ("    def __init__(self, ctx, rffi_bldr_ptr):\n"
+                 "        self._mu = ctx._mu\n"
+                 "        self._bldr = rffi_bldr_ptr\n"
+                 "\n")
+        }
+        fp.write(
+            "class MuRuntimeError(Exception):\n"
+            "    def __init__(self, muerrno):\n"
+            "        self.muerrno = muerrno\n"
+            "\n"
+            "    def __str__(self):\n"
+            "        return 'Error thrown in Mu: %d' % self.muerrno \n"
+            "\n"
+        )
+    else:
+        init_funcs = {
+            'MuVM':
+                ("    def __init__(self):\n"
+                 "        self._mu = mu_new()\n"
+                 "\n"),
+            'MuCtx':
+                ("    def __init__(self, mu, rffi_ctx_ptr):\n"
+                 "        self._mu = mu\n"
+                 "        self._ctx = rffi_ctx_ptr\n"
+                 "\n"),
+            'MuIRBuilder':
+                ("    def __init__(self, ctx, rffi_bldr_ptr):\n"
+                 "        self._mu = ctx._mu\n"
+                 "        self._bldr = rffi_bldr_ptr\n"
+                 "\n")
+        }
     for stt in db['structs']:
         fp.write('class %(name)s:\n' % stt)
         fp.write(init_funcs[stt['name']])
         for mtd in stt['methods']:
-            _oogen_method(stt['name'], mtd, fp)
-        _gen_struct_extras(stt, db, fp)
+            _oogen_method(opts, stt['name'], mtd, fp)
+        _gen_struct_extras(opts, stt, db, fp)
         fp.write('\n')
 
 
 # ------------------------------------------------------------
-def gen_extras(db, fp):
+def gen_extras(opts, db, fp):
     fp.write('# -------------------------------------------------------------------------------------------------------\n')
-    fp.write('# Mu reference implementation functions\n')
-    fp.write(
-"""\
+    if opts.impl == 'ref':
+        fp.write('# Mu reference implementation functions\n')
+        fp.write(
+    """\
 mu_new = rffi.llexternal('mu_refimpl2_new', [], _MuVMPtr, compilation_info=eci)
 mu_new_ex = rffi.llexternal('mu_refimpl2_new_ex', [rffi.CCHARP], _MuVMPtr, compilation_info=eci)
 mu_close = rffi.llexternal('mu_refimpl2_close', [_MuVMPtr], lltype.Void, compilation_info=eci)
+""")
+    else:
+        fp.write('# Mu fast implementation functions\n')
+        fp.write(
+            """\
+mu_new = rffi.llexternal('mu_fastimpl_new', [], _MuVMPtr, compilation_info=eci)
 """)
     fp.write('\n')
     fp.write(
@@ -399,9 +426,10 @@ def lst2arr(ELM_T, lst):
 
 
 # ------------------------------------------------------------
-def gen_header(db, fp):
-    fp.write(
-"""\
+def gen_header(opts, db, fp):
+    if opts.impl == 'ref':
+        fp.write(
+    """\
 \"\"\"
 Mu API RPython binding.
 This file is auto-generated and then added a few minor modifications.
@@ -421,23 +449,51 @@ eci = ExternalCompilationInfo(includes=['refimpl2-start.h', 'muapi.h'],
                               library_dirs=[mu_dir])
 
 """
-    )
+        )
+    else:
+        fp.write(
+            """\
+\"\"\"
+Mu API RPython binding.
+This file is auto-generated and then added a few minor modifications.
+Note: environment variable $MU needs to be defined to point to the reference implementation!
+\"\"\"
+
+from rpython.rtyper.lltypesystem import rffi
+from rpython.rtyper.lltypesystem import lltype
+from rpython.translator.tool.cbuild import ExternalCompilationInfo
+from rpython.rlib.objectmodel import specialize
+import os
+
+libmu_dir = os.path.join(os.getenv('MU_RUST'), 'target', 'debug')
+muapi_dir = os.path.join(os.getenv('MU_RUST'), 'src', 'vm', 'api')
+eci = ExternalCompilationInfo(includes=['muapi.h'],
+                              include_dirs=[muapi_dir],
+                              libraries=['mu'],
+                              library_dirs=[libmu_dir])
+
+"""
+        )
 
     fp.write('\n')
 
 
 # ------------------------------------------------------------
-def main(argv):
-    with open(argv[1], 'r') as fp:
+def main(opts):
+    with open(opts.api_h, 'r') as fp:
         db = parse_muapi(fp.read())
 
-    gen_header(db, sys.stdout)
+    gen_header(opts, db, sys.stdout)
     gen_typedefs(db, sys.stdout)
     gen_enums(db, sys.stdout)
-    gen_oowrapper(db, sys.stdout)
+    gen_oowrapper(opts, db, sys.stdout)
 
     gen_structs(db, sys.stdout)
-    gen_extras(db, sys.stdout)
+    gen_extras(opts, db, sys.stdout)
 
 if __name__ == '__main__':
-    main(sys.argv)
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument('--impl', choices=['ref', 'fast'], required=True, help='Select targetting Mu implementation')
+    parser.add_argument('api_h', help='Path to muapi.h')
+    main(parser.parse_args())

@@ -64,13 +64,19 @@ def build_test_bundle(rmu):
 
 def main(opts):
     if opts.run:
-        from rpython.rlib import rmu
+        if opts.impl == 'ref':
+            from rpython.rlib import rmu
+        else:
+            from rpython.rlib import rmu_fast as rmu
     else:
-        from rpython.rlib import rmu_genc as rmu
+        if opts.impl == 'ref':
+            from rpython.rlib import rmu_genc as rmu
+        else:
+            from rpython.rlib import rmu_genc_fast as rmu
 
     mu, ctx, bldr, id_dict = build_test_bundle(rmu)
 
-    if opts.impl == 'rust':
+    if opts.impl == 'fast':
         raise NotImplementedError
     else:   # on Scala reference implementation
         """
@@ -153,7 +159,7 @@ def main(opts):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--impl', type=str, choices=['scala', 'rust'], default='scala',
+    parser.add_argument('--impl', type=str, choices=['ref', 'fast'], default='ref',
                         help='Compile script to C targeting the selected implementation of Mu.')
     parser.add_argument('--run', action='store_true',
                         help='Run the script under RPython FFI on Mu Scala reference implementation.')

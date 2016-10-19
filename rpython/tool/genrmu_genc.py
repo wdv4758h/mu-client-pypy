@@ -221,7 +221,7 @@ def get_rpyparam_type(prm):
 def get_rpyreturn_type(ret_rmu_t):
     return _rmu2rpy_type_map.get(ret_rmu_t, ret_rmu_t)
 
-def _oogen_method(sttname, mtd, fp):
+def _oogen_method(opts, sttname, mtd, fp):
     for p in mtd['params']:
         p['rmu_type'] = get_rmu_def(p['type'])
         p['rpy_type'] = get_rpyparam_type(p)
@@ -329,42 +329,60 @@ def _oogen_method(sttname, mtd, fp):
     fp.write('\n')
 
 
-def _gen_struct_extras(stt, db, fp):
-    if stt['name'] == 'MuVM':
-        fp.write(
-            "    def close(self):\n"
-            "        _apilog.logcall('mu_refimpl2_close', [self._mu], None)\n"
-            "\n"
-        )
+def _gen_struct_extras(opts, stt, db, fp):
+    if opts.impl == 'ref':
+        if stt['name'] == 'MuVM':
+            fp.write(
+                "    def close(self):\n"
+                "        _apilog.logcall('mu_refimpl2_close', [self._mu], None)\n"
+                "\n"
+            )
 
-def gen_oowrapper(db, fp):
+def gen_oowrapper(opts, db, fp):
     fp.write(
         '# -------------------------------------------------------------------------------------------------------\n')
     fp.write('# OO wrappers\n')
-    init_funcs = {
-        'MuVM':
-            ("    def __init__(self, config_str=\"\"):\n"
-             "        self._mu = CVar('MuVM*', 'mu')\n"
-             "        _apilog.logcall('mu_refimpl2_new_ex', [CStr(config_str)], self._mu, check_err=False)\n"
-             "        muerrno = CVar('int*', 'muerrno')\n"
-             "        _apilog.logcall('get_mu_error_ptr', [self._mu], muerrno, self._mu, check_err=False)\n"
-             "\n"),
-        'MuCtx':
-            ("    def __init__(self, ctx_var):\n"
-             "        self._ctx = ctx_var"
-             "\n"),
-        'MuIRBuilder':
-            ("    def __init__(self, bldr_var):\n"
-             "        self._bldr = bldr_var\n"
-             "\n")
-    }
+    if opts.impl == 'ref':
+        init_funcs = {
+            'MuVM':
+                ("    def __init__(self, config_str=\"\"):\n"
+                 "        self._mu = CVar('MuVM*', 'mu')\n"
+                 "        _apilog.logcall('mu_refimpl2_new_ex', [CStr(config_str)], self._mu, check_err=False)\n"
+                 "        muerrno = CVar('int*', 'muerrno')\n"
+                 "        _apilog.logcall('get_mu_error_ptr', [self._mu], muerrno, self._mu, check_err=False)\n"
+                 "\n"),
+            'MuCtx':
+                ("    def __init__(self, ctx_var):\n"
+                 "        self._ctx = ctx_var"
+                 "\n"),
+            'MuIRBuilder':
+                ("    def __init__(self, bldr_var):\n"
+                 "        self._bldr = bldr_var\n"
+                 "\n")
+        }
+    else:
+        init_funcs = {
+            'MuVM':
+                ("    def __init__(self):\n"
+                 "        self._mu = CVar('MuVM*', 'mu')\n"
+                 "        _apilog.logcall('mu_fastimpl_new', [], self._mu)\n"
+                 "\n"),
+            'MuCtx':
+                ("    def __init__(self, ctx_var):\n"
+                 "        self._ctx = ctx_var"
+                 "\n"),
+            'MuIRBuilder':
+                ("    def __init__(self, bldr_var):\n"
+                 "        self._bldr = bldr_var\n"
+                 "\n")
+        }
 
     for stt in db['structs']:
         fp.write('class %(name)s:\n' % stt)
         fp.write(init_funcs[stt['name']])
         for mtd in stt['methods']:
-            _oogen_method(stt['name'], mtd, fp)
-        _gen_struct_extras(stt, db, fp)
+            _oogen_method(opts, stt['name'], mtd, fp)
+        _gen_struct_extras(opts, stt, db, fp)
         fp.write('\n')
 
 
@@ -390,7 +408,7 @@ def lst2arr(c_elm_t, lst):
 
 
 # ------------------------------------------------------------
-def gen_header(db, fp):
+def gen_header(opts, db, fp):
     fp.write(
 """\
 \"\"\"
@@ -401,9 +419,6 @@ NOTE: THIS FILE IS *NOT* RPYTHON.
 
 from rpython.rtyper.lltypesystem import rffi
 from rpython.rtyper.lltypesystem import lltype
-from rpython.translator.tool.cbuild import ExternalCompilationInfo
-from rpython.rlib.objectmodel import specialize
-import os
 
 class CCall(object):
     __slots__ = ('fnc_name', 'args', 'rtn_var', 'context', 'check_err')
@@ -482,8 +497,11 @@ class CVar(object):
         return self.name
 
     __repr__ = __str__
-
-
+"""
+    )
+    if opts.impl == 'ref':
+        fp.write(
+"""\
 class APILogger:
     def __init__(self):
         self.ccalls = []
@@ -493,7 +511,7 @@ class APILogger:
         self.ccalls.append(CCall(fnc_name, args, rtn_var, context, check_err))
         if rtn_var:
             self.decl_vars.append(rtn_var)
-    def genc(self, fp):
+    def genc(self, fp, exitcode=0):
         fp.write('\\n'
                  '// Compile with flag -std=c99\\n'
                  '#include <stdio.h>\\n'
@@ -517,8 +535,44 @@ class APILogger:
 
         for ccall in self.ccalls:
             fp.write(idt + '%(ccall)s\\n' % locals())
+        fp.write(idt + 'return %(exitcode)s;\\n' % locals())
         fp.write('}\\n')
+"""
+    )
+    else:
+        fp.write(
+"""\
+class APILogger:
+    def __init__(self):
+        self.ccalls = []
+        self.decl_vars = []
 
+    def logcall(self, fnc_name, args, rtn_var, context=None):
+        self.ccalls.append(CCall(fnc_name, args, rtn_var, context, False))
+        if rtn_var:
+            self.decl_vars.append(rtn_var)
+    def genc(self, fp, exitcode=0):
+        fp.write('\\n'
+                 '// Compile with flag -std=c99\\n'
+                 '#include <stdio.h>\\n'
+                 '#include <stdlib.h>\\n'
+                 '#include <stdbool.h>\\n'
+                 '#include "muapi.h"\\n')
+
+        fp.write('int main(int argc, char** argv) {\\n')
+        idt = ' ' * 4
+        for var in self.decl_vars:
+            fp.write(idt + '%s %s;\\n' % (var.type, var.name))
+
+        for ccall in self.ccalls:
+            fp.write(idt + '%(ccall)s\\n' % locals())
+        fp.write(idt + 'return %(exitcode)s;\\n' % locals())
+        fp.write('}\\n')
+"""
+        )
+
+    fp.write(
+"""\
 _apilog = APILogger()
 def get_global_apilogger():
     return _apilog
@@ -529,17 +583,21 @@ def get_global_apilogger():
 
 
 # ------------------------------------------------------------
-def main(argv):
-    with open(argv[1], 'r') as fp:
+def main(opts):
+    with open(opts.api_h, 'r') as fp:
         db = parse_muapi(fp.read())
 
-    gen_header(db, sys.stdout)
+    gen_header(opts, db, sys.stdout)
     gen_typedefs(db, sys.stdout)
     gen_enums(db, sys.stdout)
-    gen_oowrapper(db, sys.stdout)
-    #
+    gen_oowrapper(opts, db, sys.stdout)
+
     # gen_structs(db, sys.stdout)
     gen_extras(db, sys.stdout)
 
 if __name__ == '__main__':
-    main(sys.argv)
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument('--impl', choices=['ref', 'fast'], required=True, help='Select targetting Mu implementation')
+    parser.add_argument('api_h', help='Path to muapi.h')
+    main(parser.parse_args())
