@@ -4,21 +4,18 @@ from rpython.jit.backend.arm import conditions as c
 from rpython.jit.backend.arm.arch import (JITFRAME_FIXED_SIZE)
 from rpython.jit.backend.arm.regalloc import (Regalloc)
 from rpython.jit.backend.llsupport import jitframe
-from rpython.jit.backend.llsupport.asmmemmgr import MachineDataBlockWrapper
 from rpython.jit.backend.llsupport.assembler import BaseAssembler, GuardToken
 from rpython.jit.backend.llsupport.gcmap import allocate_gcmap
 from rpython.jit.backend.model import CompiledLoopToken
-from rpython.jit.backend.muvm import conditions as c, regalloc
+from rpython.jit.backend.muvm import conditions as c
 from rpython.jit.backend.muvm.arch import JITFRAME_FIXED_SIZE
 from rpython.jit.backend.muvm.regalloc import Regalloc
-from rpython.jit.backend.muvm.mutypes import get_type, get_func_sig, INT64_t, INT32_t, FLOAT_t, DOUBLE_t, VOID_t
-from rpython.jit.codewriter.effectinfo import EffectInfo
 from rpython.jit.metainterp.resoperation import rop
 from rpython.rlib.debug import debug_print, debug_start, debug_stop
 from rpython.rlib.jit import AsmInfo
 from rpython.rlib.objectmodel import we_are_translated
 from rpython.rlib.rarithmetic import r_uint
-from rpython.rlib.rmu import MuVM, MuBinOptr, MuCmpOptr, MuConvOptr
+from rpython.rlib.rmu import MuBinOptr, MuCmpOptr, MuConvOptr, MuVM
 from rpython.rtyper.lltypesystem import rffi
 
 
@@ -64,12 +61,10 @@ class AssemblerMu(BaseAssembler):
         self.current_clt = None
         self.pending_guard_tokens = None
         self.pending_guard_tokens_recovered = 0
-        self.datablockwrapper = None
         self.target_tokens_currently_compiling = None
         self.frame_depth_to_patch = None
         self.pending_guards = None
-        self.mu = MuVM()
-        self.ctx = self.mu.new_context()
+        self.ctx = MuVM().new_context()
         self.mc = None
         self.bndl = None
         self.vars = None
@@ -81,11 +76,14 @@ class AssemblerMu(BaseAssembler):
         self.func = None
         self.fv = None
         self.bb = None
+        self.exc_param_id = None
 
         # temporary constant declarations
         self.const_i0 = None
         self.const_f0 = None
         self.const_ineg1 = None
+
+        self.loop_run_counters = []
 
     def setup_once(self):
         BaseAssembler.setup_once(self)
@@ -96,10 +94,6 @@ class AssemblerMu(BaseAssembler):
         self.current_clt = looptoken.compiled_loop_token
         self.pending_guard_tokens = []
         self.pending_guard_tokens_recovered = 0
-        allblocks = self.get_asmmemmgr_blocks(looptoken)
-        # implement mumemmgr?
-        self.datablockwrapper = MachineDataBlockWrapper(self.cpu.asmmemmgr,
-                                                        allblocks)
         # self.ctx = self.mu.new_context()
         self.mc = self.ctx.new_ir_builder()
         self.type_i32 = self.mc.gen_sym('@i32')
@@ -111,8 +105,8 @@ class AssemblerMu(BaseAssembler):
         self.type_double = self.mc.gen_sym('@double')
         self.mc.new_type_double(self.type_double)
         self.bb = self.mc.gen_sym('@bb')
-        exc_param_id = self.mc.gen_sym('@bb_exc_param_id')
-        self.mc.new_bb(self.bb, [], [], exc_param_id, [])
+        self.exc_param_id = self.mc.gen_sym('@bb_exc_param_id')
+        self.mc.new_bb(self.bb, [], [], self.exc_param_id, [])
         self.sig = self.mc.gen_sym('@func_sig')
         self.mc.new_funcsig(self.sig, [], [])
         self.func = self.mc.gen_sym('@func')
@@ -133,25 +127,34 @@ class AssemblerMu(BaseAssembler):
         self.mc = None
         self.pending_guards = None
 
+    # TODO: I think for each of these I need to create a basic block that
+    # implements the functionality
     def _build_cond_call_slowpath(self, supports_floats, callee_only):
+        print '_build_cond_call_slowpath called'
         pass
 
     def _build_failure_recovery(self, exc, withfloats=False):
+        print '_build_failure_recovery called'
         pass
 
     def _build_malloc_slowpath(self, kind):
+        print '_build_malloc_slowpath called'
         pass
 
     def _build_propagate_exception_path(self):
+        print '_build_propagate_exception_path called'
         pass
 
     def _build_stack_check_slowpath(self):
+        print '_build_stack_check_slowpath called'
         pass
 
     def _build_wb_slowpath(self, withcards, withfloats=False, for_frame=False):
+        print '_build_wb_slowpath called'
         pass
 
     def build_frame_realloc_slowpath(self):
+        print 'build_frame_realloc_slowpath called'
         pass
 
     def get_asmmemmgr_blocks(self, looptoken):
@@ -173,10 +176,11 @@ class AssemblerMu(BaseAssembler):
 
         self.setup(looptoken)
 
-        frame_info = self.datablockwrapper.malloc_aligned(
-            jitframe.JITFRAMEINFO_SIZE)
-        clt.frame_info = rffi.cast(jitframe.JITFRAMEINFOPTR, frame_info)
-        clt.frame_info.clear()  # for now
+        # set clt.frame_info to a newly allocated jitframe.JITFRAMEINFOPTR
+        # frame_info = self.datablockwrapper.malloc_aligned(
+        #         jitframe.JITFRAMEINFO_SIZE)
+        # clt.frame_info = rffi.cast(jitframe.JITFRAMEINFOPTR, frame_info)
+        # clt.frame_info.clear()  # for now
 
         if log:
             operations = self._inject_debugging_code(looptoken, operations,
@@ -329,7 +333,7 @@ class AssemblerMu(BaseAssembler):
         l0, res = arglocs
         v0 = self.get_int(l0)
         inst = self.mc.new_binop(self.bb, MuBinOptr.SUB, self.type_i32,
-                                 self.const_int_neg, v0)
+                                 self.const_ineg1, v0)
         inst_res = self.mc.get_inst_res(inst, 0)
         self.mc.set_name(self.bndl, inst_res, res.__repr__())
         self.vars[res] = inst_res
@@ -491,9 +495,10 @@ class AssemblerMu(BaseAssembler):
             guard_block = self.mc.new_bb(
                     self.fv)  # TODO: Generate code for guard block, remove need
             # for guard tokens
-            self.mc.add_dest(branch2, MuDestKind.TRUE, norm_path,
-                             regalloc.get_live_vars())
-            # .add_dest(branch2, MuDestKind.FALSE, guard_block, guard_args)
+            # TODO: this was outdated
+            # self.mc.add_dest(branch2, MuDestKind.TRUE, norm_path,
+            # regalloc.get_live_vars()).add_dest(branch2, MuDestKind.FALSE,
+            # guard_block, guard_args)
             self.bb = norm_path
         else:
             pass

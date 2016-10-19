@@ -8,6 +8,7 @@ from rpython.rtyper.lltypesystem import lltype, llmemory
 
 jitframe.STATICSIZE = JITFRAME_FIXED_SIZE
 
+
 class MuCPU(AbstractLLCPU):
     IS_64_BIT = True
 
