@@ -49,7 +49,9 @@ from rpython.jit.metainterp.history import (Const, ConstInt, ConstFloat,
                                             ConstPtr,
                                             INT, REF, FLOAT)
 from rpython.jit.metainterp.history import TargetToken
-from rpython.jit.metainterp.resoperation import rop
+from rpython.jit.metainterp.resoperation import (rop, AbstractInputArg,
+                                                 InputArgFloat,InputArgInt,
+                                                 InputArgRef, InputArgVector)
 from rpython.jit.backend.llsupport.descr import ArrayDescr
 from rpython.jit.backend.llsupport.gcmap import allocate_gcmap
 from rpython.jit.backend.llsupport import symbolic
@@ -188,10 +190,14 @@ class MuVMRegisterManager(RegisterManager):
         NOTE: right now t is instance of MuType() class. It may be better
         to split t into (t,width) variables.
         """
-        ### OVERRIDE
-        ### Scratch Method
-        assert isinstance(t, MuType)
-        assert selectedReg == None
+
+        if not isinstance(t, MuType):             # Change to checking specific type
+            if isinstance(t, InputArgInt) or isinstance(t, InputArgFloat):
+                t = get_type(t.datatype, t.bytesize)
+            elif isinstance(t, InputArgRef):      # TODO: How to handle?
+                t = get_type(t.datatype, reftype=get_type(INT))   # XXX: We don't know what kind of ref this is
+
+        assert selected_reg == None
         v = len(self.all_regs)      # Position
         ssa = SSALocation(v, t)     # SSA variable, to be appended
         self.all_regs.append(ssa)
@@ -293,6 +299,10 @@ class Regalloc(BaseRegalloc):
     def possibly_free_var(self, var):
         self.rm.possibly_free_var(var)
 
+    def possibly_free_vars(self, vars):
+        for var in vars:
+            self.possibly_free_var(var)
+
     def possibly_free_vars_for_op(self, op):
         for var in vars:
             if var is not None:  # xxx kludgy
@@ -334,7 +344,8 @@ class Regalloc(BaseRegalloc):
     def prepare_loop(self, inputargs, operations, looptoken, allgcrefs):
         operations = self._prepare(inputargs, operations, allgcrefs)
         self._set_initial_bindings(inputargs, looptoken)
-        self.possibly_free_vars(list(inputargs))
+        # XXX: Removing since unnecessary
+        # self.possibly_free_vars(list(inputargs))
         return operations
 
     def prepare_bridge(self, inputargs, arglocs, operations, allgcrefs,
@@ -424,6 +435,20 @@ class Regalloc(BaseRegalloc):
     def _sync_var(self, v):
         self.rm._sync_var(v)
 
+    def _set_initial_bindings(self, inputargs, looptoken):
+        """
+        TODO: Remove reference to fm
+        Set the bindings at the start of the loop
+        """
+        locs = []
+        base_ofs = self.assembler.cpu.get_baseofs_of_frame_field()
+        for box in inputargs:
+            assert not isinstance(box, Const)
+            # loc = self.fm.get_new_loc(box)
+            loc = self.rm.try_allocate_reg(box)       # XXX: Is this correct???
+            locs.append(loc - base_ofs)
+        if looptoken.compiled_loop_token is not None:   # <- for tests
+            looptoken.compiled_loop_token._ll_initial_locs = locs
 
     prepare_op_int_add                = prepare_binop_int
     prepare_op_nursery_ptr_increment  = prepare_binop_int

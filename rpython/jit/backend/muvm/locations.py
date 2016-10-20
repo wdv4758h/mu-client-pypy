@@ -66,7 +66,7 @@ class SSALocation(AssemblerLocation):
 
     def __repr__(self):
         """Temp implementation. Will update"""
-        return '{}_{}'.format( self.tp.prefix(), self.value)
+        return '{}_{}'.format( str(self.tp), self.value)
     
     def is_core_reg(self):
         # TODO find out what this implies
