@@ -96,6 +96,7 @@ class AssemblerMu(BaseAssembler):
         self.mc.new_const_int(self.const_i0, self.type_i32, 0)
         self.const_f0 = self.mc.gen_sym('@f0')
         self.mc.new_const_float(self.const_f0, self.type_float, 0.0)
+        self.const_ineg1 = self.mc.gen_sym('@i_neg1')
         self.mc.new_const_int(self.const_ineg1, self.type_i32, -1)
         self.mc.load()
 
