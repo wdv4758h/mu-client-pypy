@@ -82,14 +82,6 @@ class AssemblerMu(BaseAssembler):
         self.type_i64 = None
         self.type_float = None
         self.type_double = None
-<<<<<<< HEAD
-        self.sig = None
-        self.func = None
-        self.fv = None
-        self.bb = None
-        self.exc_param_id = None
-=======
->>>>>>> 37e25fca86852ae12c622a74600243c9524eae3a
 
         # temporary constant declarations
         self.const_i0 = None
@@ -100,17 +92,6 @@ class AssemblerMu(BaseAssembler):
 
     def setup_once(self):
         BaseAssembler.setup_once(self)
-<<<<<<< HEAD
-
-    def setup(self, looptoken):
-        BaseAssembler.setup(self, looptoken)
-        assert self.memcpy_addr != 0, "setup_once() not called?"
-        self.current_clt = looptoken.compiled_loop_token
-        self.pending_guard_tokens = []
-        self.pending_guard_tokens_recovered = 0
-        # self.ctx = self.mu.new_context()
-=======
->>>>>>> 37e25fca86852ae12c622a74600243c9524eae3a
         self.mc = self.ctx.new_ir_builder()
         self.type_i32 = self.mc.gen_sym('@i32')
         self.mc.new_type_int(self.type_i32, 32)
@@ -120,20 +101,6 @@ class AssemblerMu(BaseAssembler):
         self.mc.new_type_float(self.type_float)
         self.type_double = self.mc.gen_sym('@double')
         self.mc.new_type_double(self.type_double)
-<<<<<<< HEAD
-        self.bb = self.mc.gen_sym('@bb')
-        self.exc_param_id = self.mc.gen_sym('@bb_exc_param_id')
-        self.mc.new_bb(self.bb, [], [], self.exc_param_id, [])
-        self.sig = self.mc.gen_sym('@func_sig')
-        self.mc.new_funcsig(self.sig, [], [])
-        self.func = self.mc.gen_sym('@func')
-        self.mc.new_func(self.func, self.sig)
-        self.fv = self.mc.gen_sym('@func.v1')
-        self.mc.new_func_ver(self.fv, self.func, [self.bb])
-        self.target_tokens_currently_compiling = {}
-        self.frame_depth_to_patch = []
-=======
->>>>>>> 37e25fca86852ae12c622a74600243c9524eae3a
         self.const_i0 = self.mc.gen_sym('@i0')
         self.mc.new_const_int(self.const_i0, self.type_i32, 0)
         self.const_f0 = self.mc.gen_sym('@f0')
