@@ -3,10 +3,6 @@ from __future__ import with_statement
 from rpython.jit.backend.arm import conditions as c
 from rpython.jit.backend.arm.arch import (JITFRAME_FIXED_SIZE)
 from rpython.jit.backend.arm.regalloc import (Regalloc)
-<<<<<<< HEAD
-from rpython.jit.backend.llsupport import jitframe
-=======
->>>>>>> 37e25fca86852ae12c622a74600243c9524eae3a
 from rpython.jit.backend.llsupport.assembler import BaseAssembler, GuardToken
 from rpython.jit.backend.llsupport.gcmap import allocate_gcmap
 from rpython.jit.backend.model import CompiledLoopToken
@@ -18,13 +14,8 @@ from rpython.rlib.debug import debug_print, debug_start, debug_stop
 from rpython.rlib.jit import AsmInfo
 from rpython.rlib.objectmodel import we_are_translated
 from rpython.rlib.rarithmetic import r_uint
-<<<<<<< HEAD
-from rpython.rlib.rmu import MuBinOptr, MuCmpOptr, MuConvOptr, MuVM
-from rpython.rtyper.lltypesystem import rffi
-=======
 from rpython.rlib.rmu import MuBinOptr, MuCmpOptr, MuConvOptr, MuVM, \
     MuBinOpStatus
->>>>>>> 37e25fca86852ae12c622a74600243c9524eae3a
 
 
 class MuGuardToken(GuardToken):
