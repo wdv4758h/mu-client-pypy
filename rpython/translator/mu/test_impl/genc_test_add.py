@@ -2,12 +2,28 @@
 Generate C source file that builds a bundle to
 test the binary operations
 
-Run on reference implementation with:
-    $ PYTHONPATH=$PYPY_MU:$MU/tools python gen_test_binops.py
-Compile to C, then compile with clang, then run:
-    $ PYTHONPATH=$PYPY_MU:$MU/tools python gen_test_binops.py -c gen_test_binops.c
-    $ clang -std=c99 -I$MU/cbinding -L$MU/cbinding -lmurefimpl2start -o test_binops gen_test_binops.c
-    $ ./test_binops
+A few ways of running this script:
+* Run the test script with a running Mu instance:
+    ```bash
+    $ PYTHONPATH=$PYPY_MU python genc_test_add.py --impl <impl> --run
+    ```
+* Compile to C, then compile with clang, then run:
+    ```bash
+    $ PYTHONPATH=$PYPY_MU python genc_test_add.py --impl <impl> -o test_add.c
+    ```
+    - reference implementation:
+        ```bash
+        $ clang -std=c99 -I$MU/cbinding -L$MU/cbinding -lmurefimpl2start -o test_add test_add.c
+        ```
+    - fast implementation:
+        ```bash
+        $ clang -std=c99 -I$MU_RUST/src/vm/api -L$MU_RUST/target/debug -lmu -o test_add test_add.c
+        ```
+    $ ./test_add
+* Compile to C as a JIT test for fast implementation:
+        ```bash
+        $ PYTHONPATH=$PYPY_MU python genc_test_add.py --impl fast --testjit -o test_add.c
+        ```
 """
 
 def build_test_bundle(rmu):
@@ -62,24 +78,8 @@ def build_test_bundle(rmu):
         "@test_fnc": test_fnc,
     }
 
-def main(opts):
-    if opts.run:
-        if opts.impl == 'ref':
-            from rpython.rlib import rmu
-        else:
-            from rpython.rlib import rmu_fast as rmu
-    else:
-        if opts.impl == 'ref':
-            from rpython.rlib import rmu_genc as rmu
-        else:
-            from rpython.rlib import rmu_genc_fast as rmu
-
-    mu, ctx, bldr, id_dict = build_test_bundle(rmu)
-
-    if opts.impl == 'fast':
-        raise NotImplementedError
-    else:   # on Scala reference implementation
-        """
+def extend_with_entrypoint(bldr, id_dict, rmu):
+    """
         Extend the bundle with:
             .typedef @i32 = int<32>
             .typedef @i8 = int<8>
@@ -94,40 +94,65 @@ def main(opts):
                     COMMINST @uvm.thread_exit
             }
         """
-        i8 = id_dict['@i8']
-        sig__i8 = id_dict['@sig__i8']
-        test_fnc = id_dict['@test_fnc']
+    i8 = id_dict['@i8']
+    sig__i8 = id_dict['@sig__i8']
+    test_fnc = id_dict['@test_fnc']
+    i32 = bldr.gen_sym("@i32")
+    bldr.new_type_int(i32, 32)
+    pi8 = bldr.gen_sym("@pi8")
+    bldr.new_type_uptr(pi8, i8)
+    ppi8 = bldr.gen_sym("@ppi8")
+    bldr.new_type_uptr(ppi8, pi8)
+    result = bldr.gen_sym("@result")
+    bldr.new_global_cell(result, i8)
+    sig_i32ppi8_ = bldr.gen_sym("@sig_i32ppi8_")
+    bldr.new_funcsig(sig_i32ppi8_, [i32, ppi8], [])
+    entry = bldr.gen_sym("@entry")
+    bldr.new_func(entry, sig_i32ppi8_)
+    # function body
+    v1 = bldr.gen_sym("@entry_v1")
+    blk0 = bldr.gen_sym()
+    argc = bldr.gen_sym()
+    argv = bldr.gen_sym()
+    res = bldr.gen_sym()
+    op_call = bldr.gen_sym()
+    bldr.new_call(op_call, [res], sig__i8, test_fnc, [])
+    op_store = bldr.gen_sym()
+    bldr.new_store(op_store, False, rmu.MuMemOrd.NOT_ATOMIC, i8, result, res)
+    op_exit = bldr.gen_sym()
+    bldr.new_comminst(op_exit, [], rmu.MuCommInst.THREAD_EXIT, [], [], [], [])
+    bldr.new_bb(blk0, [argc, argv], [i32, ppi8], rmu.MU_NO_ID, [op_call, op_store, op_exit])
+    bldr.new_func_ver(v1, entry, [blk0])
 
-        i32 = bldr.gen_sym("@i32")
-        bldr.new_type_int(i32, 32)
-        pi8 = bldr.gen_sym("@pi8")
-        bldr.new_type_uptr(pi8, i8)
-        ppi8 = bldr.gen_sym("@ppi8")
-        bldr.new_type_uptr(ppi8, pi8)
+    id_dict.update({
+        '@entry': entry,
+        '@i32': i32,
+        '@ppi8': ppi8,
+        '@result': result
+    })
 
-        result = bldr.gen_sym("@result")
-        bldr.new_global_cell(result, i8)
+def main(opts):
+    if opts.run:
+        if opts.impl == 'ref':
+            from rpython.rlib import rmu
+        else:
+            from rpython.rlib import rmu_fast as rmu
+    else:
+        if opts.impl == 'ref':
+            from rpython.rlib import rmu_genc as rmu
+        else:
+            from rpython.rlib import rmu_genc_fast as rmu
 
-        sig_i32ppi8_ = bldr.gen_sym("@sig_i32ppi8_")
-        bldr.new_funcsig(sig_i32ppi8_, [i32, ppi8], [])
+    mu, ctx, bldr, id_dict = build_test_bundle(rmu)
 
-        entry = bldr.gen_sym("@entry")
-        bldr.new_func(entry, sig_i32ppi8_)
-
-        # function body
-        v1 = bldr.gen_sym("@entry_v1")
-        blk0 = bldr.gen_sym()
-        argc = bldr.gen_sym()
-        argv = bldr.gen_sym()
-        res = bldr.gen_sym()
-        op_call = bldr.gen_sym()
-        bldr.new_call(op_call, [res], sig__i8, test_fnc, [])
-        op_store = bldr.gen_sym()
-        bldr.new_store(op_store, False, rmu.MuMemOrd.NOT_ATOMIC, i8, result, res)
-        op_exit = bldr.gen_sym()
-        bldr.new_comminst(op_exit, [], rmu.MuCommInst.THREAD_EXIT, [], [], [], [])
-        bldr.new_bb(blk0, [argc, argv], [i32, ppi8], rmu.MU_NO_ID, [op_call, op_store, op_exit])
-        bldr.new_func_ver(v1, entry, [blk0])
+    if opts.impl == 'fast' and not opts.run and opts.testjit:
+        raise NotImplementedError
+    else:
+        extend_with_entrypoint(bldr, id_dict, rmu)
+        entry = id_dict['@entry']
+        result = id_dict['@result']
+        i32 = id_dict['@i32']
+        ppi8 = id_dict['@ppi8']
 
         bldr.load()
 
@@ -141,7 +166,8 @@ def main(opts):
         else:   # HACK
             hargv = ctx.handle_from_ptr(ppi8, '(char **){&"entry"}')
         thd = ctx.new_thread_nor(stk, rmu.null(rmu.MuThreadRefValue), [hargc, hargv])
-        mu.execute()
+        if opts.impl == 'ref':
+            mu.execute()
 
         hres = ctx.load(rmu.MuMemOrd.NOT_ATOMIC, ctx.handle_from_global(result))
         if opts.run:
@@ -152,7 +178,10 @@ def main(opts):
             log = rmu.get_global_apilogger()
             res_val = rmu.CVar('int', 'res_val')
             log.logcall("handle_to_sint32", [ctx._ctx, hres], res_val, ctx._ctx)
-            log.logcall("printf", [rmu.CStr("result = %d\\n"), res_val], None, context=None, check_err=False)
+            if opts.impl == 'ref':
+                log.logcall("printf", [rmu.CStr("result = %d\\n"), res_val], None, context=None, check_err=False)
+            else:
+                log.logcall("printf", [rmu.CStr("result = %d\\n"), res_val], None, context=None)
             with open(opts.output, 'w') as fp:
                 log.genc(fp, exitcode=res_val)
 
@@ -163,6 +192,12 @@ if __name__ == "__main__":
                         help='Compile script to C targeting the selected implementation of Mu.')
     parser.add_argument('--run', action='store_true',
                         help='Run the script under RPython FFI on Mu Scala reference implementation.')
-    parser.add_argument('-o', '--output', help='file name of the generated C source file.')
+    arg_testjit = parser.add_argument('--testjit', action='store_true',
+                                      help='Renerate C source file that can be used to test the JIT.')
+    parser.add_argument('-o', '--output', help='File name of the generated C source file.')
     opts = parser.parse_args()
+    if opts.testjit:
+        if not (opts.impl == 'fast' and not opts.run):
+            raise argparse.ArgumentError(arg_testjit,
+                                         "must be specified with '--impl fast' and '-o <output>'.")
     main(opts)
