@@ -12,7 +12,7 @@ import os
 
 libmu_dir = os.path.join(os.getenv('MU_RUST'), 'target', 'debug')
 muapi_dir = os.path.join(os.getenv('MU_RUST'), 'src', 'vm', 'api')
-eci = ExternalCompilationInfo(includes=['muapi.h'],
+eci = ExternalCompilationInfo(includes=['mu-implfast.h', 'muapi.h'],
                               include_dirs=[muapi_dir],
                               libraries=['mu'],
                               library_dirs=[libmu_dir])

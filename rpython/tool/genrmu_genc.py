@@ -557,7 +557,8 @@ class APILogger:
                  '#include <stdio.h>\\n'
                  '#include <stdlib.h>\\n'
                  '#include <stdbool.h>\\n'
-                 '#include "muapi.h"\\n')
+                 '#include "muapi.h"\\n'
+                 '#include "mu-fastimpl.h"\\n')
 
         fp.write('int main(int argc, char** argv) {\\n')
         idt = ' ' * 4
