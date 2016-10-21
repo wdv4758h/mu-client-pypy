@@ -373,6 +373,12 @@ class MuVM:
         # type: (MuTrapHandler, MuCPtr) -> None
         self._mu.c_set_trap_handler(self._mu, trap_handler, userdata)
 
+    def compile_to_sharedlib(self, fncname):
+        # type: (str) -> str
+        with rffi.scoped_str2charp(fncname) as fncname_buf:
+            res = rffi.charp2str(self._mu.c_compile_to_sharedlib(self._mu, fncname_buf))
+            return res
+
 
 class MuCtx:
     def __init__(self, mu, rffi_ctx_ptr):
@@ -1315,6 +1321,7 @@ _MuVM.become(rffi.CStruct(
     ('id_of', rffi.CCallback([_MuVMPtr, MuName], MuID)),
     ('name_of', rffi.CCallback([_MuVMPtr, MuID], MuName)),
     ('set_trap_handler', rffi.CCallback([_MuVMPtr, MuTrapHandler, MuCPtr], lltype.Void)),
+    ('compile_to_sharedlib', rffi.CCallback([_MuVMPtr, MuCString], MuCString)),
 ))
 _MuCtx.become(rffi.CStruct(
     'MuCtx',
