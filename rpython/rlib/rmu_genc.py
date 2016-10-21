@@ -6,9 +6,6 @@ NOTE: THIS FILE IS *NOT* RPYTHON.
 
 from rpython.rtyper.lltypesystem import rffi
 from rpython.rtyper.lltypesystem import lltype
-from rpython.translator.tool.cbuild import ExternalCompilationInfo
-from rpython.rlib.objectmodel import specialize
-import os
 
 class CCall(object):
     __slots__ = ('fnc_name', 'args', 'rtn_var', 'context', 'check_err')
@@ -87,8 +84,6 @@ class CVar(object):
         return self.name
 
     __repr__ = __str__
-
-
 class APILogger:
     def __init__(self):
         self.ccalls = []
@@ -125,7 +120,6 @@ class APILogger:
             fp.write(idt + '%(ccall)s\n' % locals())
         fp.write(idt + 'return 0;\n')
         fp.write('}\n')
-
 _apilog = APILogger()
 def get_global_apilogger():
     return _apilog
@@ -483,6 +477,13 @@ class MuVM:
         _apilog.logcall('id_of', [self._mu, name_cstr], res_var, self._mu)
         return res_var
 
+    def name_of(self, id):
+        # type: (MuID) -> str
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('MuName', 'var')
+        _apilog.logcall('name_of', [self._mu, id], res_var, self._mu)
+        return res_var
+
     def set_trap_handler(self, trap_handler, userdata):
         # type: (MuTrapHandler, MuCPtr) -> None
         _apilog.logcall('set_trap_handler', [self._mu, trap_handler, userdata], None, self._mu)
@@ -509,6 +510,13 @@ class MuCtx:
         name_cstr = CStr(name) if name else NULL
         res_var = CVar('MuID', 'id')
         _apilog.logcall('id_of', [self._ctx, name_cstr], res_var, self._ctx)
+        return res_var
+
+    def name_of(self, id):
+        # type: (MuID) -> str
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('MuName', 'var')
+        _apilog.logcall('name_of', [self._ctx, id], res_var, self._ctx)
         return res_var
 
     def close_context(self):
@@ -608,6 +616,76 @@ class MuCtx:
         _apilog.logcall('handle_from_fp', [self._ctx, mu_type, fp], res_var, self._ctx)
         return res_var
 
+    def handle_to_sint8(self, opnd):
+        # type: (MuIntValue) -> int
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('int8_t', 'var')
+        _apilog.logcall('handle_to_sint8', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
+    def handle_to_uint8(self, opnd):
+        # type: (MuIntValue) -> int
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('uint8_t', 'var')
+        _apilog.logcall('handle_to_uint8', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
+    def handle_to_sint16(self, opnd):
+        # type: (MuIntValue) -> int
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('int16_t', 'var')
+        _apilog.logcall('handle_to_sint16', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
+    def handle_to_uint16(self, opnd):
+        # type: (MuIntValue) -> int
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('uint16_t', 'var')
+        _apilog.logcall('handle_to_uint16', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
+    def handle_to_sint32(self, opnd):
+        # type: (MuIntValue) -> int
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('int32_t', 'var')
+        _apilog.logcall('handle_to_sint32', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
+    def handle_to_uint32(self, opnd):
+        # type: (MuIntValue) -> int
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('uint32_t', 'var')
+        _apilog.logcall('handle_to_uint32', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
+    def handle_to_sint64(self, opnd):
+        # type: (MuIntValue) -> int
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('int64_t', 'var')
+        _apilog.logcall('handle_to_sint64', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
+    def handle_to_uint64(self, opnd):
+        # type: (MuIntValue) -> int
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('uint64_t', 'var')
+        _apilog.logcall('handle_to_uint64', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
+    def handle_to_float(self, opnd):
+        # type: (MuFloatValue) -> float
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('float', 'var')
+        _apilog.logcall('handle_to_float', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
+    def handle_to_double(self, opnd):
+        # type: (MuDoubleValue) -> float
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('double', 'var')
+        _apilog.logcall('handle_to_double', [self._ctx, opnd], res_var, self._ctx)
+        return res_var
+
     def handle_to_ptr(self, opnd):
         # type: (MuUPtrValue) -> MuCPtr
         res_var = CVar('MuCPtr', 'var')
@@ -647,6 +725,20 @@ class MuCtx:
     def delete_value(self, opnd):
         # type: (MuValue) -> None
         _apilog.logcall('delete_value', [self._ctx, opnd], None, self._ctx)
+
+    def ref_eq(self, lhs, rhs):
+        # type: (MuGenRefValue, MuGenRefValue) -> bool
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('MuBool', 'var')
+        _apilog.logcall('ref_eq', [self._ctx, lhs, rhs], res_var, self._ctx)
+        return res_var
+
+    def ref_ult(self, lhs, rhs):
+        # type: (MuIRefValue, MuIRefValue) -> bool
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('MuBool', 'var')
+        _apilog.logcall('ref_ult', [self._ctx, lhs, rhs], res_var, self._ctx)
+        return res_var
 
     def extract_value(self, str, index):
         # type: (MuStructValue, int) -> MuValue
@@ -829,6 +921,27 @@ class MuCtx:
     def push_frame(self, stack, func):
         # type: (MuStackRefValue, MuFuncRefValue) -> None
         _apilog.logcall('push_frame', [self._ctx, stack, func], None, self._ctx)
+
+    def tr64_is_fp(self, value):
+        # type: (MuTagRef64Value) -> bool
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('MuBool', 'var')
+        _apilog.logcall('tr64_is_fp', [self._ctx, value], res_var, self._ctx)
+        return res_var
+
+    def tr64_is_int(self, value):
+        # type: (MuTagRef64Value) -> bool
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('MuBool', 'var')
+        _apilog.logcall('tr64_is_int', [self._ctx, value], res_var, self._ctx)
+        return res_var
+
+    def tr64_is_ref(self, value):
+        # type: (MuTagRef64Value) -> bool
+        # NOTE: runtime dependent method, the return value should not be examined in Python.
+        res_var = CVar('MuBool', 'var')
+        _apilog.logcall('tr64_is_ref', [self._ctx, value], res_var, self._ctx)
+        return res_var
 
     def tr64_to_fp(self, value):
         # type: (MuTagRef64Value) -> MuDoubleValue

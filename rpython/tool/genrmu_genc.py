@@ -228,9 +228,6 @@ def _oogen_method(sttname, mtd, fp):
     mtd['ret_rmu_type'] = get_rmu_def(mtd['ret_ty'])
     mtd['ret_rpy_type'] = get_rpyreturn_type(mtd['ret_rmu_type'])
 
-    if mtd['ret_rpy_type'] in ('int', 'float', 'bool', 'str'):
-        return  # these depends on a running Mu instance, abort this method generation
-
     can_opt = True
     for i in range(len(mtd['params']) - 1, -1, -1):
         prm = mtd['params'][i]
@@ -259,6 +256,10 @@ def _oogen_method(sttname, mtd, fp):
         'arg_ts': ', '.join([p['rpy_type'] for p in rpy_params]),
         'ret_t': mtd['ret_rpy_type']
     })
+
+    if mtd['ret_rpy_type'] in ('int', 'float', 'bool', 'str'):
+        fp.write(cur_idt + '# NOTE: runtime dependent method, '
+                           'the return value should not be examined in Python.\n')
 
     # body
     c2rpy_param_map = {}
