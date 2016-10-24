@@ -1,15 +1,14 @@
 """
-Generate C source file that builds a bundle to
-test the binary operations
+Mu JIT testing utility script.
 
-A few ways of running this script:
+Example of ways of using this script:
 * Run the test script with a running Mu instance:
     ```bash
-    $ PYTHONPATH=$PYPY_MU python genc_test_add.py --impl <impl> --run
+    $ PYTHONPATH=$PYPY_MU python test_add.py --impl <impl> --run
     ```
 * Compile to C, then compile with clang, then run:
     ```bash
-    $ PYTHONPATH=$PYPY_MU python genc_test_add.py --impl <impl> -o test_add.c
+    $ PYTHONPATH=$PYPY_MU python test_add.py --impl <impl> -o test_add.c
     ```
     - reference implementation:
         ```bash
@@ -22,62 +21,9 @@ A few ways of running this script:
     $ ./test_add
 * Compile to C as a JIT test for fast implementation:
         ```bash
-        $ PYTHONPATH=$PYPY_MU python genc_test_add.py --impl fast --testjit -o test_add.c
+        $ PYTHONPATH=$PYPY_MU python test_add.py --impl fast --testjit -o test_add.c
         ```
 """
-
-def build_test_bundle(rmu):
-    """
-    Builds the following test bundle.
-        .typedef @i8 = int<8>
-        .const @0xff_i8 <@i8> = 0xff
-        .const @0x0a_i8 <@i8> = 0x0a
-        .funcsig @sig__i8 = () -> (@i8)
-        .funcdecl @test_fnc <@fnrsig__i8>
-        .funcdef @test_fnc VERSION @test_fnc_v1 <@sig__i8> {
-            @test_fnc_v1.blk0():
-                @test_fnc_v1.blk0.res = ADD <@i8> @0xff_i8 @0x0a_i8
-                RET @test_fnc_v1.blk0.res
-        }
-    :return: (rmu.MuVM(), rmu.MuCtx, rmu.MuIRBuilder, MuID, MuID)
-    """
-    mu = rmu.MuVM()
-    ctx = mu.new_context()
-    bldr = ctx.new_ir_builder()
-
-    i8 = bldr.gen_sym("@i8")
-    bldr.new_type_int(i8, 8)
-
-    c_0xff_i8 = bldr.gen_sym("@0xff_i8")
-    bldr.new_const_int(c_0xff_i8, i8, 0xff)
-    c_0x0a_i8 = bldr.gen_sym("@0x0a_i8")
-    bldr.new_const_int(c_0x0a_i8, i8, 0x0a)
-
-    sig__i8 = bldr.gen_sym("@sig__i8")
-    bldr.new_funcsig(sig__i8, [], [i8])
-
-    test_fnc = bldr.gen_sym("@test_fnc")
-    bldr.new_func(test_fnc, sig__i8)
-
-    # function body
-    v1 = bldr.gen_sym("@test_fnc_v1")
-    blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
-    res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-    op_add = bldr.gen_sym()
-    bldr.new_binop(op_add, res, rmu.MuBinOptr.ADD, i8, c_0xff_i8, c_0x0a_i8)
-    op_ret = bldr.gen_sym()
-    bldr.new_ret(op_ret, [res])
-    bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
-    bldr.new_func_ver(v1, test_fnc, [blk0])
-
-    return mu, ctx, bldr, {
-        "@i8": i8,
-        "@0xff_i8": c_0xff_i8,
-        "@0x0a_i8": c_0x0a_i8,
-        "@sig__i8": sig__i8,
-        "@test_fnc": test_fnc,
-    }
-
 def extend_with_entrypoint(bldr, id_dict, rmu):
     """
         Extend the bundle with:
@@ -94,9 +40,16 @@ def extend_with_entrypoint(bldr, id_dict, rmu):
                     COMMINST @uvm.thread_exit
             }
         """
-    i8 = id_dict['@i8']
-    sig__i8 = id_dict['@sig__i8']
-    test_fnc = id_dict['@test_fnc']
+    if '@i8' in id_dict:
+        i8 = id_dict['@i8']
+    else:
+        i8 = bldr.gen_sym('@i8')
+        bldr.new_type_int(i8, 8)
+
+    test_fnc_sig = id_dict['test_fnc_sig']
+    test_fnc = id_dict['test_fnc']
+    result_type = id_dict['result_type']
+
     i32 = bldr.gen_sym("@i32")
     bldr.new_type_int(i32, 32)
     pi8 = bldr.gen_sym("@pi8")
@@ -104,7 +57,7 @@ def extend_with_entrypoint(bldr, id_dict, rmu):
     ppi8 = bldr.gen_sym("@ppi8")
     bldr.new_type_uptr(ppi8, pi8)
     result = bldr.gen_sym("@result")
-    bldr.new_global_cell(result, i8)
+    bldr.new_global_cell(result, result_type)
     sig_i32ppi8_ = bldr.gen_sym("@sig_i32ppi8_")
     bldr.new_funcsig(sig_i32ppi8_, [i32, ppi8], [])
     entry = bldr.gen_sym("@entry")
@@ -116,9 +69,9 @@ def extend_with_entrypoint(bldr, id_dict, rmu):
     argv = bldr.gen_sym()
     res = bldr.gen_sym()
     op_call = bldr.gen_sym()
-    bldr.new_call(op_call, [res], sig__i8, test_fnc, [])
+    bldr.new_call(op_call, [res], test_fnc_sig, test_fnc, [])
     op_store = bldr.gen_sym()
-    bldr.new_store(op_store, False, rmu.MuMemOrd.NOT_ATOMIC, i8, result, res)
+    bldr.new_store(op_store, False, rmu.MuMemOrd.NOT_ATOMIC, result_type, result, res)
     op_exit = bldr.gen_sym()
     bldr.new_comminst(op_exit, [], rmu.MuCommInst.THREAD_EXIT, [], [], [], [])
     bldr.new_bb(blk0, [argc, argv], [i32, ppi8], rmu.MU_NO_ID, [op_call, op_store, op_exit])
@@ -131,7 +84,8 @@ def extend_with_entrypoint(bldr, id_dict, rmu):
         '@result': result
     })
 
-def main(opts):
+
+def run_test(opts, test_bundle_building_fn, expected_result):
     if opts.run:
         if opts.impl == 'ref':
             from rpython.rlib import rmu
@@ -143,10 +97,44 @@ def main(opts):
         else:
             from rpython.rlib import rmu_genc_fast as rmu
 
-    mu, ctx, bldr, id_dict = build_test_bundle(rmu)
+    mu = rmu.MuVM()
+    ctx = mu.new_context()
+    bldr = ctx.new_ir_builder()
 
-    if opts.impl == 'fast' and not opts.run and opts.testjit:
-        raise NotImplementedError
+    id_dict = test_bundle_building_fn(bldr, rmu)
+
+    if opts.testjit:
+        # TODO: implemeent properly
+        # bldr.load()
+        # lib = mu.compile_to_sharedlib(id_dict["@test_fnc"])
+        # if opts.run:
+        #     print "compiled shared library:", lib
+        # else:
+        #     log = rmu.get_global_apilogger()
+        #     log.logcall("printf", [rmu.CStr("compiled shared library: %s\\n"), lib], None, context=None)
+        #     with open(opts.output, 'w') as fp:
+        #         log.genc(fp)
+
+        # NOTE: below is just a mock up
+        lib_path = "libfnc.dylib"
+        symbol = "fnc"
+        if opts.run:
+            import ctypes
+            lib = ctypes.CDLL(lib_path)
+            fn = getattr(lib, symbol)
+            print "fn() =", fn()
+        else:
+            log = rmu.get_global_apilogger()
+            lib = rmu.CVar("void*", "lib")
+            log.logcall("dlopen", [rmu.CStr(lib_path), "RTLD_LAZY"], lib, context=None)
+            fn = rmu.CFuncPtr([], "int", "fn")
+            log.logcall("dlsym", [lib, rmu.CStr(symbol)], fn, context=None)
+            res = rmu.CVar("int", "res")
+            log.logcall("fn", [], res, context=None)
+            log.logcall("printf", [rmu.CStr("fn() = %d\\n"), res], None, context=None)
+            log.logcall("dlclose", [lib], None, context=None)
+            with open(opts.output, 'w') as fp:
+                log.genc(fp)
     else:
         extend_with_entrypoint(bldr, id_dict, rmu)
         entry = id_dict['@entry']
@@ -163,7 +151,7 @@ def main(opts):
         if opts.run:
             from rpython.rtyper.lltypesystem import rffi
             hargv = ctx.handle_from_ptr(ppi8, rffi.cast(rffi.VOIDP, rffi.liststr2charpp(["entry"])))
-        else:   # HACK
+        else:  # HACK
             hargv = ctx.handle_from_ptr(ppi8, '(char **){&"entry"}')
         thd = ctx.new_thread_nor(stk, rmu.null(rmu.MuThreadRefValue), [hargc, hargv])
         if opts.impl == 'ref':
@@ -173,11 +161,10 @@ def main(opts):
         if opts.run:
             res_val = ctx.handle_to_sint32(hres)
             print "result =", res_val
-            assert res_val == 9
-        else:   # HACK again
+            assert res_val == expected_result
+        else:  # HACK again
             log = rmu.get_global_apilogger()
-            res_val = rmu.CVar('int', 'res_val')
-            log.logcall("handle_to_sint32", [ctx._ctx, hres], res_val, ctx._ctx)
+            res_val = ctx.handle_to_sint32(hres)
             if opts.impl == 'ref':
                 log.logcall("printf", [rmu.CStr("result = %d\\n"), res_val], None, context=None, check_err=False)
             else:
@@ -185,7 +172,8 @@ def main(opts):
             with open(opts.output, 'w') as fp:
                 log.genc(fp, exitcode=res_val)
 
-if __name__ == "__main__":
+
+def impl_jit_test(build_fn, expected_res):
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--impl', type=str, choices=['ref', 'fast'], default='ref',
@@ -197,7 +185,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output', help='File name of the generated C source file.')
     opts = parser.parse_args()
     if opts.testjit:
-        if not (opts.impl == 'fast' and not opts.run):
+        if not (opts.impl == 'fast'):
             raise argparse.ArgumentError(arg_testjit,
-                                         "must be specified with '--impl fast' and '-o <output>'.")
-    main(opts)
+                                         "must be specified with '--impl fast'.")
+    run_test(opts, build_fn, expected_res)
