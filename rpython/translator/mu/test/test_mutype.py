@@ -87,36 +87,13 @@ def test_func():
     assert f._callable() == (mu_int8(0), mu_float(0.0))
 
 
-def test_cannot_inline_opaque():
-    Stack = MuOpaqueType("Stack")
-    with pytest.raises(TypeError):
-        MuArray(Stack, 5)
-    with pytest.raises(TypeError):
-        MuStruct('tmp', ('stk', Stack))
-    with pytest.raises(TypeError):
-        MuHybrid('tmp', ('stk', Stack))
-
-
 def test_opaquereference():
-    IRNode = MuOpaqueType("IRNode")
-
-    # enforce Ref, IRef and UPtr can not refer to Opaque types
-    with pytest.raises(TypeError):
-        MuRef(IRNode)
-    with pytest.raises(TypeError):
-        MuIRef(IRNode)
-    with pytest.raises(TypeError):
-        MuUPtr(IRNode)
-
-    with pytest.raises(TypeError):
-        MuOpaqueRef(MU_INT64)  # opaque reference can only refer to MuOpaque type
-
-    IRNodeRef = MuOpaqueRef(IRNode)
-    refNULL = IRNodeRef._allocate()
-    assert not refNULL  # NULL reference
-    assert mutypeOf(refNULL) == IRNodeRef  # has _TYPE
+    IRNodeRef = MuOpaqueRef("IRNodeRef")
+    opqref = IRNodeRef._example()
+    assert opqref  # not NULL
+    assert mutypeOf(opqref) == IRNodeRef
     with pytest.raises(AttributeError):
-        refNULL._cast_to(MuRef(MU_INT64))   # can not cast opaque reference
+        opqref._cast_to(MuRef(MU_INT64))   # can not cast opaque reference
 
 
 def test_castable():
@@ -130,8 +107,7 @@ def test_castable():
     IRef3 = MuIRef(Point3)
     UPtr3 = MuUPtr(Point3)
 
-    IRNode = MuOpaqueType("IRNode")
-    OpqRef = MuOpaqueRef(IRNode)
+    OpqRef = MuOpaqueRef("IRNodeRef")
 
     with pytest.raises(TypeError):
         castable(Ref2, IRef2)
@@ -146,7 +122,7 @@ def test_new_newhybrid():
     Point = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
     PointArr5 = MuArray(Point, 5)
     String = MuHybrid("String", ("length", MU_INT64), ("chars", MU_INT8))
-    IRNode = MuOpaqueType("IRNode")
+    IRNodeRef = MuOpaqueRef("IRNodeRef")
 
     ref_p = new(Point)
     assert ref_p
@@ -163,9 +139,11 @@ def test_new_newhybrid():
     assert isinstance(ref_s._obj.chars, mutype._mumemarray)
     assert len(ref_s._obj.chars) == 5
 
-    refN = new(IRNode)
-    assert refN
-    assert isinstance(refN, mutype._muopqref)
+    refopqref= new(IRNodeRef)
+    assert refopqref
+    assert not refopqref._obj
+    assert isinstance(refopqref, mutype._muref)
+    assert isinstance(refopqref._obj, mutype._muopqref)
 
 def test_null():
     Point2 = MuStruct('Point2', ('x', MU_INT64), ('y', MU_INT64))
@@ -183,9 +161,7 @@ def test_null():
     assert not nullUPtr2  # null ref should evaluate to False
     assert nullUPtr2._is_null()
 
-
-    IRNode = MuOpaqueType("IRNode")
-    OpqRef = MuOpaqueRef(IRNode)
+    OpqRef = MuOpaqueRef("OpqRef")
     nullOpqRef = OpqRef._null()
     assert not nullOpqRef
     assert nullOpqRef._is_null()
@@ -337,12 +313,42 @@ def test_funcref():
     Fnr = MuFuncRef(Sig)
     Fnp = MuUFuncPtr(Sig)
 
-    fnr_null = Fnr._val_type._null(Fnr)
+    fnr_null = Fnr._null()
     assert fnr_null._is_null()
-    fnp_null = Fnp._val_type._null(Fnp)
+    fnp_null = Fnp._null()
     assert fnp_null._is_null()
 
     fakegraph = object()
     fnr = mutype._mufuncref(Fnr, _name="test_fnc", graph=fakegraph)
     assert not fnr._is_null()
     assert fnr.graph is fakegraph
+
+    def fac(n):
+        if n == 0:
+            return 1
+        return fac(n-1) * n
+    fnr_fac = mutype._mufuncref(Fnr, _name="fac", _callable=fac)
+    assert fnr_fac(mu_int64(5)) == 120
+
+def test_val_type():
+    Point = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
+    PointArr5 = MuArray(Point, 5)
+    String = MuHybrid("String", ("length", MU_INT64), ("chars", MU_INT8))
+    RefPoint = MuRef(Point)
+    IRefPoint = MuIRef(Point)
+    UPtrPoint = MuUPtr(Point)
+    FncRef = MuFuncRef(MuFuncSig([MU_INT64], [MU_INT64]))
+    FncUPtr = MuUFuncPtr(MuFuncSig([MU_INT64], [MU_INT64]))
+    OpqRef = MuOpaqueRef('StackRef')
+
+    assert MU_INT8._val_type is mutype.mu_int8
+    assert MU_INT128._val_type is mutype.mu_int128
+    assert Point._val_type is mutype._mustruct
+    assert PointArr5._val_type is mutype._muarray
+    assert String._val_type is mutype._muhybrid
+    assert RefPoint._val_type is mutype._muref
+    assert IRefPoint._val_type is mutype._muiref
+    assert UPtrPoint._val_type is mutype._muuptr
+    assert FncRef._val_type  is mutype._mufuncref
+    assert FncUPtr._val_type is mutype._muufuncptr
+    assert OpqRef._val_type is mutype._muopqref

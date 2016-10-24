@@ -80,6 +80,7 @@ class MuNumber(MuPrimitive):
     ))
 
     _cache = {}
+    _val_type = property(lambda self: self._val_t)
 
     def __new__(cls, *args):
         try:
@@ -96,10 +97,6 @@ class MuNumber(MuPrimitive):
             self._cast = type
         else:
             self._cast = cast
-
-    def _get_val_type(self):
-        return self._val_t
-    _val_type = property(_get_val_type)
 _setup_consistent_methods(MuNumber)
 
 
@@ -204,6 +201,7 @@ class MuStruct(MuContainerType):
         '_short_name',
         '_immutable_field',
     ))
+    _val_type = property(lambda self: _mustruct)
 
     def __init__(self, name, *fields, **kwds):
         self._name = self.__name__ = name
@@ -404,6 +402,7 @@ class MuHybrid(MuContainerType):
         '_short_name',
         '_immutable_field',
     ))
+    _val_type = property(lambda self: _muhybrid)
 
     def __init__(self, name, *fields, **kwds):
         """
@@ -507,6 +506,7 @@ class MuArray(MuContainerType):
         '_short_name',
         '_first_struct'
     ))
+    _val_type = property(lambda self: _muarray)
 
     def __init__(self, OF, length, **kwds):
         self.OF = OF
@@ -556,36 +556,27 @@ class _muarray(lltype._parentable):
 _setup_consistent_methods(_muarray)
 
 
-# ----------------------------------------------------------
-class MuOpaqueType(MuType):     # note this is not a container type
-    _template = (lltype.OpaqueType, (
-        "__init__",
-        "__str__",
-    ))
+class MuFuncSig(MuContainerType):
+    def __init__(self, arg_ts, res_ts):
+        for arg in arg_ts + res_ts:
+            assert isinstance(arg, MuType)
 
-    def _note_inlined_into(self, parent, last=False):
-        raise TypeError("%s can not be inlined" % self.__class__.__name__)
+        self.ARGS = tuple(arg_ts)
+        self.RESULTS = tuple(res_ts)
 
-    def _example(self):
-        return _muopaque(self)
+    def __str__(self):
+        return "( %s ) -> ( %s )" % (
+            ", ".join(map(str, self.ARGS)),
+            ", ".join(map(str, self.RESULTS))
+        )
+    __str__ = lltype.saferecursive(__str__, '...')
 
-    def _allocate(self, parent=None, parentindex=None):
-        return _muopaque(self)
-_setup_consistent_methods(MuOpaqueType)
-
-
-class _muopaque(object):
-    _template = (lltype._opaque, (
-        "__repr__",
-        "__str__",
-        "__eq__",
-        "__ne__",
-    ))
-
-    def __init__(self, TYPE, **attrs):
-        self._name = "?"
-        self.__dict__.update(attrs)
-_setup_consistent_methods(_muopaque)
+    def _short_name(self):
+        return "(%s)->(%s)" % (
+            ", ".join(map(str, self.ARGS)),
+            ", ".join(map(str, self.RESULTS))
+        )
+    _short_name = lltype.saferecursive(_short_name, '...')
 
 
 # ----------------------------------------------------------
@@ -593,11 +584,10 @@ class MuReferenceType(MuType):
     _template = (lltype.Ptr, (
 
     ))
-    _suffix = 'OpqRef'     # child class must specify
-    _symbol = '@?'     # child class must specify
+    _suffix = None     # child class must specify
+    _symbol = None     # child class must specify
     _val_type = property(lambda self: _mugeneral_reference)
 
-    __name__ = property(lambda self: '%s%s' % (self.TO.__name__, self._suffix))
     _cache = lltype.WeakValueDictionary()
 
     def __new__(cls, TO, use_cache=True):
@@ -613,55 +603,46 @@ class MuReferenceType(MuType):
         return obj
 
     def __str__(self):
-        return '%s %s' % (self._symbol, self.TO)
-
-    def _short_name(self):
-        return '%s %s' % (self._suffix, self.TO._short_name())
+        raise NotImplementedError
 
     def _defl(self, parent=None, parentindex=None):
-        return self._val_type._null(self)
+        return self._null()
 
     def _null(self):
-        return self._defl()
+        raise NotImplementedError
 
     def _allocate(self, parent=None, parentindex=None):
         return self._defl(parent, parentindex)
 
     def _example(self):
-        if isinstance(self.TO, MuContainerType):
-            o = self.TO._container_example()
-        else:
-            o = self.TO._example()
-        return self._val_type(self, o)
+        raise NotImplementedError
 _setup_consistent_methods(MuReferenceType)
 
 
 class _mugeneral_reference(object):
     _template = (lltype._abstract_ptr, (
-        '__eq__',
         '__ne__',
-        '_same_obj',
         '__hash__',
-        '__nonzero__',
         '__repr__',
-        '_lookup_adtmeth'
     ))
 
-    # assumes one can access _T, _TYPE, _expose and _obj
+    def __eq__(self, other):
+        return (self is other) or (self._is_null() and other._is_null())
 
     def __str__(self):
-        try:
-            return '%s %s' % (type(self._TYPE)._symbol, self._obj)
-        except RuntimeError:
-            return '%s DEAD %s' % (type(self._TYPE)._symbol, self._T)
+        if self._is_null():
+            return "NULL"
+        else:
+            return self._non_null_str()
 
-    @staticmethod
-    def _null(TYPE):
+    def __nonzero__(self):
+        return not self._is_null()
+
+    def _non_null_str(self):
         raise NotImplementedError
 
     def _is_null(self):
         raise NotImplementedError
-
 _setup_consistent_methods(_mugeneral_reference)
 
 
@@ -670,31 +651,140 @@ class MuOpaqueRef(MuReferenceType):
     _symbol = '@pq'
     _val_type = property(lambda self: _muopqref)
 
-    def __init__(self, TO):
-        if not isinstance(TO, MuOpaqueType):
-            raise TypeError("MuOpaqueRef can only point to MuOpaqueType, not %r" % TO)
+    def __init__(self, ref_name, obj_name=None):
+        self.ref_name = ref_name
+        if obj_name is None:
+            obj_name = ref_name.lower()[:-3]
+        self.obj_name = obj_name
 
-        self.TO = TO
+    def __str__(self):
+        return self._suffix + self.ref_name
+
+    def _null(self):
+        return self._val_type(self, _nullref=True)
+
+    def _example(self):
+        return _muopqref(self)
 
 
 class _muopqref(_mugeneral_reference):
-    def __init__(self, TYPE, opqobj):
+    def __init__(self, TYPE, **attrs):
         self._TYPE = TYPE
-        self._obj = opqobj
+        self.__dict__.update(attrs)
 
-    @staticmethod
-    def _null(TYPE):
-        return _muopqref(TYPE, None)
+    def _non_null_str(self):
+        return "%s (%s)" % (self._symbol, self.ref_name)
 
     def _is_null(self):
-        return self._obj is None
+        return hasattr(self, '_nullref') and self._nullref
 
+
+class MuFuncRef(MuOpaqueRef):
+    _template = (lltype.FuncType, (
+        "__name__",
+    ))
+    _suffix = 'FncRef'
+    _symbol = '@#'
+    _val_type = property(lambda self: _mufuncref)
+
+    def __init__(self, SIG):
+        self.Sig = SIG
+
+    def __str__(self):
+        return self._suffix + str(self.Sig)
+
+    def _example(self):
+        def f(*args):
+            return tuple(T._defl() for T in self.Sig.RESULTS)
+        return self._val_type(self, _callable=f)
+_setup_consistent_methods(MuFuncRef)
+
+class _mufunction_reference(_muopqref):
+    def __init__(self, TYPE, **attrs):
+        attrs.setdefault('_TYPE', TYPE)
+        attrs.setdefault('_name', '?')
+        attrs.setdefault('_callable', None)
+        self.__dict__.update(attrs)
+        if '_callable' in attrs and hasattr(attrs['_callable'],
+                                            '_compilation_info'):
+            self.__dict__['compilation_info'] = \
+                attrs['_callable']._compilation_info
+
+    def _non_null_str(self):
+        return "%s %s" % (self._symbol, self._name)
+
+    def __call__(self, *args):
+        Sig = self._TYPE.Sig
+        if len(args) != len(Sig.ARGS):
+            raise TypeError("calling %r with wrong argument number: %r" %
+                            (self._TYPE, args))
+        for i, a, ARG in zip(range(len(Sig.ARGS)), args, Sig.ARGS):
+            if mutypeOf(a) != ARG:
+                # be either None or 0 (MuUPtr)
+                if isinstance(ARG, MuReferenceType):
+                    if a == ARG._defl()._obj:
+                        pass
+
+                    # Any ref is convertible to ref<void> of same ref type
+                    elif ARG.TO is MU_VOID and \
+                            isinstance(mutypeOf(a), ARG):
+                        pass
+                # # special case: ARG can be a container type, in which
+                # # case a should be a pointer to it.  This must also be
+                # # special-cased in the backends.
+                # elif (isinstance(ARG, ContainerType) and
+                #       typeOf(a) == Ptr(ARG)):
+                #     pass
+                else:
+                    args_repr = [mutypeOf(arg) for arg in args]
+                    raise TypeError("calling %r with wrong argument "
+                                    "types: %r" % (self._T, args_repr))
+        callb = self._callable
+        if callb is None:
+            raise RuntimeError("calling undefined function")
+        return callb(*args)     # call the callbale
+
+class _mufuncref(_mufunction_reference):
+    _template = (lltype._func, (
+        '__repr__',
+        '__eq__',
+        '__ne__',
+        '__hash__',
+        '_getid'
+    ))
+_setup_consistent_methods(_mufuncref)
+
+class MuUFuncPtr(MuOpaqueRef):
+    _template = (MuFuncRef, (
+        "__init__",
+        "__str__",
+        "_example"
+    ))
+    _suffix = 'UFncPtr'  # child class must specify
+    _symbol = '*#'  # child class must specify
+    _val_type = property(lambda self: _muufuncptr)
+_setup_consistent_methods(MuUFuncPtr)
+
+class _muufuncptr(_mufunction_reference):
+    _template = (_mufuncref, (
+        "__repr__",
+        "__eq__",
+        "__ne__",
+        "__hash__",
+        "_getid"
+    ))
+_setup_consistent_methods(_muufuncptr)
+
+
+# ----------------------------------------------------------
 class MuObjectRef(MuReferenceType):
+    _val_type = property(lambda self: _muobject_reference)
+
     def __init__(self, TO):
-        if isinstance(TO, MuOpaqueType):
-            raise TypeError("%s can not point to %s" % (type(self), TO))
         self.TO = TO
 
+    def __str__(self):
+        return "%s %s" % (self._symbol, self.TO)
 
 class _muobject_reference(_mugeneral_reference):
     def _cast_to(self, REFTYPE):
@@ -735,55 +825,32 @@ class _muobject_reference(_mugeneral_reference):
                                (CURTYPE, PARENTTYPE, REFTYPE.TO))
         return cls(REFTYPE, struc)
 
-    def __call__(self, *args):
-        if isinstance(self._T, MuFuncType):
-            if len(args) != len(self._T.ARGS):
-                raise TypeError("calling %r with wrong argument number: %r" %
-                                (self._T, args))
-            for i, a, ARG in zip(range(len(self._T.ARGS)), args, self._T.ARGS):
-                if mutypeOf(a) != ARG:
-                    # be either None or 0 (MuUPtr)
-                    if isinstance(ARG, MuReferenceType):
-                        if a == ARG._defl()._obj:
-                            pass
 
-                        # Any ref is convertible to ref<void> of same ref type
-                        elif ARG.TO is MU_VOID and \
-                                isinstance(mutypeOf(a), ARG):
-                            pass
-                    # # special case: ARG can be a container type, in which
-                    # # case a should be a pointer to it.  This must also be
-                    # # special-cased in the backends.
-                    # elif (isinstance(ARG, ContainerType) and
-                    #       typeOf(a) == Ptr(ARG)):
-                    #     pass
-                    else:
-                        args_repr = [mutypeOf(arg) for arg in args]
-                        raise TypeError("calling %r with wrong argument "
-                                        "types: %r" % (self._T, args_repr))
-            callb = self._obj._callable
-            if callb is None:
-                raise RuntimeError("calling undefined function")
-            return callb(*args)     # call the callbale
-        raise TypeError("%r instance is not a function" % (self._T,))
 
 class MuRef(MuObjectRef):
     _suffix = 'Ref'
     _symbol = '@'
     _val_type = property(lambda self: _muref)
 
+    def _null(self):
+        return _muref(self, None)
 
 class MuIRef(MuObjectRef):
     _suffix = 'IRef'
     _symbol = '&'
     _val_type = property(lambda self: _muiref)
 
+    def _null(self):
+        return _muiref(self, MuRef(self.TO)._null(), [])
 
 class MuUPtr(MuObjectRef):
     _suffix = 'UPtr'
     _symbol = '*'
     _val_type = property(lambda self: _muuptr)
 
+    def _null(self):
+        nullref = MuRef(self.TO)._null()
+        return nullref._pin()  # hack!
 
 class MuWeakRef(MuObjectRef):
     _suffix = 'WkRef'
@@ -816,10 +883,6 @@ class _muref(_muobject_reference):
 
     def _ispinned(self):
         return self._pin_count > 0
-
-    @staticmethod
-    def _null(TYPE):
-        return _muref(TYPE, None)
 
     def _is_null(self):
         return self._obj is None
@@ -888,10 +951,6 @@ class _muiref(_muobject_reference):
 
     def _unpin(self):
         self._root_ref.unpin()
-
-    @staticmethod
-    def _null(TYPE):
-        return _muiref(TYPE, _muref._null(MuRef(TYPE.TO)), [])
 
     def _is_null(self):
         return self._root_ref._is_null()
@@ -1035,11 +1094,6 @@ class _muuptr(_muobject_reference):
     def _expose(self, offset, val):
         T = mutypeOf(val)
         return _muuptr(MuIRef(T), self._root_ref, self._offsets + [offset])
-
-    @staticmethod
-    def _null(TYPE):
-        nullref = _muref._null(MuRef(TYPE.TO))
-        return nullref._pin()   # hack!
 _setup_consistent_methods(_muuptr)
 
 
@@ -1056,115 +1110,6 @@ class MuGlobalCell(MuIRef):
 
 class _muglobalcell(_muiref):
     pass
-
-
-class MuFuncSig(MuContainerType):
-    def __init__(self, arg_ts, res_ts):
-        for arg in arg_ts + res_ts:
-            assert isinstance(arg, MuType)
-
-        self.ARGS = tuple(arg_ts)
-        self.RESULTS = tuple(res_ts)
-
-    def __str__(self):
-        return "( %s ) -> ( %s )" % (
-            ", ".join(map(str, self.ARGS)),
-            ", ".join(map(str, self.RESULTS))
-        )
-    __str__ = lltype.saferecursive(__str__, '...')
-
-    def _short_name(self):
-        return "(%s)->(%s)" % (
-            ", ".join(map(str, self.ARGS)),
-            ", ".join(map(str, self.RESULTS))
-        )
-    _short_name = lltype.saferecursive(_short_name, '...')
-
-
-class MuFuncRef(MuReferenceType):
-    _template = (lltype.FuncType, (
-        "__name__",
-    ))
-    _suffix = 'FncRef'  # child class must specify
-    _symbol = '@#'  # child class must specify
-    _val_type = property(lambda self: _mufuncref)
-
-    def __init__(self, SIG):
-        self.Sig = SIG
-
-    def __str__(self):
-        return self._suffix + str(self.Sig)
-
-    def _short_name(self):
-        return self._symbol + self.Sig._short_name()
-
-    def _example(self):
-        def f(*args):
-            return tuple(T._defl() for T in self.Sig.RESULTS)
-        return self._val_type(self, _callable=f)
-_setup_consistent_methods(MuFuncRef)
-
-class _mufunction_reference(_mugeneral_reference):
-    pass
-
-class _mufuncref(_mufunction_reference):
-    _template = (lltype._func, (
-        '__repr__',
-        '__eq__',
-        '__ne__',
-        '__hash__',
-        '_getid'
-    ))
-
-    def __init__(self, TYPE, **attrs):
-        attrs.setdefault('_TYPE', TYPE)
-        attrs.setdefault('_name', '?')
-        attrs.setdefault('_callable', None)
-        self.__dict__.update(attrs)
-        if '_callable' in attrs and hasattr(attrs['_callable'],
-                                            '_compilation_info'):
-            self.__dict__['compilation_info'] = \
-                attrs['_callable']._compilation_info
-
-    def __str__(self):
-        return "%s %s" % (MuFuncRef._symbol, self._name)
-
-    @staticmethod
-    def _null(TYPE):
-        return _mufuncref(TYPE, _nullref=True)
-
-    def _is_null(self):
-        return hasattr(self, '_nullref') and self._nullref
-_setup_consistent_methods(_mufuncref)
-
-class MuUFuncPtr(MuReferenceType):
-    _template = (MuFuncRef, (
-        "__init__",
-        "__str__",
-        "_short_name",
-        "_example"
-    ))
-    _suffix = 'UFncPtr'  # child class must specify
-    _symbol = '*#'  # child class must specify
-    _val_type = property(lambda self: _muufuncptr)
-_setup_consistent_methods(MuUFuncPtr)
-
-class _muufuncptr(_mufunction_reference):
-    _template = (_mufuncref, (
-        "__init__",
-        "__str__",
-        "_is_null",
-        "__repr__",
-        "__eq__",
-        "__ne__",
-        "__hash__",
-        "_getid"
-    ))
-
-    @staticmethod
-    def _null(TYPE):
-        return _muufuncptr(TYPE, _nullref=True)
-_setup_consistent_methods(_muufuncptr)
 
 class MuWeakRef(MuRef):
     _suffix = "WkRef"
@@ -1242,9 +1187,6 @@ def mutypeOf(val):
 
 
 def new(T):
-    if isinstance(T, MuOpaqueType):
-        o = _muopaque(T)
-        return _muopqref(MuOpaqueRef(T), o)
     if isinstance(T, MuGlobalCell):
         ref = new(T.TO)
         return _muglobalcell(T, ref, [])
