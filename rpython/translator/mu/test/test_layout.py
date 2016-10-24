@@ -12,7 +12,7 @@ def test_sizeof_prim():
     assert mu_sizeOf(MuWeakRef(MU_VOID)) == 8
     assert mu_sizeOf(MU_VOID) == 0
     assert mu_sizeOf(MuFuncRef(MuFuncSig([], []))) == 8
-    assert mu_sizeOf(MuOpaqueRef(MuOpaqueType("Thread"))) == 8
+    assert mu_sizeOf(MuOpaqueRef("Thread")) == 8
 
 def test_alignof_prim():
     assert mu_alignOf(MU_INT8) == 1
@@ -26,7 +26,7 @@ def test_alignof_prim():
     assert mu_alignOf(MuWeakRef(MU_VOID)) == 8
     assert mu_alignOf(MU_VOID) == 1
     assert mu_alignOf(MuFuncRef(MuFuncSig([], []))) == 8
-    assert mu_alignOf(MuOpaqueRef(MuOpaqueType("Thread"))) == 8
+    assert mu_alignOf(MuOpaqueRef("Thread")) == 8
 
 def test_struct():
     S1 = MuStruct("stt", ('a', MU_INT8), ('b', MU_INT16), ('c', MU_INT32), ('d', MU_INT64))
