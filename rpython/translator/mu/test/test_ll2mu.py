@@ -7,6 +7,7 @@ def test_map_type_prim():
     assert ll2mu.map_type(lltype.Bool) == mutype.MU_INT8
 
     assert ll2mu.map_type(rffi.INT) == mutype.MU_INT32
+    assert ll2mu.map_type(lltype.Void) == mutype.MU_VOID
 
 def test_map_type_addr():
     ll2mu = LL2MuMapper()
@@ -162,7 +163,7 @@ def test_map_value_ptr():
     pvtbl.hash = 12345
 
     r = ll2mu.map_value(pobj)
-    ll2mu.resolve_ptr_values()
+    ll2mu.resolve_ptr_types()
     ll2mu.resolve_ptr_values()
     assert isinstance(r._obj.typeptr, mutype._muuptr)
     assert isinstance(r._obj.typeptr._obj, mutype._mustruct)

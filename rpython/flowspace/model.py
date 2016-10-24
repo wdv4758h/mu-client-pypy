@@ -163,7 +163,7 @@ class Link(object):
 
 class Block(object):
     __slots__ = """inputargs operations exitswitch
-                exits blockcolor""".split()
+                exits blockcolor mu_excparam""".split()
 
     def __init__(self, inputargs):
         self.inputargs = list(inputargs)  # mixed list of variable/const XXX
@@ -171,6 +171,7 @@ class Block(object):
         self.exitswitch = None            # a variable or
                                           #  Constant(last_exception), see below
         self.exits = []                   # list of Link(s)
+        self.mu_excparam = None           # exception parameter for Mu backend
 
     def is_final_block(self):
         return self.operations == ()      # return or except block

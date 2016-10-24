@@ -564,6 +564,37 @@ LL_OPERATIONS = {
 
     # __________ instrumentation _________
     'instrument_count':     LLOp(),
+
+    # __________ Mu backend _________
+    'mu_binop':             LLOp(),
+    'mu_cmpop':             LLOp(),
+    'mu_convop':            LLOp(),
+    'mu_select':            LLOp(),
+    'mu_branch':            LLOp(),
+    'mu_branch2':           LLOp(),
+    'mu_switch':            LLOp(),
+    'mu_call':              LLOp(),
+    'mu_tailcall':          LLOp(),
+    'mu_ret':               LLOp(),
+    'mu_throw':             LLOp(),
+    'mu_extractvalue':      LLOp(),
+    'mu_insertvalue':       LLOp(),
+    'mu_extractelement':    LLOp(),
+    'mu_insertelement':     LLOp(),
+    'mu_new':               LLOp(),
+    'mu_alloca':            LLOp(),
+    'mu_newhybrid':         LLOp(),
+    'mu_allocahybrid':      LLOp(),
+    'mu_getiref':           LLOp(),
+    'mu_getfieldiref':      LLOp(),
+    'mu_getelemiref':       LLOp(),
+    'mu_shiftiref':         LLOp(),
+    'mu_getvarpartiref':    LLOp(),
+    'mu_load':              LLOp(),
+    'mu_store':             LLOp(),
+    'mu_trap':              LLOp(),
+    'mu_ccall':             LLOp(),
+    'mu_comminst':          LLOp(),
 }
 # ***** Run test_lloperation after changes. *****
 

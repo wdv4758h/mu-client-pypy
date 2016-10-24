@@ -2,8 +2,8 @@ from rpython.rtyper.lltypesystem import lltype, llmemory, rffi
 from rpython.translator.mu import mutype, layout
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
-from rpython.rlib import rarithmetic
-from rpython.flowspace.model import Constant, SpaceOperation
+from rpython.rlib import rarithmetic, rmu
+from rpython.flowspace.model import Variable, Constant, SpaceOperation, Link
 from rpython.translator.c.node import needs_gcheader
 from random import randint
 
@@ -16,6 +16,31 @@ mdb = Driver()
 class IgnoredLLVal(NotImplementedError):
     pass
 
+class IgnoredLLOp(NotImplementedError):
+    _llops = (
+        "cast_int_to_uint",
+        "cast_uint_to_int",
+        "cast_int_to_unichar",
+        "hint",
+        "likely",
+        "debug_flush",
+        "debug_forked",
+        "debug_offset",
+        "debug_print",
+        "debug_start",
+        "debug_stop",
+        "gc_add_memory_pressure",
+        "gc_set_max_heap_size",
+        "gc_thread_after_fork",
+        "gc_writebarrier",
+        "gc_writebarrier_before_copy",
+        "gc_unpin",
+        "jit_conditional_call",
+        "jit_force_quasi_immutable",
+        "jit_force_virtual",
+        "jit_is_virtual",
+        "jit_marker",
+    )
 
 class LL2MuMapper:
     GC_IDHASH_FIELD = ('gc_idhash', mutype.MU_INT64)
@@ -254,7 +279,7 @@ class LL2MuMapper:
             else:
                 raise NotImplementedError("Don't know how to map primitive value %s" % llv)
 
-        return MuT._get_val_type()(llv)
+        return MuT._val_type(llv)
 
     def map_value_arrfix(self, llv):
         MuT = self.map_type(lltype.typeOf(llv))
@@ -279,7 +304,7 @@ class LL2MuMapper:
 
             if hasattr(stt, gcidfld) and hasattr(topstt, '_hash_cache_'):
                 _idhash = topstt._hash_cache_
-                setattr(stt, gcidfld, gcidfld_T._get_val_type(_idhash))
+                setattr(stt, gcidfld, gcidfld_T._val_type(_idhash))
 
             llprnt = llv._parentstructure()
             llprnt_t = lltype.typeOf(llprnt)
@@ -317,7 +342,7 @@ class LL2MuMapper:
         LLT = lltype.typeOf(llv)
         MuT = self.map_type(LLT)
         arr = getattr(llv, LLT._arrayfld)
-        hyb = mutype._muhybrid(MuT, MuT.length._get_val_type()(arr.getlength()))
+        hyb = mutype._muhybrid(MuT, MuT.length._val_type(arr.getlength()))
 
         gcidfld, gcidfld_T = self.GC_IDHASH_FIELD
 
@@ -326,7 +351,7 @@ class LL2MuMapper:
 
         if hasattr(hyb, gcidfld) and hasattr(llv, '_hash_cache_'):
             _idhash = llv._hash_cache_
-            setattr(hyb, gcidfld, gcidfld_T._get_val_type(_idhash))
+            setattr(hyb, gcidfld, gcidfld_T._val_type(_idhash))
 
         _memarr = getattr(hyb, MuT._varfld)
         for i in range(arr.getlength()):
@@ -356,20 +381,19 @@ class LL2MuMapper:
     def map_value_ptr(self, llv):
         LLT = lltype.typeOf(llv)
         MuT = self.map_type(LLT)
-        refcls = MuT._val_type
 
         if llv._obj0 is None:
-            return refcls._null(MuT)
+            return MuT._null()
 
         if isinstance(LLT.TO, lltype.FuncType):
             return self.map_value_funcptr(llv)
 
         if MuT.TO is mutype.MU_VOID:
-            muv = refcls._null(MuT)
+            muv = MuT._null()
             log.warning("Translating LL value '%(llv)r' to '%(muv)r'" % locals())
             return muv
 
-        ref = refcls._null(MuT)     # set object later
+        ref = MuT._null()     # set object later
 
         self._pending_ptr_values.append((llv._obj, ref))
         return ref
@@ -424,7 +448,7 @@ class LL2MuMapper:
             else:
                 raise AssertionError("Value {:r} of type {:r} shouldn't appear.".format(llv, type(llv)))
         MuT = self.map_type(lltype.typeOf(llv))
-        return MuT._get_val_type()(rec(llv))
+        return MuT._val_type(rec(llv))
 
     def map_value_opq(self, llv):
         if llv._TYPE is lltype.RuntimeTypeInfo:
@@ -448,3 +472,150 @@ class LL2MuMapper:
         muobj = self.map_value(llobj) if llobj else MuT._null(MuT)
         setattr(stt, 'wref', muobj)
         return stt
+
+    # -----------------------------------------------------------------------------
+    def mapped_const(self, llv, LLT=None):
+        if LLT is None:
+            try:
+                LLT = lltype.typeOf(llv)
+            except TypeError:
+                LLT = lltype.Void
+        MuT = self.map_type(LLT)
+        muv = self.map_value(llv) if LLT != lltype.Void else llv
+        c = Constant(muv, MuT)
+        return c
+
+    def var(self, name, MuT):
+        v = Variable(name)
+        v.concretetype = MuT
+        return v
+
+    def map_op(self, llop):
+        """
+        May RTyped operations to Mu operations.
+        NOTE: the name of the original operation is changed.
+
+        :param llop: SpaceOperation
+        :return: [SpaceOperation]
+        """
+        try:
+            return getattr(self, 'map_op_' + llop.opname)(llop)
+        except KeyError:
+            if llop.opname in IgnoredLLOp._llops:  # Making ignoring explicit
+                raise IgnoredLLOp(llop.opname)
+
+            # try if it's an integer operation that can be redirected.
+            prefixes = ('uint', 'char', 'lllong', 'long')
+            opname = llop.opname
+            if any(n in opname for n in prefixes):
+                for pfx in prefixes:
+                    opname = opname.replace(pfx, 'int')
+                try:
+                    return getattr(self, 'map_op_' + llop.opname)(llop)
+                except KeyError:
+                    pass  # raise error on next line
+            raise NotImplementedError("Has not implemented specialisation for operation '%s'" % llop)
+
+    def dest_clause(self, blk, args):
+        """ Destination clause is a Link """
+        return Link(args, blk)
+
+    def exc_clause(self, dst_nor, dst_exc):
+        """ Exception clause is a tuple """
+        return dst_nor, dst_exc
+
+    # ----------------
+    # call ops
+    def map_op_direct_call(self, llop):
+        fr = llop.args[0].value
+        if isinstance(fr, mutype._muufuncptr):  # external function
+            opname = 'mu_ccall'
+        else:
+            opname = 'mu_call'
+
+        llop.opname = opname
+        return [llop]
+
+    def map_op_indirect_call(self, llop):
+        last = llop.args[-1]
+        if isinstance(last, Constant) and isinstance(last.value, list):
+            args = llop.args[:-1]
+        else:
+            args = llop.args
+        llop.opname = 'mu_call'
+        llop.args = args
+        return [llop]
+
+    # ----------------
+    # primitive ops
+    """
+    The arguments of mu_binops are:
+        0: optr(Constant(rmu.MuBinOptr)>
+        1: operand 1
+        2: operand 2
+        3: metainfo(Constant(dict))
+            - 'exc': exception clause
+            - 'status': (ORed rmu.BinOpStatus, list of result Variables)
+    The arguments of mu_cmpop are:
+        0: optr(Constant(rmu.MuCmpOptr)>
+        1: operand 1
+        2: operand 2
+    The arguments of mu_convop are:
+        0: optr(Constant(rmu.MuConvOptr)>
+        1: operand
+        2: to_ty (Constant(MuType))
+    """
+    def map_op_bool_not(self, llop):
+        ops = []
+        if llop.args[0].mu_type is mutype.MU_INT1:
+            res = self.var('res', mutype.MU_INT8)
+            v = ops.append(SpaceOperation('mu_convop', [
+                self.mapped_const(rmu.MuConvOptr.ZEXT),
+                llop.args[0],
+                self.mapped_const(mutype.MU_INT8),
+            ],
+                                          res))
+        else:
+            v = llop.args[0]
+        SpaceOperation.__init__(llop, 'mu_binop', [
+            self.mapped_const(rmu.MuBinOptr.XOR),
+            v,
+            self.mapped_const(True),
+            self.mapped_const({})
+        ],
+                                llop.result)
+        ops.append(llop)
+        return ops
+
+    def map_op_int_is_true(self, llop):
+        cmp_res = self.var('cmp_res', mutype.MU_INT1)
+        SpaceOperation.__init__(llop, 'mu_select', [
+            cmp_res,
+            self.mapped_const(True),
+            self.mapped_const(False)
+        ],
+                                llop.result)
+        return [llop]
+
+    def map_op_int_neg(self, llop):
+        MuT = llop.args[0].concretetype
+        SpaceOperation.__init__(llop, 'mu_binop', [
+            self.mapped_const(rmu.MuBinOptr.SUB),
+            Constant(MuT._val_type(0), MuT),
+            llop.args[0],
+            self.mapped_const({})
+        ],
+                                llop.result)
+        return [llop]
+
+    def map_op_int_abs(self, llop):
+        # TODO: implement
+        ops = []
+        x = llop.args[0]
+
+        neg_x = self.var('neg_%s' % str(x), x.concretetype)
+        op_neg = SpaceOperation('int_neg', [x], neg_x)
+        ops.extend(self.map_op(op_neg))
+
+        cmp_res = self.var('cmp_res', mutype.MU_INT8)
+        op_cmp = SpaceOperation('int_gt', [x, ])
