@@ -83,7 +83,20 @@ class CVar(object):
     def __str__(self):
         return self.name
 
+    def decl(self):
+        return '%s %s;' % (self.type, self.name)
+
     __repr__ = __str__
+
+class CFuncPtr(CVar):
+    def __init__(self, arg_ts, ret_t, var_name):
+        self.arg_ts = arg_ts
+        self.ret_t = ret_t
+        self.name = var_name
+
+    def decl(self):
+        return '%s (*%s) (%s);' % (self.ret_t, self.name, ', '.join(self.arg_ts))
+
 class APILogger:
     def __init__(self):
         self.ccalls = []
@@ -99,13 +112,14 @@ class APILogger:
                  '#include <stdio.h>\n'
                  '#include <stdlib.h>\n'
                  '#include <stdbool.h>\n'
+                 '#include <dlfcn.h>\n'
                  '#include "muapi.h"\n'
                  '#include "mu-fastimpl.h"\n')
 
         fp.write('int main(int argc, char** argv) {\n')
         idt = ' ' * 4
         for var in self.decl_vars:
-            fp.write(idt + '%s %s;\n' % (var.type, var.name))
+                fp.write(idt + var.decl() + '\n')
 
         for ccall in self.ccalls:
             fp.write(idt + '%(ccall)s\n' % locals())
