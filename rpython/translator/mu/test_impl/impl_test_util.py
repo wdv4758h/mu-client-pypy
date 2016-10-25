@@ -1,29 +1,3 @@
-"""
-Mu JIT testing utility script.
-
-Example of ways of using this script:
-* Run the test script with a running Mu instance:
-    ```bash
-    $ PYTHONPATH=$PYPY_MU python test_add.py --impl <impl> --run
-    ```
-* Compile to C, then compile with clang, then run:
-    ```bash
-    $ PYTHONPATH=$PYPY_MU python test_add.py --impl <impl> -o test_add.c
-    ```
-    - reference implementation:
-        ```bash
-        $ clang -std=c99 -I$MU/cbinding -L$MU/cbinding -lmurefimpl2start -o test_add test_add.c
-        ```
-    - fast implementation:
-        ```bash
-        $ clang -std=c99 -I$MU_RUST/src/vm/api -L$MU_RUST/target/debug -lmu -o test_add test_add.c
-        ```
-    $ ./test_add
-* Compile to C as a JIT test for fast implementation:
-        ```bash
-        $ PYTHONPATH=$PYPY_MU python test_add.py --impl fast --testjit -o test_add.c
-        ```
-"""
 def extend_with_entrypoint(bldr, id_dict, rmu):
     """
         Extend the bundle with:
@@ -85,7 +59,7 @@ def extend_with_entrypoint(bldr, id_dict, rmu):
     })
 
 
-def run_test(opts, test_bundle_building_fn, expected_result):
+def impl_jit_test(opts, test_bundle_building_fn):
     if opts.run:
         if opts.impl == 'ref':
             from rpython.rlib import rmu
@@ -150,7 +124,8 @@ def run_test(opts, test_bundle_building_fn, expected_result):
         hargc = ctx.handle_from_sint32(1, i32)
         if opts.run:
             from rpython.rtyper.lltypesystem import rffi
-            hargv = ctx.handle_from_ptr(ppi8, rffi.cast(rffi.VOIDP, rffi.liststr2charpp(["entry"])))
+            c_argv = rffi.liststr2charpp(["entry"])
+            hargv = ctx.handle_from_ptr(ppi8, rffi.cast(rffi.VOIDP, c_argv))
         else:  # HACK
             hargv = ctx.handle_from_ptr(ppi8, '(char **){&"entry"}')
         thd = ctx.new_thread_nor(stk, rmu.null(rmu.MuThreadRefValue), [hargc, hargv])
@@ -161,7 +136,6 @@ def run_test(opts, test_bundle_building_fn, expected_result):
         if opts.run:
             res_val = ctx.handle_to_sint32(hres)
             print "result =", res_val
-            assert res_val == expected_result
         else:  # HACK again
             log = rmu.get_global_apilogger()
             res_val = ctx.handle_to_sint32(hres)
@@ -172,20 +146,10 @@ def run_test(opts, test_bundle_building_fn, expected_result):
             with open(opts.output, 'w') as fp:
                 log.genc(fp, exitcode=res_val)
 
+        # clean up
+        if opts.run:
+            rffi.free_charpp(c_argv)
 
-def impl_jit_test(build_fn, expected_res):
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--impl', type=str, choices=['ref', 'fast'], default='ref',
-                        help='Compile script to C targeting the selected implementation of Mu.')
-    parser.add_argument('--run', action='store_true',
-                        help='Run the script under RPython FFI on Mu Scala reference implementation.')
-    arg_testjit = parser.add_argument('--testjit', action='store_true',
-                                      help='Renerate C source file that can be used to test the JIT.')
-    parser.add_argument('-o', '--output', help='File name of the generated C source file.')
-    opts = parser.parse_args()
-    if opts.testjit:
-        if not (opts.impl == 'fast'):
-            raise argparse.ArgumentError(arg_testjit,
-                                         "must be specified with '--impl fast'.")
-    run_test(opts, build_fn, expected_res)
+        # return
+        if opts.run:
+            return res_val
