@@ -34,11 +34,11 @@ def test_add(cmdopt):
         v1 = bldr.gen_sym("@test_fnc_v1")
         blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
         res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-        op_add = bldr.gen_sym()
-        bldr.new_binop(op_add, res, rmu.MuBinOptr.ADD, i8, c_0xff_i8, c_0x0a_i8)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, res, rmu.MuBinOptr.ADD, i8, c_0xff_i8, c_0x0a_i8)
         op_ret = bldr.gen_sym()
         bldr.new_ret(op_ret, [res])
-        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
         bldr.new_func_ver(v1, test_fnc, [blk0])
 
         return {
@@ -85,11 +85,11 @@ def test_sub(cmdopt):
         v1 = bldr.gen_sym("@test_fnc_v1")
         blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
         res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-        op_add = bldr.gen_sym()
-        bldr.new_binop(op_add, res, rmu.MuBinOptr.SUB, i8, c_0x0a_i8, c_0xff_i8)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, res, rmu.MuBinOptr.SUB, i8, c_0x0a_i8, c_0xff_i8)
         op_ret = bldr.gen_sym()
         bldr.new_ret(op_ret, [res])
-        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
         bldr.new_func_ver(v1, test_fnc, [blk0])
 
         return {
@@ -136,11 +136,11 @@ def test_mul(cmdopt):
         v1 = bldr.gen_sym("@test_fnc_v1")
         blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
         res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-        op_add = bldr.gen_sym()
-        bldr.new_binop(op_add, res, rmu.MuBinOptr.MUL, i8, c_0xff_i8, c_0x0a_i8)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, res, rmu.MuBinOptr.MUL, i8, c_0xff_i8, c_0x0a_i8)
         op_ret = bldr.gen_sym()
         bldr.new_ret(op_ret, [res])
-        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
         bldr.new_func_ver(v1, test_fnc, [blk0])
 
         return {
@@ -187,11 +187,11 @@ def test_sdiv(cmdopt):
         v1 = bldr.gen_sym("@test_fnc_v1")
         blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
         res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-        op_add = bldr.gen_sym()
-        bldr.new_binop(op_add, res, rmu.MuBinOptr.SDIV, i8, c_0x80_i8, c_0x0a_i8)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, res, rmu.MuBinOptr.SDIV, i8, c_0x80_i8, c_0x0a_i8)
         op_ret = bldr.gen_sym()
         bldr.new_ret(op_ret, [res])
-        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
         bldr.new_func_ver(v1, test_fnc, [blk0])
 
         return {
@@ -238,11 +238,11 @@ def test_urem(cmdopt):
         v1 = bldr.gen_sym("@test_fnc_v1")
         blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
         res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-        op_add = bldr.gen_sym()
-        bldr.new_binop(op_add, res, rmu.MuBinOptr.UREM, i8, c_0xff_i8, c_0x0a_i8)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, res, rmu.MuBinOptr.UREM, i8, c_0xff_i8, c_0x0a_i8)
         op_ret = bldr.gen_sym()
         bldr.new_ret(op_ret, [res])
-        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
         bldr.new_func_ver(v1, test_fnc, [blk0])
 
         return {
@@ -289,11 +289,11 @@ def test_shl(cmdopt):
         v1 = bldr.gen_sym("@test_fnc_v1")
         blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
         res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-        op_add = bldr.gen_sym()
-        bldr.new_binop(op_add, res, rmu.MuBinOptr.SHL, i64, c_0x6d9f9c1d58324b55_i64, c_0x0a_i64)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, res, rmu.MuBinOptr.SHL, i64, c_0x6d9f9c1d58324b55_i64, c_0x0a_i64)
         op_ret = bldr.gen_sym()
         bldr.new_ret(op_ret, [res])
-        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
         bldr.new_func_ver(v1, test_fnc, [blk0])
 
         return {
@@ -340,11 +340,11 @@ def test_lshr(cmdopt):
         v1 = bldr.gen_sym("@test_fnc_v1")
         blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
         res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-        op_add = bldr.gen_sym()
-        bldr.new_binop(op_add, res, rmu.MuBinOptr.LSHR, i64, c_0x8d9f9c1d58324b55_i64, c_0x0a_i64)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, res, rmu.MuBinOptr.LSHR, i64, c_0x8d9f9c1d58324b55_i64, c_0x0a_i64)
         op_ret = bldr.gen_sym()
         bldr.new_ret(op_ret, [res])
-        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
         bldr.new_func_ver(v1, test_fnc, [blk0])
 
         return {
@@ -391,11 +391,11 @@ def test_and(cmdopt):
         v1 = bldr.gen_sym("@test_fnc_v1")
         blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
         res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-        op_add = bldr.gen_sym()
-        bldr.new_binop(op_add, res, rmu.MuBinOptr.AND, i64, c_0x8d9f9c1d58324b55_i64, c_0xd5a8f2deb00debb4_i64)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, res, rmu.MuBinOptr.AND, i64, c_0x8d9f9c1d58324b55_i64, c_0xd5a8f2deb00debb4_i64)
         op_ret = bldr.gen_sym()
         bldr.new_ret(op_ret, [res])
-        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
         bldr.new_func_ver(v1, test_fnc, [blk0])
 
         return {
@@ -442,11 +442,11 @@ def test_xor(cmdopt):
         v1 = bldr.gen_sym("@test_fnc_v1")
         blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
         res = bldr.gen_sym("@test_fnc_v1.blk0.res")
-        op_add = bldr.gen_sym()
-        bldr.new_binop(op_add, res, rmu.MuBinOptr.XOR, i64, c_0x8d9f9c1d58324b55_i64, c_0xd5a8f2deb00debb4_i64)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, res, rmu.MuBinOptr.XOR, i64, c_0x8d9f9c1d58324b55_i64, c_0xd5a8f2deb00debb4_i64)
         op_ret = bldr.gen_sym()
         bldr.new_ret(op_ret, [res])
-        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_add, op_ret])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
         bldr.new_func_ver(v1, test_fnc, [blk0])
 
         return {
