@@ -149,13 +149,13 @@ def impl_jit_test(opts, test_bundle_building_fn):
 
         hres = ctx.load(rmu.MuMemOrd.NOT_ATOMIC, ctx.handle_from_global(result))
         if opts.run:
-            res_val = ctx.handle_to_sint32(hres)
+            res_val = ctx.handle_to_uint64(hres)
             print "result =", res_val
 
             rffi.free_charpp(c_argv)    # clean up
         else:  # HACK again
             log = rmu.get_global_apilogger()
-            res_val = ctx.handle_to_sint32(hres)
+            res_val = ctx.handle_to_uint64(hres)
             if opts.impl == 'ref':
                 log.logcall("printf", [rmu.CStr("result = %d\\n"), res_val], None, context=None, check_err=False)
             else:
