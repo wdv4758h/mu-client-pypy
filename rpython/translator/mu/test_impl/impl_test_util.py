@@ -24,8 +24,11 @@ def extend_with_entrypoint(bldr, id_dict, rmu):
     test_fnc = id_dict['test_fnc']
     result_type = id_dict['result_type']
 
-    i32 = bldr.gen_sym("@i32")
-    bldr.new_type_int(i32, 32)
+    if '@i32' in id_dict:
+        i32 = id_dict['@i32']
+    else:
+        i32 = bldr.gen_sym('@i32')
+        bldr.new_type_int(i32, 32)
     pi8 = bldr.gen_sym("@pi8")
     bldr.new_type_uptr(pi8, i8)
     ppi8 = bldr.gen_sym("@ppi8")
@@ -78,25 +81,16 @@ def impl_jit_test(opts, test_bundle_building_fn):
     id_dict = test_bundle_building_fn(bldr, rmu)
 
     if opts.testjit:
-        # TODO: implemeent properly
-        # bldr.load()
-        # lib = mu.compile_to_sharedlib(id_dict["@test_fnc"])
-        # if opts.run:
-        #     print "compiled shared library:", lib
-        # else:
-        #     log = rmu.get_global_apilogger()
-        #     log.logcall("printf", [rmu.CStr("compiled shared library: %s\\n"), lib], None, context=None)
-        #     with open(opts.output, 'w') as fp:
-        #         log.genc(fp)
-
-        # NOTE: below is just a mock up
-        lib_path = "libfnc.dylib"
-        symbol = "fnc"
+        bldr.load()
+        lib_path = mu.compile_to_sharedlib(id_dict["test_fnc"])
+        symbol = "test_fnc"
         if opts.run:
+            print "compiled shared library:", lib_path
             import ctypes
             lib = ctypes.CDLL(lib_path)
             fn = getattr(lib, symbol)
-            print "fn() =", fn()
+            res = fn()
+            print "fn() =", res
         else:
             log = rmu.get_global_apilogger()
             lib = rmu.CVar("void*", "lib")
@@ -109,6 +103,27 @@ def impl_jit_test(opts, test_bundle_building_fn):
             log.logcall("dlclose", [lib], None, context=None)
             with open(opts.output, 'w') as fp:
                 log.genc(fp)
+
+        # # NOTE: below is just a mock up
+        # lib_path = "libfnc.dylib"
+        # symbol = "fnc"
+        # if opts.run:
+        #     import ctypes
+        #     lib = ctypes.CDLL(lib_path)
+        #     fn = getattr(lib, symbol)
+        #     print "fn() =", fn()
+        # else:
+        #     log = rmu.get_global_apilogger()
+        #     lib = rmu.CVar("void*", "lib")
+        #     log.logcall("dlopen", [rmu.CStr(lib_path), "RTLD_LAZY"], lib, context=None)
+        #     fn = rmu.CFuncPtr([], "int", "fn")
+        #     log.logcall("dlsym", [lib, rmu.CStr(symbol)], fn, context=None)
+        #     res = rmu.CVar("int", "res")
+        #     log.logcall("fn", [], res, context=None)
+        #     log.logcall("printf", [rmu.CStr("fn() = %d\\n"), res], None, context=None)
+        #     log.logcall("dlclose", [lib], None, context=None)
+        #     with open(opts.output, 'w') as fp:
+        #         log.genc(fp)
     else:
         extend_with_entrypoint(bldr, id_dict, rmu)
         entry = id_dict['@entry']
@@ -136,6 +151,8 @@ def impl_jit_test(opts, test_bundle_building_fn):
         if opts.run:
             res_val = ctx.handle_to_sint32(hres)
             print "result =", res_val
+
+            rffi.free_charpp(c_argv)    # clean up
         else:  # HACK again
             log = rmu.get_global_apilogger()
             res_val = ctx.handle_to_sint32(hres)
@@ -146,10 +163,6 @@ def impl_jit_test(opts, test_bundle_building_fn):
             with open(opts.output, 'w') as fp:
                 log.genc(fp, exitcode=res_val)
 
-        # clean up
-        if opts.run:
-            rffi.free_charpp(c_argv)
-
-        # return
-        if opts.run:
-            return res_val
+    # return
+    if opts.run:
+        return res_val
