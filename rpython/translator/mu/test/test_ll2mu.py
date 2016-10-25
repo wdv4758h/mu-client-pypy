@@ -302,15 +302,66 @@ def check_muop(muop):
         assert isinstance(args[2].value, Link)
 
     elif muop.opname == 'mu_switch':
-        raise NotImplementedError
+        MuT = args[0].concretetype
+        # 1: default case
+        assert isinstance(args[1], Constant)
+        assert isinstance(args[1].value, Link)
+        for arg in args[2:]:
+            assert isinstance(arg, Constant)
+            assert isinstance(arg.value, Link)
+            assert isinstance(arg.value.exitcase, (Variable, Constant))
+            assert arg.value.exitcase.concretetype == MuT
+
     elif muop.opname == 'mu_call':
-        raise NotImplementedError
+        assert isinstance(args[0].concretetype, mutype.MuGeneralFunctionReference)
+        Sig = args[0].concretetype.Sig
+        assert len(args[1:-1]) == len(Sig.ARGS)
+        for i, arg in enumerate(args[1:]):
+            assert arg.concretetype == Sig.ARGS[i]
+        assert res.concretetype == Sig.RESULTS[0]   # still assumes call only return 1 value
+
+        # last argument as meta info
+        assert isinstance(args[-1], Constant)
+        assert isinstance(args[-1].value, dict)
+        metainfo = args[-1].value
+        if 'keepalive' in metainfo:
+            lst = metainfo['keepalive']
+            for v in lst:
+                assert isinstance(v, (Constant, Variable))
+        if 'excclause' in metainfo:
+            nor, exc = metainfo['excclause']
+            assert isinstance(nor, Link)
+            assert isinstance(exc, Link)
+
     elif muop.opname == 'mu_tailcall':
-        raise NotImplementedError
+        assert isinstance(args[0].concretetype, mutype.MuGeneralFunctionReference)
+        Sig = args[0].concretetype.Sig
+        assert len(args[1:-1]) == len(Sig.ARGS)
+        for i, arg in enumerate(args[1:]):
+            assert arg.concretetype == Sig.ARGS[i]
+        assert res.concretetype == Sig.RESULTS[0]  # still assumes call only return 1 value
+
+        # last argument as meta info
+        assert isinstance(args[-1], Constant)
+        assert isinstance(args[-1].value, dict)
+        metainfo = args[-1].value
+        if 'keepalive' in metainfo:
+            lst = metainfo['keepalive']
+            for v in lst:
+                assert isinstance(v, (Constant, Variable))
+        if 'excclause' in metainfo:
+            nor, exc = metainfo['excclause']
+            assert isinstance(nor, Link)
+            assert isinstance(exc, Link)
+
     elif muop.opname == 'mu_ret':
-        raise NotImplementedError
+        assert len(args) in (0, 1)  # assume only return 1 value
+
     elif muop.opname == 'mu_throw':
-        raise NotImplementedError
+        assert len(args) == 1
+        assert isinstance(args[0].concretetype, mutype.MuReferenceType)
+
+    # don't think it will ever appear
     elif muop.opname == 'mu_extractvalue':
         raise NotImplementedError
     elif muop.opname == 'mu_insertvalue':
@@ -319,34 +370,136 @@ def check_muop(muop):
         raise NotImplementedError
     elif muop.opname == 'mu_insertelement':
         raise NotImplementedError
+
     elif muop.opname == 'mu_new':
-        raise NotImplementedError
+        assert isinstance(args[0], Constant)
+        assert isinstance(args[0].value, mutype.MuType)
+        assert not isinstance(args[0].value, mutype.MuHybrid)
+        assert res.concretetype == mutype.MuRef(args[0].value)
+
     elif muop.opname == 'mu_alloca':
-        raise NotImplementedError
+        assert isinstance(args[0], Constant)
+        assert isinstance(args[0].value, mutype.MuType)
+        assert not isinstance(args[0].value, mutype.MuHybrid)
+        assert res.concretetype == mutype.MuIRef(args[0].value)
+
     elif muop.opname == 'mu_newhybrid':
-        raise NotImplementedError
+        assert isinstance(args[0], Constant)
+        assert isinstance(args[0].value, mutype.MuHybrid)
+        assert isinstance(args[1].concretetype, mutype.MuIntType)
+        assert res.concretetype == mutype.MuRef(args[0].value)
+
     elif muop.opname == 'mu_allocahybrid':
-        raise NotImplementedError
+        assert isinstance(args[0], Constant)
+        assert isinstance(args[0].value, mutype.MuHybrid)
+        assert isinstance(args[1].concretetype, mutype.MuIntType)
+        assert res.concretetype == mutype.MuIRef(args[0].value)
+
     elif muop.opname == 'mu_getiref':
-        raise NotImplementedError
+        assert isinstance(args[0].concretetype, mutype.MuRef)
+        assert res.concretetype == mutype.MuIRef(args[0].concretetype.TO)
+
     elif muop.opname == 'mu_getfieldiref':
-        raise NotImplementedError
+        assert isinstance(args[0].concretetype, (mutype.MuIRef, mutype.MuUPtr))
+        MuT = args[0].concretetype.TO
+        fld = args[1].value
+        assert isinstance(fld, str)
+        assert fld in MuT._names
+        if isinstance(MuT, mutype.MuHybrid):
+            assert fld != MuT._varfld   # use getvarpartiref instead
+        FLD = getattr(MuT, fld)
+        cls = args[0].concretetype.__class__
+        assert res.concretetype == cls(FLD)
+
     elif muop.opname == 'mu_getelemiref':
-        raise NotImplementedError
+        assert isinstance(args[0].concretetype, (mutype.MuIRef, mutype.MuUPtr))
+        MuT = args[0].concretetype.TO
+        assert isinstance(MuT, mutype.MuArray)
+        assert isinstance(args[1].concretetype, mutype.MuIntType)
+        ELM = MuT.OF
+        cls = args[0].concretetype.__class__
+        assert res.concretetype == cls(ELM)
+
     elif muop.opname == 'mu_shiftiref':
-        raise NotImplementedError
+        assert isinstance(args[0].concretetype, (mutype.MuIRef, mutype.MuUPtr))
+        assert isinstance(args[1].concretetype, mutype.MuIntType)
+        assert res.concretetype == args[0].concretetype
+
     elif muop.opname == 'mu_getvarpartiref':
-        raise NotImplementedError
+        assert isinstance(args[0].concretetype, (mutype.MuIRef, mutype.MuUPtr))
+        MuT = args[0].concretetype.TO
+        assert isinstance(MuT, mutype.MuHybrid)
+        cls = args[0].concretetype.__class__
+        assert res.concretetype == cls(MuT._vartype.OF)
+
     elif muop.opname == 'mu_load':
-        raise NotImplementedError
+        assert isinstance(args[0].concretetype, mutype.MuObjectRef)
+        MuT = args[0].concretetype.TO
+        assert res.concretetype == MuT
+
+        assert isinstance(args[1].value, dict)
+        check_flag(args[1].value['memord'], rmu.MuMemOrd)
+
     elif muop.opname == 'mu_store':
+        assert isinstance(args[0].concretetype, mutype.MuObjectRef)
+        MuT = args[0].concretetype.TO
+        assert args[1].concretetype == MuT
+
+        assert isinstance(args[2].value, dict)
+        check_flag(args[2].value['memord'], rmu.MuMemOrd)
+
+    elif muop.opname == 'mu_trap':      # not used at the moment
         raise NotImplementedError
-    elif muop.opname == 'mu_trap':
-        raise NotImplementedError
+
     elif muop.opname == 'mu_ccall':
-        raise NotImplementedError
+        assert isinstance(args[0].concretetype, mutype.MuGeneralFunctionReference)
+        Sig = args[0].concretetype.Sig
+        assert len(args[1:-1]) == len(Sig.ARGS)
+        for i, arg in enumerate(args[1:]):
+            assert arg.concretetype == Sig.ARGS[i]
+        assert res.concretetype == Sig.RESULTS[0]  # still assumes call only return 1 value
+
+        # last argument as meta info
+        assert isinstance(args[-1], Constant)
+        assert isinstance(args[-1].value, dict)
+        metainfo = args[-1].value
+        if 'keepalive' in metainfo:
+            lst = metainfo['keepalive']
+            for v in lst:
+                assert isinstance(v, (Constant, Variable))
+        if 'excclause' in metainfo:
+            nor, exc = metainfo['excclause']
+            assert isinstance(nor, Link)
+            assert isinstance(exc, Link)
+        if 'callconv' in metainfo:
+            check_flag(metainfo['callconv'], rmu.MuCallConv)
+
     elif muop.opname == 'mu_comminst':
-        raise NotImplementedError
+        """
+        0: Constant(rmu.MuCommInst)
+        1..n-2: arguments
+        n-1: metainfo
+        """
+        check_flag(args[0], rmu.MuCommInst)
+        metainfo = args[-1].value
+        assert isinstance(metainfo, dict)
+        if 'flags' in metainfo:
+            for flag in metainfo['flags']:
+                assert isinstance(flag, mutype.mu_int32)
+        if 'types' in metainfo:
+            for T in metainfo['types']:
+                assert isinstance(T, mutype.MuType)
+        if 'sigs' in metainfo:
+            for Sig in metainfo['sigs']:
+                assert isinstance(Sig, mutype.MuFuncSig)
+        if 'keepalive' in metainfo:
+            lst = metainfo['keepalive']
+            for v in lst:
+                assert isinstance(v, (Constant, Variable))
+        if 'excclause' in metainfo:
+            nor, exc = metainfo['excclause']
+            assert isinstance(nor, Link)
+            assert isinstance(exc, Link)
 
 def test_bool_not():
     ll2mu = LL2MuMapper()
