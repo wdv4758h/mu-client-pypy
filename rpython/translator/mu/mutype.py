@@ -678,15 +678,7 @@ class _muopqref(_mugeneral_reference):
     def _is_null(self):
         return hasattr(self, '_nullref') and self._nullref
 
-
-class MuFuncRef(MuOpaqueRef):
-    _template = (lltype.FuncType, (
-        "__name__",
-    ))
-    _suffix = 'FncRef'
-    _symbol = '@#'
-    _val_type = property(lambda self: _mufuncref)
-
+class MuGeneralFunctionReference(MuOpaqueRef):
     def __init__(self, SIG):
         self.Sig = SIG
 
@@ -697,7 +689,6 @@ class MuFuncRef(MuOpaqueRef):
         def f(*args):
             return tuple(T._defl() for T in self.Sig.RESULTS)
         return self._val_type(self, _callable=f)
-_setup_consistent_methods(MuFuncRef)
 
 class _mufunction_reference(_muopqref):
     def __init__(self, TYPE, **attrs):
@@ -744,6 +735,11 @@ class _mufunction_reference(_muopqref):
             raise RuntimeError("calling undefined function")
         return callb(*args)     # call the callbale
 
+class MuFuncRef(MuGeneralFunctionReference):
+    _suffix = 'FncRef'
+    _symbol = '@#'
+    _val_type = property(lambda self: _mufuncref)
+
 class _mufuncref(_mufunction_reference):
     _template = (lltype._func, (
         '__repr__',
@@ -754,16 +750,10 @@ class _mufuncref(_mufunction_reference):
     ))
 _setup_consistent_methods(_mufuncref)
 
-class MuUFuncPtr(MuOpaqueRef):
-    _template = (MuFuncRef, (
-        "__init__",
-        "__str__",
-        "_example"
-    ))
+class MuUFuncPtr(MuGeneralFunctionReference):
     _suffix = 'UFncPtr'  # child class must specify
     _symbol = '*#'  # child class must specify
     _val_type = property(lambda self: _muufuncptr)
-_setup_consistent_methods(MuUFuncPtr)
 
 class _muufuncptr(_mufunction_reference):
     _template = (_mufuncref, (
