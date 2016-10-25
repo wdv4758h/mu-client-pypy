@@ -75,7 +75,6 @@ def test_map_type_funcptr():
     assert Sig.RESULTS == (MuT, )
 
 # -----------------------------------------------------------------------------
-# TODO: write tests for mapping values
 def test_map_value_prim():
     ll2mu = LL2MuMapper()
     assert ll2mu.map_value(10) == mutype.mu_int64(10)
@@ -190,3 +189,174 @@ def test_map_funcptr():
     assert isinstance(extfnp, mutype._muufuncptr)
     assert extfnp._name == llfncptr._obj._name
     assert extfnp.eci == llfncptr._obj.compilation_info
+
+
+# -----------------------------------------------------------------------------
+# operation map test
+def test_mapped_const():
+    ll2mu = LL2MuMapper()
+    c = ll2mu.mapped_const(True)
+    assert c.value == mutype.mu_int8(1)
+    assert c.concretetype == mutype.MU_INT8
+
+    d = ll2mu.mapped_const({})
+    assert d.value == {}
+    assert d.concretetype == mutype.MU_VOID
+
+    t = ll2mu.mapped_const(mutype.MU_INT8)
+    assert t.value == mutype.MU_INT8
+    assert t.concretetype == mutype.MU_VOID
+
+    e = ll2mu.mapped_const(10)
+    assert e.value == mutype.mu_int64(10)
+    assert e.concretetype == mutype.MU_INT64
+
+    f = ll2mu.mapped_const(10, rffi.UCHAR)
+    assert f.value == mutype.mu_int8(10)
+    assert f.concretetype == mutype.MU_INT8
+
+def check_muop(muop):
+    for arg in muop.args:
+        assert isinstance(arg, (Variable, Constant))
+        assert isinstance(arg.concretetype, mutype.MuType)
+
+    def check_flag(const, cls):
+        assert isinstance(const, Constant)
+        assert const.concretetype == mutype.MU_INT32
+        flags = filter(lambda k: k.isupper(), cls.__dict__.keys())
+        assert any(const.value == getattr(cls, flag) for flag in flags)
+
+    res = muop.result
+    args = muop.args
+    if muop.opname == 'mu_binop':
+        """
+        The arguments of mu_binops are:
+            0: optr(Constant(rmu.MuBinOptr)>
+            1: operand 1
+            2: operand 2
+            3: metainfo(Constant(dict))
+                - 'exc': exception clause
+                - 'status': (ORed rmu.BinOpStatus, list of result Variables)
+        """
+        assert len(args) == 4
+        check_flag(args[0], rmu.MuBinOptr)
+
+        assert args[1].concretetype == args[2].concretetype == res.concretetype
+
+        assert isinstance(args[3], Constant)
+        assert isinstance(args[3].value, dict)
+        d = args[3].value
+        if 'exc' in d:
+            assert isinstance(d['exc'], tuple)
+            assert isinstance(d['exc'][0], Link)
+            assert isinstance(d['exc'][1], Link)
+        if 'status' in d:
+            assert isinstance(d['status'][0], mutype.mu_int32)
+            assert isinstance(d['status'][1], list)
+            for v in d['status'][1]:
+                assert isinstance(v, Variable)
+
+    elif muop.opname == 'mu_cmpop':
+        """
+        The arguments of mu_cmpop are:
+            0: optr(Constant(rmu.MuCmpOptr)>
+            1: operand 1
+            2: operand 2
+        """
+        assert len(args) == 3
+        check_flag(args[0], rmu.MuCmpOptr)
+
+        assert args[1].concretetype == args[2].concretetype
+        assert res.concretetype == mutype.MU_INT1
+
+    elif muop.opname == 'mu_convop':
+        """
+        The arguments of mu_convop are:
+        0: optr(Constant(rmu.MuConvOptr)>
+        1: operand
+        2: to_ty (Constant(MuType))
+        """
+        assert len(args) == 3
+        check_flag(args[0], rmu.MuConvOptr)
+
+        assert isinstance(args[2], Constant)
+        assert isinstance(args[2].value, mutype.MuType)
+        assert res.concretetype == args[2].value
+
+    elif muop.opname == 'mu_select':
+        assert len(args) == 3
+        assert args[0].concretetype == mutype.MU_INT1
+        assert args[1].concretetype == args[2].concretetype == res.concretetype
+
+    elif muop.opname == 'mu_branch':
+        assert len(args) == 1
+        assert isinstance(args[0], Constant)
+        assert isinstance(args[0].value, Link)
+
+    elif muop.opname == 'mu_branch2':
+        assert len(args) == 3
+        assert args[0].concretetype == mutype.MU_INT1
+        assert isinstance(args[1], Constant)
+        assert isinstance(args[1].value, Link)
+        assert isinstance(args[2], Constant)
+        assert isinstance(args[2].value, Link)
+
+    elif muop.opname == 'mu_switch':
+        raise NotImplementedError
+    elif muop.opname == 'mu_call':
+        raise NotImplementedError
+    elif muop.opname == 'mu_tailcall':
+        raise NotImplementedError
+    elif muop.opname == 'mu_ret':
+        raise NotImplementedError
+    elif muop.opname == 'mu_throw':
+        raise NotImplementedError
+    elif muop.opname == 'mu_extractvalue':
+        raise NotImplementedError
+    elif muop.opname == 'mu_insertvalue':
+        raise NotImplementedError
+    elif muop.opname == 'mu_extractelement':
+        raise NotImplementedError
+    elif muop.opname == 'mu_insertelement':
+        raise NotImplementedError
+    elif muop.opname == 'mu_new':
+        raise NotImplementedError
+    elif muop.opname == 'mu_alloca':
+        raise NotImplementedError
+    elif muop.opname == 'mu_newhybrid':
+        raise NotImplementedError
+    elif muop.opname == 'mu_allocahybrid':
+        raise NotImplementedError
+    elif muop.opname == 'mu_getiref':
+        raise NotImplementedError
+    elif muop.opname == 'mu_getfieldiref':
+        raise NotImplementedError
+    elif muop.opname == 'mu_getelemiref':
+        raise NotImplementedError
+    elif muop.opname == 'mu_shiftiref':
+        raise NotImplementedError
+    elif muop.opname == 'mu_getvarpartiref':
+        raise NotImplementedError
+    elif muop.opname == 'mu_load':
+        raise NotImplementedError
+    elif muop.opname == 'mu_store':
+        raise NotImplementedError
+    elif muop.opname == 'mu_trap':
+        raise NotImplementedError
+    elif muop.opname == 'mu_ccall':
+        raise NotImplementedError
+    elif muop.opname == 'mu_comminst':
+        raise NotImplementedError
+
+def test_bool_not():
+    ll2mu = LL2MuMapper()
+    llop = SpaceOperation('bool_not',
+                          [ll2mu.mapped_const(True)],
+                          ll2mu.var('res', mutype.MU_INT8))
+    muops = ll2mu.map_op(llop)
+    assert len(muops) == 1
+    binop = muops[0]
+    assert binop.opname == 'mu_binop'
+
+    for op in muops:
+        check_muop(op)

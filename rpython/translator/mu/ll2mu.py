@@ -548,26 +548,9 @@ class LL2MuMapper:
 
     # ----------------
     # primitive ops
-    """
-    The arguments of mu_binops are:
-        0: optr(Constant(rmu.MuBinOptr)>
-        1: operand 1
-        2: operand 2
-        3: metainfo(Constant(dict))
-            - 'exc': exception clause
-            - 'status': (ORed rmu.BinOpStatus, list of result Variables)
-    The arguments of mu_cmpop are:
-        0: optr(Constant(rmu.MuCmpOptr)>
-        1: operand 1
-        2: operand 2
-    The arguments of mu_convop are:
-        0: optr(Constant(rmu.MuConvOptr)>
-        1: operand
-        2: to_ty (Constant(MuType))
-    """
     def map_op_bool_not(self, llop):
         ops = []
-        if llop.args[0].mu_type is mutype.MU_INT1:
+        if llop.args[0].concretetype is mutype.MU_INT1:
             res = self.var('res', mutype.MU_INT8)
             v = ops.append(SpaceOperation('mu_convop', [
                 self.mapped_const(rmu.MuConvOptr.ZEXT),
@@ -609,13 +592,21 @@ class LL2MuMapper:
         return [llop]
 
     def map_op_int_abs(self, llop):
-        # TODO: implement
         ops = []
         x = llop.args[0]
+        MuT = x.concretetype
 
         neg_x = self.var('neg_%s' % str(x), x.concretetype)
         op_neg = SpaceOperation('int_neg', [x], neg_x)
         ops.extend(self.map_op(op_neg))
 
         cmp_res = self.var('cmp_res', mutype.MU_INT8)
-        op_cmp = SpaceOperation('int_gt', [x, ])
+        op_cmp = SpaceOperation('int_gt',
+                                [x, Constant(MuT._val_type(0), MuT)],
+                                cmp_res)
+        ops.extend(self.map_op(op_cmp))
+
+        SpaceOperation.__init__(llop, 'mu_select', [cmp_res, x, neg_x], llop.result)
+        ops.append(llop)
+
+        return [op_neg, op_cmp, llop]
