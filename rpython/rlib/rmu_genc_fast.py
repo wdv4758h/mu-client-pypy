@@ -102,6 +102,9 @@ class APILogger:
         self.ccalls = []
         self.decl_vars = []
 
+    def clear(self):
+        APILogger.__init__(self)
+
     def logcall(self, fnc_name, args, rtn_var, context=None):
         self.ccalls.append(CCall(fnc_name, args, rtn_var, context, False))
         if rtn_var:

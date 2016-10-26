@@ -73,6 +73,7 @@ def impl_jit_test(opts, test_bundle_building_fn):
             from rpython.rlib import rmu_genc as rmu
         else:
             from rpython.rlib import rmu_genc_fast as rmu
+        rmu.get_global_apilogger().clear()
 
     mu = rmu.MuVM()
     ctx = mu.new_context()

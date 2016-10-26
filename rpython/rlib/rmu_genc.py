@@ -83,6 +83,9 @@ class CVar(object):
     def __str__(self):
         return self.name
 
+    def decl(self):
+        return '%s %s;' % (self.type, self.name)
+
     __repr__ = __str__
 class APILogger:
     def __init__(self):
@@ -93,6 +96,10 @@ class APILogger:
         self.ccalls.append(CCall(fnc_name, args, rtn_var, context, check_err))
         if rtn_var:
             self.decl_vars.append(rtn_var)
+
+    def clear(self):
+        APILogger.__init__(self)
+
     def genc(self, fp, exitcode=0):
         fp.write('\n'
                  '// Compile with flag -std=c99\n'
@@ -114,7 +121,7 @@ class APILogger:
         fp.write('int main(int argc, char** argv) {\n')
         idt = ' ' * 4
         for var in self.decl_vars:
-            fp.write(idt + '%s %s;\n' % (var.type, var.name))
+            fp.write(idt + var.decl() + '\n')
 
         for ccall in self.ccalls:
             fp.write(idt + '%(ccall)s\n' % locals())

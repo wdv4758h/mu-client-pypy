@@ -515,6 +515,10 @@ class APILogger:
         self.ccalls.append(CCall(fnc_name, args, rtn_var, context, check_err))
         if rtn_var:
             self.decl_vars.append(rtn_var)
+
+    def clear(self):
+        APILogger.__init__(self)
+
     def genc(self, fp, exitcode=0):
         fp.write('\\n'
                  '// Compile with flag -std=c99\\n'
@@ -560,6 +564,9 @@ class APILogger:
     def __init__(self):
         self.ccalls = []
         self.decl_vars = []
+
+    def clear(self):
+        APILogger.__init__(self)
 
     def logcall(self, fnc_name, args, rtn_var, context=None):
         self.ccalls.append(CCall(fnc_name, args, rtn_var, context, False))
