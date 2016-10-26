@@ -41,7 +41,8 @@ def cmdopt(request):
                         help='Run the script under RPython FFI on Mu Scala reference implementation.')
     arg_testjit = parser.add_argument('--testjit', action='store_true',
                                       help='Renerate C source file that can be used to test the JIT.')
-    parser.add_argument('-o', '--output', help='File name of the generated C source file.')
+    parser.add_argument('-o', '--output', default=request.function.__name__ + '.c',
+                        help='File name of the generated C source file.')
     argv = request.config.getoption("--cmdopt").split(' ')
     opts = parser.parse_args(argv)
     if opts.testjit:
