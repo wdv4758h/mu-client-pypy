@@ -95,15 +95,14 @@ def impl_jit_test(opts, test_bundle_building_fn):
         else:
             log = rmu.get_global_apilogger()
             lib = rmu.CVar("void*", "lib")
-            log.logcall("dlopen", [rmu.CStr(lib_path), "RTLD_LAZY"], lib, context=None)
+            log.logcall("dlopen", [lib_path, "RTLD_LAZY"], lib, context=None)
             fn = rmu.CFuncPtr([], "int", "fn")
             log.logcall("dlsym", [lib, rmu.CStr(symbol)], fn, context=None)
             res = rmu.CVar("int", "res")
             log.logcall("fn", [], res, context=None)
-            log.logcall("printf", [rmu.CStr("fn() = %d\\n"), res], None, context=None)
             log.logcall("dlclose", [lib], None, context=None)
             with open(opts.output, 'w') as fp:
-                log.genc(fp)
+                log.genc(fp, res)
 
         # # NOTE: below is just a mock up
         # lib_path = "libfnc.dylib"
