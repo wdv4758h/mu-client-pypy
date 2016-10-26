@@ -62,7 +62,7 @@ def extend_with_entrypoint(bldr, id_dict, rmu):
     })
 
 
-def impl_jit_test(opts, test_bundle_building_fn):
+def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoint):
     if opts.run:
         if opts.impl == 'ref':
             from rpython.rlib import rmu
@@ -128,7 +128,7 @@ def impl_jit_test(opts, test_bundle_building_fn):
         #     with open(opts.output, 'w') as fp:
         #         log.genc(fp)
     else:
-        extend_with_entrypoint(bldr, id_dict, rmu)
+        extend_fnc(bldr, id_dict, rmu)
         entry = id_dict['@entry']
         result = id_dict['@result']
         i32 = id_dict['@i32']
