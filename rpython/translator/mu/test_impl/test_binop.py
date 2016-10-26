@@ -413,7 +413,7 @@ def test_xor(cmdopt):
         """
         Builds the following test bundle.
             .typedef @i64 = int<64>
-            .const @0x6d9f9c1d58324b55_i64 <@i64> = 0x6d9f9c1d58324b55
+            .const @0x8d9f9c1d58324b55_i64 <@i64> = 0x8d9f9c1d58324b55
             .const @0xd5a8f2deb00debb4_i64 <@i64> = 0xd5a8f2deb00debb4
             .funcsig @sig__i64 = () -> (@i64)
             .funcdecl @fnc <@fnrsig__i64>
