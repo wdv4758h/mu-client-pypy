@@ -94,15 +94,18 @@ def impl_jit_test(opts, test_bundle_building_fn):
             print "fn() =", res
         else:
             log = rmu.get_global_apilogger()
-            lib = rmu.CVar("void*", "lib")
-            log.logcall("dlopen", [lib_path, "RTLD_LAZY"], lib, context=None)
-            fn = rmu.CFuncPtr([], "int", "fn")
-            log.logcall("dlsym", [lib, rmu.CStr(symbol)], fn, context=None)
-            res = rmu.CVar("int", "res")
-            log.logcall("fn", [], res, context=None)
-            log.logcall("dlclose", [lib], None, context=None)
+            # lib = rmu.CVar("void*", "lib")
+            # log.logcall("dlopen", [lib_path, "RTLD_LAZY"], lib, context=None)
+            # fn = rmu.CFuncPtr([], "int", "fn")
+            # log.logcall("dlsym", [lib, rmu.CStr(symbol)], fn, context=None)
+            # res = rmu.CVar("int", "res")
+            # log.logcall("fn", [], res, context=None)
+            # log.logcall("dlclose", [lib], None, context=None)
+
+            # just print out the compiled library name
+            log.logcall("printf", [rmu.CStr("%s\\n"), lib_path], None, context=None)
             with open(opts.output, 'w') as fp:
-                log.genc(fp, res)
+                log.genc(fp)
 
         # # NOTE: below is just a mock up
         # lib_path = "libfnc.dylib"
