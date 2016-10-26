@@ -142,6 +142,14 @@ class MuDatabase:
 
     def _process_externfuncs(self):
         def _get_required_libs(extfns):
+            if sys.platform.startswith('darwin'):
+                for fn in extfns:
+                    if 'rt' in fn.eci.libraries:
+                        l = list(fn.eci.libraries)
+                        l.remove('rt')
+                        l.append('System')
+                        fn.eci.libraries = tuple(l)
+                        
             libraries = [fn.eci.libraries for fn in extfns]
             libs = set()
             for tup_libs in libraries:
