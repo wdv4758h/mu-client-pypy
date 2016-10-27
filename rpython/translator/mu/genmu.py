@@ -190,37 +190,44 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         mu_meta_set(str(bdlpath),
                     extra_libraries=":".join(map(lambda lib: lib._name, self.db.dylibs)))
 
+    def gen_primitive_types(self):
+        i1 = self.bdr.gen_sym(str(mutype.int1_t.mu_name))
+        self.bdr.new_type_int(i1, 1)
+        i8 = self.bdr.gen_sym(str(mutype.int8_t.mu_name))
+        self.bdr.new_type_int(i8, 8)
+        i16 = self.bdr.gen_sym(str(mutype.int16_t.mu_name))
+        self.bdr.new_type_int(i16, 16)
+        i32 = self.bdr.gen_sym(str(mutype.int32_t.mu_name))
+        self.bdr.new_type_int(i32, 32)
+        i64 = self.bdr.gen_sym(str(mutype.int64_t.mu_name))
+        self.bdr.new_type_int(i64, 64)
+        i128 = self.bdr.gen_sym(str(mutype.int128_t.mu_name))
+        self.bdr.new_type_int(i128, 128)
+        flt = self.bdr.gen_sym(str(mutype.float_t.mu_name))
+        self.bdr.new_type_float(flt)
+        dbl = self.bdr.gen_sym(str(mutype.double_t.mu_name))
+        self.bdr.new_type_double(dbl)
+        void = self.bdr.gen_sym(str(mutype.void_t.mu_name))
+        self.bdr.new_type_void(void)
+        self.idmap.update({
+            mutype.int1_t:  i1,
+            mutype.int8_t:  i8,
+            mutype.int16_t: i16,
+            mutype.int32_t: i32,
+            mutype.int64_t: i64,
+            mutype.int128_t:    i128,
+            mutype.float_t: flt,
+            mutype.double_t: dbl,
+            mutype.void_t: void
+        })
+
     def gen_types(self):
         self.log.gen_types("start generating types.")
         bdr = self.bdr
         ref_nodes = []  # 2 pass declaration, need to call set_
         idmap = self.idmap
 
-        # primitive types
-        prelude = (
-            ".typedef {int1_t.mu_name} = int<1>%(newline)s"
-            ".typedef {int8_t.mu_name} = int<8>%(newline)s"
-            ".typedef {int16_t.mu_name} = int<16>%(newline)s"
-            ".typedef {int32_t.mu_name} = int<32>%(newline)s"
-            ".typedef {int64_t.mu_name} = int<64>%(newline)s"
-            ".typedef {int128_t.mu_name} = int<128>%(newline)s"
-            ".typedef {float_t.mu_name} = float%(newline)s"
-            ".typedef {double_t.mu_name} = double%(newline)s"
-            ".typedef {void_t.mu_name} = void%(newline)s"
-        ).format(**mutype.__dict__) % {'newline': self.__class__._newline}
-
-        self.ctx.load_bundle(prelude)
-        for t in (
-                mutype.int1_t,
-                mutype.int8_t,
-                mutype.int16_t,
-                mutype.int32_t,
-                mutype.int64_t,
-                mutype.int128_t,
-                mutype.float_t,
-                mutype.double_t,
-                mutype.void_t):
-            idmap[t] = self.ctx.id_of(str(t.mu_name))
+        self.gen_primitive_types()
 
         def _gen_type(t):
             try:
