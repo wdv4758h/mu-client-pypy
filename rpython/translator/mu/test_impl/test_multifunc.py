@@ -110,7 +110,7 @@ def build_test_bundle(bldr, rmu):
     entry_blk0 = bldr.gen_sym("@entry_v1.blk0")
     entry_blk0_res = bldr.gen_sym("@entry_v1.blk0.res")
     op_call = bldr.gen_sym()
-    bldr.new_call(op_call, entry_blk0_res, sig_i64_i64, fib, [c_20_i64])
+    bldr.new_call(op_call, [entry_blk0_res], sig_i64_i64, fib, [c_20_i64])
     op_ret = bldr.gen_sym()
     bldr.new_ret(op_ret, [entry_blk0_res])
     bldr.new_bb(entry_blk0, [], [], rmu.MU_NO_ID, [op_call, op_ret])
@@ -143,4 +143,4 @@ if __name__ == '__main__':
             raise argparse.ArgumentError(arg_testjit,
                                          "must be specified with '--impl fast'.")
 
-    impl_jit_test(opts, build_test_bundle, extend_with_entrypoint)
+    impl_jit_test(opts, build_test_bundle)
