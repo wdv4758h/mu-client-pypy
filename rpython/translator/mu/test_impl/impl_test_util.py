@@ -1,3 +1,5 @@
+import sys
+
 def extend_with_entrypoint(bldr, id_dict, rmu):
     """
         Extend the bundle with:
@@ -83,7 +85,14 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
 
     if opts.testjit:
         bldr.load()
-        lib_path = mu.compile_to_sharedlib(id_dict["test_fnc"])
+        if sys.platform.startswith('linux'):
+            libext = '.so'
+        elif sys.platform.startswith('darwin'):
+            libext = '.dylib'
+        else:
+            libext = '.dll'
+        lib_path = opts.output[:-2] + libext
+        mu.compile_to_sharedlib(lib_path)
         symbol = "test_fnc"
         if opts.run:
             print "compiled shared library:", lib_path
@@ -103,7 +112,7 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
             # log.logcall("dlclose", [lib], None, context=None)
 
             # just print out the compiled library name
-            log.logcall("printf", [rmu.CStr("%s\\n"), lib_path], None, context=None)
+            log.logcall("printf", [rmu.CStr("%s\\n"), rmu.CStr(lib_path)], None, context=None)
             with open(opts.output, 'w') as fp:
                 log.genc(fp)
 
