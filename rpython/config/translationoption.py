@@ -292,6 +292,12 @@ translation_optiondescription = OptionDescription(
     # Mu backend options
     ChoiceOption("mucodegen", "Code generator to use for Mu backend",
                  ["text", "api", "c", "all"], default="text", cmdline="--mugen"),
+
+    ChoiceOption("muimpl", "Mu implementation to target",
+                 ["ref", "fast"], default="ref", cmdline="--muimpl"),
+    BoolOption("mutestjit", "Generate code suitable for testing Mu JIT",
+               requires=[('translation.muimpl', 'fast')],
+               default=False, cmdline="--mutestjit")
 ])
 
 def get_combined_translation_config(other_optdescr=None,
