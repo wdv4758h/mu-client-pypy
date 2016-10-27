@@ -492,12 +492,10 @@ class MuVM:
         # type: (MuTrapHandler, MuCPtr) -> None
         _apilog.logcall('set_trap_handler', [self._mu, trap_handler, userdata], None, self._mu)
 
-    def compile_to_sharedlib(self, fnc_id):
-        # type: (MuID) -> str
-        # NOTE: runtime dependent method, the return value should not be examined in Python.
-        res_var = CVar('MuCString', 'var')
-        _apilog.logcall('compile_to_sharedlib', [self._mu, fnc_id], res_var, self._mu)
-        return res_var
+    def compile_to_sharedlib(self, lib_name):
+        # type: (str) -> None
+        lib_name_cstr = CStr(lib_name) if lib_name else NULL
+        _apilog.logcall('compile_to_sharedlib', [self._mu, lib_name_cstr], None, self._mu)
 
 
 class MuCtx:
