@@ -37,6 +37,8 @@ def cmdopt(request):
     parser = argparse.ArgumentParser()
     parser.add_argument('--impl', type=str, choices=['ref', 'fast'], default='ref',
                         help='Compile script to C targeting the selected implementation of Mu.')
+    arg_vmargs = parser.add_argument('--vmargs', type=str,
+                                     help='MuVM arguments to be passed, only works with --impl ref.')
     parser.add_argument('--run', action='store_true',
                         help='Run the script under RPython FFI on Mu Scala reference implementation.')
     arg_testjit = parser.add_argument('--testjit', action='store_true',
@@ -49,5 +51,9 @@ def cmdopt(request):
         if not (opts.impl == 'fast'):
             raise argparse.ArgumentError(arg_testjit,
                                          "must be specified with '--impl fast'.")
+    if opts.vmargs:
+        if not (opts.impl == 'ref'):
+            raise argparse.ArgumentError(arg_vmargs,
+                                         "must be specified with '--impl ref'.")
 
     return opts

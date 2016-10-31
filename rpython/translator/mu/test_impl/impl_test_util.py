@@ -64,7 +64,7 @@ def extend_with_entrypoint(bldr, id_dict, rmu):
     })
 
 
-def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoint):
+def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoint, extra_srcs=[]):
     if opts.run:
         if opts.impl == 'ref':
             from rpython.rlib import rmu
@@ -77,7 +77,10 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
             from rpython.rlib import rmu_genc_fast as rmu
         rmu.get_global_apilogger().clear()
 
-    mu = rmu.MuVM()
+    if opts.vmargs:
+        mu = rmu.MuVM(opts.vmargs)
+    else:
+        mu = rmu.MuVM()
     ctx = mu.new_context()
     bldr = ctx.new_ir_builder()
 
@@ -92,7 +95,7 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
         else:
             libext = '.dll'
         lib_path = opts.output[:-2] + libext
-        mu.compile_to_sharedlib(lib_path)
+        mu.compile_to_sharedlib(lib_path, extra_srcs)
         symbol = "test_fnc"
         if opts.run:
             print "compiled shared library:", lib_path
