@@ -52,8 +52,12 @@ class CArrayConst(object):
         self.lst = lst
 
     def __str__(self):
-        return '({type}){value}'.format(type='%s [%d]' % (self.c_elm_t, len(self.lst)),
-                                        value='{%s}' % ', '.join(map(str, self.lst)))
+        if self.c_elm_t == 'MuCString':
+            return '({type}){value}'.format(type='char**',
+                                            value='{%s}' % ', '.join(map(lambda s: "&%s" % CStr(s), self.lst)))
+        else:
+            return '({type}){value}'.format(type='%s [%d]' % (self.c_elm_t, len(self.lst)),
+                                            value='{%s}' % ', '.join(map(str, self.lst)))
 
     __repr__ = __str__
 

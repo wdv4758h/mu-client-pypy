@@ -373,10 +373,13 @@ class MuVM:
         # type: (MuTrapHandler, MuCPtr) -> None
         self._mu.c_set_trap_handler(self._mu, trap_handler, userdata)
 
-    def compile_to_sharedlib(self, lib_name):
-        # type: (str) -> None
+    def compile_to_sharedlib(self, lib_name, extra_srcs):
+        # type: (str, [MuCString]) -> None
         with rffi.scoped_str2charp(lib_name) as lib_name_buf:
-            self._mu.c_compile_to_sharedlib(self._mu, lib_name_buf)
+            extra_srcs_arr, extra_srcs_sz = lst2arr(MuCString, extra_srcs)
+            self._mu.c_compile_to_sharedlib(self._mu, lib_name_buf, extra_srcs_arr, extra_srcs_sz)
+            if extra_srcs_arr:
+                rffi.free_charpp(extra_srcs_arr)
 
 
 class MuCtx:
@@ -855,11 +858,11 @@ class MuCtx:
             if sym_fields_arr:
                 lltype.free(sym_fields_arr, flavor='raw')
             if sym_strings_arr:
-                lltype.free(sym_strings_arr, flavor='raw')
+                rffi.free_charpp(sym_strings_arr)
             if reloc_fields_arr:
                 lltype.free(reloc_fields_arr, flavor='raw')
             if reloc_strings_arr:
-                lltype.free(reloc_strings_arr, flavor='raw')
+                rffi.free_charpp(reloc_strings_arr)
 
 
 class MuIRBuilder:
@@ -1320,7 +1323,7 @@ _MuVM.become(rffi.CStruct(
     ('id_of', rffi.CCallback([_MuVMPtr, MuName], MuID)),
     ('name_of', rffi.CCallback([_MuVMPtr, MuID], MuName)),
     ('set_trap_handler', rffi.CCallback([_MuVMPtr, MuTrapHandler, MuCPtr], lltype.Void)),
-    ('compile_to_sharedlib', rffi.CCallback([_MuVMPtr, MuCString], lltype.Void)),
+    ('compile_to_sharedlib', rffi.CCallback([_MuVMPtr, MuCString, MuCStringPtr, MuArraySize], lltype.Void)),
 ))
 _MuCtx.become(rffi.CStruct(
     'MuCtx',
@@ -1516,9 +1519,12 @@ def lst2arr(ELM_T, lst):
     if len(lst) == 0:
         buf = lltype.nullptr(rffi.CArray(ELM_T))
     else:
-        buf = lltype.malloc(rffi.CArray(ELM_T), len(lst), flavor='raw')
-        for i, e in enumerate(lst):
-            buf[i] = rffi.cast(ELM_T, e)
+        if ELM_T == MuCString:
+            buf = rffi.liststr2charpp(lst)
+        else:
+            buf = lltype.malloc(rffi.CArray(ELM_T), len(lst), flavor='raw')
+            for i, e in enumerate(lst):
+                buf[i] = rffi.cast(ELM_T, e)
 
     return buf, sz
 

@@ -1158,11 +1158,11 @@ class MuCtx:
             if sym_fields_arr:
                 lltype.free(sym_fields_arr, flavor='raw')
             if sym_strings_arr:
-                lltype.free(sym_strings_arr, flavor='raw')
+                rffi.free_charpp(sym_strings_arr)
             if reloc_fields_arr:
                 lltype.free(reloc_fields_arr, flavor='raw')
             if reloc_strings_arr:
-                lltype.free(reloc_strings_arr, flavor='raw')
+                rffi.free_charpp(reloc_strings_arr)
 
 
 class MuIRBuilder:
@@ -2062,9 +2062,12 @@ def lst2arr(ELM_T, lst):
     if len(lst) == 0:
         buf = lltype.nullptr(rffi.CArray(ELM_T))
     else:
-        buf = lltype.malloc(rffi.CArray(ELM_T), len(lst), flavor='raw')
-        for i, e in enumerate(lst):
-            buf[i] = rffi.cast(ELM_T, e)
+        if ELM_T == MuCString:
+            buf = rffi.liststr2charpp(lst)
+        else:
+            buf = lltype.malloc(rffi.CArray(ELM_T), len(lst), flavor='raw')
+            for i, e in enumerate(lst):
+                buf[i] = rffi.cast(ELM_T, e)
 
     return buf, sz
 

@@ -52,8 +52,12 @@ class CArrayConst(object):
         self.lst = lst
 
     def __str__(self):
-        return '({type}){value}'.format(type='%s [%d]' % (self.c_elm_t, len(self.lst)),
-                                        value='{%s}' % ', '.join(map(str, self.lst)))
+        if self.c_elm_t == 'MuCString':
+            return '({type}){value}'.format(type='char**',
+                                            value='{%s}' % ', '.join(map(lambda s: "&%s" % CStr(s), self.lst)))
+        else:
+            return '({type}){value}'.format(type='%s [%d]' % (self.c_elm_t, len(self.lst)),
+                                            value='{%s}' % ', '.join(map(str, self.lst)))
 
     __repr__ = __str__
 
@@ -492,10 +496,11 @@ class MuVM:
         # type: (MuTrapHandler, MuCPtr) -> None
         _apilog.logcall('set_trap_handler', [self._mu, trap_handler, userdata], None, self._mu)
 
-    def compile_to_sharedlib(self, lib_name):
-        # type: (str) -> None
+    def compile_to_sharedlib(self, lib_name, extra_srcs):
+        # type: (str, [MuCString]) -> None
         lib_name_cstr = CStr(lib_name) if lib_name else NULL
-        _apilog.logcall('compile_to_sharedlib', [self._mu, lib_name_cstr], None, self._mu)
+        extra_srcs_arr, extra_srcs_sz = lst2arr('MuCString', extra_srcs)
+        _apilog.logcall('compile_to_sharedlib', [self._mu, lib_name_cstr, extra_srcs_arr, extra_srcs_sz], None, self._mu)
 
 
 class MuCtx:

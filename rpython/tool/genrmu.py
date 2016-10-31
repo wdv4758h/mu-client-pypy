@@ -265,7 +265,7 @@ def _oogen_method(opts, sttname, mtd, fp):
                      })
             c2rpy_param_map[prm['name']] = prm['name'] + '_arr'
             c2rpy_param_map[prm['array_sz_param']] = prm['name'] + '_sz'
-            arrs.append(prm['name'] + '_arr')
+            arrs.append(prm)
         elif prm['rpy_type'] in ('int', 'float', 'bool'):
             fp.write(cur_idt +
                      '%(name)s_c = rffi.cast(%(rmu_type)s, %(name)s)\n' % prm)
@@ -298,9 +298,13 @@ def _oogen_method(opts, sttname, mtd, fp):
             fp.write(cur_idt + 'if muerrno:\n')
             fp.write(cur_idt + idt + 'raise MuRuntimeError(muerrno)\n')
 
-    for arr in arrs:
+    for prm in arrs:
+        arr = c2rpy_param_map[prm['name']]
         fp.write(cur_idt + 'if %(arr)s:\n' % locals())
-        fp.write(cur_idt + idt + 'lltype.free(%(arr)s, flavor=\'raw\')\n' % locals())
+        if prm['rpy_type'][1:-1] == 'MuCString':
+            fp.write(cur_idt + idt + 'rffi.free_charpp(%(arr)s)\n' % locals())
+        else:
+            fp.write(cur_idt + idt + 'lltype.free(%(arr)s, flavor=\'raw\')\n' % locals())
 
     if mtd['ret_rpy_type'] != 'None':
         fp.write(cur_idt + 'return res\n')
@@ -413,9 +417,12 @@ def lst2arr(ELM_T, lst):
     if len(lst) == 0:
         buf = lltype.nullptr(rffi.CArray(ELM_T))
     else:
-        buf = lltype.malloc(rffi.CArray(ELM_T), len(lst), flavor='raw')
-        for i, e in enumerate(lst):
-            buf[i] = rffi.cast(ELM_T, e)
+        if ELM_T == MuCString:
+            buf = rffi.liststr2charpp(lst)
+        else:
+            buf = lltype.malloc(rffi.CArray(ELM_T), len(lst), flavor='raw')
+            for i, e in enumerate(lst):
+                buf[i] = rffi.cast(ELM_T, e)
 
     return buf, sz
 """
