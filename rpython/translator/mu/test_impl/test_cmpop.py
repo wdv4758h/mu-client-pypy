@@ -57,7 +57,8 @@ def test_eq_int(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0
+    if cmdopt.run:
+        assert res == 0
 
 def test_eq_ref(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -120,7 +121,8 @@ def test_eq_ref(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0
+    if cmdopt.run:
+        assert res == 0
 
 def test_ne_int(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -179,7 +181,8 @@ def test_ne_int(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 1
+    if cmdopt.run:
+        assert res == 1
 
 def test_ne_ref(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -242,7 +245,8 @@ def test_ne_ref(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 1
+    if cmdopt.run:
+        assert res == 1
 
 def test_sge(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -309,7 +313,8 @@ def test_sge(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 1
+    if cmdopt.run:
+        assert res == 1
 
 def test_sgt(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -376,7 +381,8 @@ def test_sgt(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0
+    if cmdopt.run:
+        assert res == 0
 
 def test_sle(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -443,7 +449,8 @@ def test_sle(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 1
+    if cmdopt.run:
+        assert res == 1
 
 def test_slt(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -510,7 +517,8 @@ def test_slt(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0
+    if cmdopt.run:
+        assert res == 0
 
 def test_ult(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -577,4 +585,5 @@ def test_ult(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0
+    if cmdopt.run:
+        assert res == 0

@@ -49,7 +49,8 @@ def test_add(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 9
+    if cmdopt.run:
+        assert res == 9
 
 def test_sub(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -100,7 +101,8 @@ def test_sub(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 11
+    if cmdopt.run:
+        assert res == 11
 
 def test_mul(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -151,7 +153,8 @@ def test_mul(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0xf6
+    if cmdopt.run:
+        assert res == 0xf6
 
 def test_sdiv(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -202,7 +205,8 @@ def test_sdiv(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0xf4
+    if cmdopt.run:
+        assert res == 0xf4
 
 def test_urem(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -253,7 +257,8 @@ def test_urem(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 5
+    if cmdopt.run:
+        assert res == 5
 
 def test_shl(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -304,7 +309,8 @@ def test_shl(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0x7e707560c92d5400
+    if cmdopt.run:
+        assert res == 0x7e707560c92d5400
 
 def test_lshr(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -355,7 +361,8 @@ def test_lshr(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0x2367e707560c92
+    if cmdopt.run:
+        assert res == 0x2367e707560c92
 
 def test_and(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -406,7 +413,8 @@ def test_and(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0x8588901c10004b14
+    if cmdopt.run:
+        assert res == 0x8588901c10004b14
 
 def test_xor(cmdopt):
     def build_test_bundle(bldr, rmu):
@@ -457,4 +465,5 @@ def test_xor(cmdopt):
         }
 
     res = impl_jit_test(cmdopt, build_test_bundle)
-    assert res == 0x58376ec3e83fa0e1
+    if cmdopt.run:
+        assert res == 0x58376ec3e83fa0e1
