@@ -197,7 +197,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         if config.translation.mutestjit:
             from rpython.translator.platform import platform
             libpath = bdlpath.dirpath().join(bdlpath.basename.replace(bdlpath.ext, '.' + platform.so_ext))
-            self.mu.compile_to_sharedlib(libpath)
+            self.mu.compile_to_sharedlib(libpath, [])
         else:
             hmain = self.ctx.handle_from_func(self.idmap[self.db.prog_entry])
             self.ctx.make_boot_image(self.idmap.values(), hmain,
