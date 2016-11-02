@@ -640,7 +640,7 @@ class LL2MuMapper:
         muops.extend(self.map_op(op_ge))
         op_lt = SpaceOperation('int_lt', [llop.args[1], llop.args[2]], lt_res)
         muops.extend(self.map_op(op_lt))
-        SpaceOperation.__init__(llop, 'int_add', [ge_res, lt_res], llop.result)
+        SpaceOperation.__init__(llop, 'int_and', [ge_res, lt_res], llop.result)
         muops.extend(self.map_op(llop))
         return muops
 
