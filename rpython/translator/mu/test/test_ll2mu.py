@@ -1,5 +1,5 @@
 from rpython.translator.mu.ll2mu import *
-
+from rpython.translator.mu.ll2mu import _init_binop_map
 
 def test_map_type_prim():
     ll2mu = LL2MuMapper()
@@ -251,7 +251,8 @@ def check_muop(muop):
             assert isinstance(d['exc'][0], Link)
             assert isinstance(d['exc'][1], Link)
         if 'status' in d:
-            assert isinstance(d['status'][0], mutype.mu_int32)
+            assert isinstance(d['status'][0], Constant)
+            assert d['status'][0].concretetype == mutype.MU_INT32
             assert isinstance(d['status'][1], list)
             for v in d['status'][1]:
                 assert isinstance(v, Variable)
@@ -513,3 +514,117 @@ def test_bool_not():
 
     for op in muops:
         check_muop(op)
+
+def test_int_abs():
+    ll2mu = LL2MuMapper()
+    llop = SpaceOperation('int_abs',
+                          [ll2mu.mapped_const(-125)],
+                          ll2mu.var('res', mutype.MU_INT64))
+    muops = ll2mu.map_op(llop)
+    assert len(muops) == 3
+    assert [op.opname for op in muops] == ['mu_binop', 'mu_cmpop', 'mu_select']
+    for op in muops:
+        check_muop(op)
+
+def test_binop_map():
+    llbinops = {
+        'char_lt',
+        'char_le',
+        'char_eq',
+        'char_ne',
+        'char_gt',
+        'char_ge',
+        'unichar_eq',
+        'unichar_ne',
+        'int_add',
+        'int_sub',
+        'int_mul',
+        'int_floordiv',
+        'int_mod',
+        'int_lt',
+        'int_le',
+        'int_eq',
+        'int_ne',
+        'int_gt',
+        'int_ge',
+        'int_and',
+        'int_or',
+        'int_lshift',
+        'int_rshift',
+        'int_xor',
+        'uint_add',
+        'uint_sub',
+        'uint_mul',
+        'uint_floordiv',
+        'uint_mod',
+        'uint_lt',
+        'uint_le',
+        'uint_eq',
+        'uint_ne',
+        'uint_gt',
+        'uint_ge',
+        'uint_and',
+        'uint_or',
+        'uint_lshift',
+        'uint_rshift',
+        'uint_xor',
+        'float_add',
+        'float_sub',
+        'float_mul',
+        'float_truediv',
+        'float_lt',
+        'float_le',
+        'float_eq',
+        'float_ne',
+        'float_gt',
+        'float_ge',
+        'llong_add',
+        'llong_sub',
+        'llong_mul',
+        'llong_floordiv',
+        'llong_mod',
+        'llong_lt',
+        'llong_le',
+        'llong_eq',
+        'llong_ne',
+        'llong_gt',
+        'llong_ge',
+        'llong_and',
+        'llong_or',
+        'llong_lshift',
+        'llong_rshift',
+        'llong_xor',
+        'ullong_add',
+        'ullong_sub',
+        'ullong_mul',
+        'ullong_floordiv',
+        'ullong_mod',
+        'ullong_lt',
+        'ullong_le',
+        'ullong_eq',
+        'ullong_ne',
+        'ullong_gt',
+        'ullong_ge',
+        'ullong_and',
+        'ullong_or',
+        'ullong_lshift',
+        'ullong_rshift',
+        'ullong_xor',
+        'lllong_add',
+        'lllong_sub',
+        'lllong_mul',
+        'lllong_floordiv',
+        'lllong_mod',
+        'lllong_lt',
+        'lllong_le',
+        'lllong_eq',
+        'lllong_ne',
+        'lllong_gt',
+        'lllong_ge',
+        'lllong_and',
+        'lllong_or',
+        'lllong_lshift',
+        'lllong_rshift',
+        'lllong_xor',
+    }
+    assert llbinops.difference(_init_binop_map().keys()) == set()    # all covered

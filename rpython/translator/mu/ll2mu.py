@@ -500,20 +500,16 @@ class LL2MuMapper:
         """
         try:
             return getattr(self, 'map_op_' + llop.opname)(llop)
-        except KeyError:
+        except AttributeError:
             if llop.opname in IgnoredLLOp._llops:  # Making ignoring explicit
                 raise IgnoredLLOp(llop.opname)
 
-            # try if it's an integer operation that can be redirected.
-            prefixes = ('uint', 'char', 'lllong', 'long')
-            opname = llop.opname
-            if any(n in opname for n in prefixes):
-                for pfx in prefixes:
-                    opname = opname.replace(pfx, 'int')
-                try:
-                    return getattr(self, 'map_op_' + llop.opname)(llop)
-                except KeyError:
-                    pass  # raise error on next line
+            if llop.opname in _binop_map:   # a binop
+                if any(cmpop in llop.opname for cmpop in 'lt le eq ne ge gt'.split(' ')):
+                    return self._map_cmpop(llop)
+                else:
+                    return self._map_binop(llop)
+
             raise NotImplementedError("Has not implemented specialisation for operation '%s'" % llop)
 
     def dest_clause(self, blk, args):
@@ -579,34 +575,220 @@ class LL2MuMapper:
         ],
                                 llop.result)
         return [llop]
+    map_op_uint_is_true = map_op_int_is_true
+    map_op_llong_is_true = map_op_int_is_true
+    map_op_ullong_is_true = map_op_int_is_true
+    map_op_lllong_is_true = map_op_int_is_true
 
     def map_op_int_neg(self, llop):
         MuT = llop.args[0].concretetype
-        SpaceOperation.__init__(llop, 'mu_binop', [
-            self.mapped_const(rmu.MuBinOptr.SUB),
+        SpaceOperation.__init__(llop, 'int_sub', [
             Constant(MuT._val_type(0), MuT),
             llop.args[0],
-            self.mapped_const({})
         ],
                                 llop.result)
-        return [llop]
+        return self.map_op(llop)
+
+    map_op_llong_neg = map_op_int_neg
+    map_op_lllong_neg = map_op_int_neg
 
     def map_op_int_abs(self, llop):
         ops = []
         x = llop.args[0]
         MuT = x.concretetype
-
-        neg_x = self.var('neg_%s' % str(x), x.concretetype)
+        # -x = 0 - x
+        neg_x = self.var('neg_x', x.concretetype)
         op_neg = SpaceOperation('int_neg', [x], neg_x)
         ops.extend(self.map_op(op_neg))
-
-        cmp_res = self.var('cmp_res', mutype.MU_INT8)
-        op_cmp = SpaceOperation('int_gt',
-                                [x, Constant(MuT._val_type(0), MuT)],
+        # x > 0 ?
+        cmp_res = self.var('cmp_res', mutype.MU_INT1)
+        op_cmp = SpaceOperation('mu_cmpop', [
+            self.mapped_const(rmu.MuCmpOptr.SGT),
+            x, Constant(MuT._val_type(0), MuT)
+        ],
                                 cmp_res)
-        ops.extend(self.map_op(op_cmp))
-
+        ops.append(op_cmp)
+        # True -> x, False -> -x
         SpaceOperation.__init__(llop, 'mu_select', [cmp_res, x, neg_x], llop.result)
         ops.append(llop)
 
         return [op_neg, op_cmp, llop]
+
+    map_op_llong_abs = map_op_int_abs
+    map_op_lllong_abs = map_op_int_abs
+
+    def map_op_int_invert(self, llop):
+        # 2's complement
+        # x' = (-x) - 1
+        ops = []
+        x = llop.args[0]
+
+        neg_x = self.var('neg_x', x.concretetype)
+        op_neg = SpaceOperation('int_neg', [x], neg_x)
+        ops.extend(self.map_op(op_neg))
+
+    map_op_uint_invert = map_op_int_invert
+    map_op_llong_invert = map_op_int_invert
+    map_op_ullong_invert = map_op_int_invert
+    map_op_lllong_invert = map_op_int_invert
+
+    def map_op_int_between(self, llop):
+        muops = []
+        ge_res = self.var('ge_res', mutype.MU_INT8)
+        lt_res = self.var('lt_res', mutype.MU_INT8)
+        op_ge = SpaceOperation('int_ge', [llop.args[1], llop.args[0]], ge_res)
+        muops.extend(self.map_op(op_ge))
+        op_lt = SpaceOperation('int_lt', [llop.args[1], llop.args[2]], lt_res)
+        muops.extend(self.map_op(op_lt))
+        SpaceOperation.__init__(llop, 'int_add', [ge_res, lt_res], llop.result)
+        muops.extend(self.map_op(llop))
+        return muops
+
+    def map_op_int_force_ge_zero(self, llop):
+        muops = []
+        a = llop.args[0]
+        MuT = a.concretetype
+        zero = Constant(MuT._val_type(0), MuT)
+        lt_zero = self.var('lt_zero', mutype.MU_INT1)
+        op_cmp = SpaceOperation('mu_cmpop', [
+            self.map_op(rmu.MuCmpOptr.SLT),
+            a, zero
+        ],
+                                lt_zero)
+        SpaceOperation.__init__(llop, 'mu_select', [lt_zero, zero, a], llop.result)
+        return [op_cmp, llop]
+
+    def map_op_int_add_ovf(self, llop):
+        flag_v = self.var('ovf_V', mutype.MU_INT1)
+        flag = self.mapped_const(rmu.MuBinOpStatus.V)
+
+        SpaceOperation.__init__(llop, 'mu_binop', [
+            self.mapped_const(rmu.MuBinOptr.ADD),
+            llop.args[0], llop.args[1],
+            self.mapped_const({
+                'status': (flag, [flag_v])
+            })
+        ],
+                                llop.result)
+        return [llop]
+
+    map_op_int_add_nonneg_ovf = map_op_int_add_ovf
+
+    def map_op_int_sub_ovf(self, llop):
+        flag_v = self.var('ovf_V', mutype.MU_INT1)
+        flag = self.mapped_const(rmu.MuBinOpStatus.V)
+
+        SpaceOperation.__init__(llop, 'mu_binop', [
+            self.mapped_const(rmu.MuBinOptr.SUB),
+            llop.args[0], llop.args[1],
+            self.mapped_const({
+                'status': (flag, [flag_v])
+            })
+        ],
+                                llop.result)
+        return [llop]
+
+    def map_op_int_mul_ovf(self, llop):
+        flag_v = self.var('ovf_V', mutype.MU_INT1)
+        flag = self.mapped_const(rmu.MuBinOpStatus.V)
+
+        SpaceOperation.__init__(llop, 'mu_binop', [
+            self.mapped_const(rmu.MuBinOptr.MUL),
+            llop.args[0], llop.args[1],
+            self.mapped_const({
+                'status': (flag, [flag_v])
+            })
+        ],
+                                llop.result)
+        return [llop]
+
+    def _map_binop(self, llop):
+        SpaceOperation.__init__(llop, 'mu_binop', [
+            self.mapped_const(_binop_map[llop.opname]),
+            llop.args[0],
+            llop.args[1],
+            self.mapped_const({})
+        ],
+                                llop.result)
+        return [llop]
+
+    def _map_cmpop(self, llop):
+        muops = []
+        cmpres = self.var('cmpres', mutype.MU_INT1)
+        muops.append(SpaceOperation('mu_cmpop', [
+            self.mapped_const(_binop_map[llop.opname]),
+            llop.args[0],
+            llop.args[1],
+        ],
+                                cmpres))
+        SpaceOperation.__init__(llop, 'mu_convop', [
+            self.mapped_const(rmu.MuConvOptr.ZEXT),
+            cmpres,
+            self.mapped_const(mutype.MU_INT8)
+        ],
+                                llop.result)
+        muops.append(llop)
+        return muops
+
+def _init_binop_map():
+    __binop_map = {
+        'int_add': rmu.MuBinOptr.ADD,
+        'int_sub': rmu.MuBinOptr.SUB,
+        'int_mul': rmu.MuBinOptr.MUL,
+        'int_floordiv': rmu.MuBinOptr.SDIV,
+        'int_mod': rmu.MuBinOptr.SREM,
+        'int_lt': rmu.MuCmpOptr.SLT,
+        'int_le': rmu.MuCmpOptr.SLE,
+        'int_eq': rmu.MuCmpOptr.EQ,
+        'int_ne': rmu.MuCmpOptr.NE,
+        'int_gt': rmu.MuCmpOptr.SGT,
+        'int_ge': rmu.MuCmpOptr.SGE,
+        'int_and': rmu.MuBinOptr.AND,
+        'int_or': rmu.MuBinOptr.OR,
+        'int_lshift': rmu.MuBinOptr.SHL,
+        'int_rshift': rmu.MuBinOptr.ASHR,
+        'int_xor': rmu.MuBinOptr.XOR,
+
+        'uint_add': rmu.MuBinOptr.ADD,
+        'uint_sub': rmu.MuBinOptr.SUB,
+        'uint_mul': rmu.MuBinOptr.MUL,
+        'uint_floordiv': rmu.MuBinOptr.UDIV,
+        'uint_mod': rmu.MuBinOptr.UREM,
+        'uint_lt': rmu.MuCmpOptr.ULT,
+        'uint_le': rmu.MuCmpOptr.ULE,
+        'uint_eq': rmu.MuCmpOptr.EQ,
+        'uint_ne': rmu.MuCmpOptr.NE,
+        'uint_gt': rmu.MuCmpOptr.UGT,
+        'uint_ge': rmu.MuCmpOptr.UGE,
+        'uint_and': rmu.MuBinOptr.AND,
+        'uint_or': rmu.MuBinOptr.OR,
+        'uint_lshift': rmu.MuBinOptr.SHL,
+        'uint_rshift': rmu.MuBinOptr.LSHR,
+        'uint_xor': rmu.MuBinOptr.XOR,
+
+        'float_add': rmu.MuBinOptr.FADD,
+        'float_sub': rmu.MuBinOptr.FSUB,
+        'float_mul': rmu.MuBinOptr.FMUL,
+        'float_truediv': rmu.MuBinOptr.FDIV,
+        'float_lt': rmu.MuCmpOptr.FOLT,
+        'float_le': rmu.MuCmpOptr.FOLE,
+        'float_eq': rmu.MuCmpOptr.FOEQ,
+        'float_ne': rmu.MuCmpOptr.FONE,
+        'float_gt': rmu.MuCmpOptr.FOGT,
+        'float_ge': rmu.MuCmpOptr.FOGE,
+    }
+
+    for org_type, coer_type in {
+        'llong': 'int',
+        'ullong': 'uint',
+        'lllong': 'int',
+        'char': 'uint',     # it's okay to be a super set of llops
+        'unichar': 'uint'
+    }.items():
+        for op in "add sub mul floordiv mod and or lshift rshift xor".split(' '):
+            __binop_map['%(org_type)s_%(op)s' % locals()] = __binop_map['%(coer_type)s_%(op)s' % locals()]
+        for cmp in 'eq ne lt le gt ge'.split(' '):
+            __binop_map['%(org_type)s_%(cmp)s' % locals()] = __binop_map['%(coer_type)s_%(cmp)s' % locals()]
+
+    return __binop_map
+_binop_map = _init_binop_map()
