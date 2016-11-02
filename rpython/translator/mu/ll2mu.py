@@ -509,6 +509,8 @@ class LL2MuMapper:
                     return self._map_cmpop(llop)
                 else:
                     return self._map_binop(llop)
+            if llop.opname in _prim_castop_map:  # a convop
+                return self._map_convop(llop)
 
             raise NotImplementedError("Has not implemented specialisation for operation '%s'" % llop)
 
@@ -730,6 +732,15 @@ class LL2MuMapper:
         muops.append(llop)
         return muops
 
+    def _map_convop(self, llop):
+        SpaceOperation.__init__(llop, 'mu_convop', [
+            self.mapped_const(_prim_castop_map[llop.opname]),
+            llop.args[0],
+            self.mapped_const(llop.result.concretetype)
+        ],
+                                llop.result)
+        return [llop]
+
 def _init_binop_map():
     __binop_map = {
         'int_add': rmu.MuBinOptr.ADD,
@@ -792,3 +803,24 @@ def _init_binop_map():
 
     return __binop_map
 _binop_map = _init_binop_map()
+
+_prim_castop_map = {
+    'cast_bool_to_int': rmu.MuConvOptr.ZEXT,
+    'cast_bool_to_uint': rmu.MuConvOptr.SEXT,
+    'cast_bool_to_float': rmu.MuConvOptr.UITOFP,
+    'cast_char_to_int': rmu.MuConvOptr.ZEXT,
+    'cast_unichar_to_int': rmu.MuConvOptr.ZEXT,
+    'cast_int_to_char': rmu.MuConvOptr.TRUNC,
+    'cast_int_to_float': rmu.MuConvOptr.SITOFP,
+    'cast_int_to_longlong': rmu.MuConvOptr.SEXT,
+    'cast_uint_to_float': rmu.MuConvOptr.UITOFP,
+    'cast_longlong_to_float': rmu.MuConvOptr.SITOFP,
+    'cast_ulonglong_to_float': rmu.MuConvOptr.UITOFP,
+    'cast_float_to_int': rmu.MuConvOptr.FPTOSI,
+    'cast_float_to_uint': rmu.MuConvOptr.FPTOUI,
+    'cast_float_to_longlong': rmu.MuConvOptr.FPTOSI,
+    'cast_float_to_ulonglong': rmu.MuConvOptr.FPTOUI,
+    'truncate_longlong_to_int': rmu.MuConvOptr.TRUNC,
+    'convert_float_bytes_to_longlong': rmu.MuConvOptr.BITCAST,
+    'convert_longlong_bytes_to_float': rmu.MuConvOptr.BITCAST,
+}

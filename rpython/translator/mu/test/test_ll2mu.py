@@ -547,6 +547,11 @@ def test_int_mul_ovf():
     muop = muops[0]
     check_muop(muop)
 
+def test_cast_char_to_int():
+    ll2mu = LL2MuMapper()
+    llop = SpaceOperation('cast_char_to_int', [ll2mu.var('c', ll2mu.map_type(lltype.Char))], ll2mu.var('res', mutype.MU_INT64))
+    check_muop(ll2mu.map_op(llop)[0])
+
 def test_binop_map():
     llbinops = {
         'char_lt',
