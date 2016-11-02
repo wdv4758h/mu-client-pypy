@@ -526,6 +526,27 @@ def test_int_abs():
     for op in muops:
         check_muop(op)
 
+def test_int_between():
+    ll2mu = LL2MuMapper()
+    llop = SpaceOperation('int_between',
+                          [ll2mu.mapped_const(42), ll2mu.var('x', mutype.MU_INT64), ll2mu.mapped_const(100)],
+                          ll2mu.var('res', ll2mu.map_type(lltype.Bool)))
+    muops = ll2mu.map_op(llop)
+    assert len(muops) == 5
+    assert [op.opname for op in muops] == ['mu_cmpop', 'mu_convop', 'mu_cmpop', 'mu_convop', 'mu_binop']
+    for op in muops:
+        check_muop(op)
+
+def test_int_mul_ovf():
+    ll2mu = LL2MuMapper()
+    llop = SpaceOperation('int_mul_ovf',
+                          [ll2mu.var('a', mutype.MU_INT64), ll2mu.var('b', mutype.MU_INT64)],
+                          ll2mu.var('res', mutype.MU_INT64))
+    muops = ll2mu.map_op(llop)
+    assert len(muops) == 1
+    muop = muops[0]
+    check_muop(muop)
+
 def test_binop_map():
     llbinops = {
         'char_lt',
