@@ -12,7 +12,6 @@ from StringIO import StringIO
 import zipfile
 import json
 from rpython.tool.ansi_mandelbrot import Driver
-from mar import mu_meta_set
 
 try:
     import zlib
@@ -173,9 +172,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         libconfig.append("vmLog=ERROR")
         return self.__class__._newline.join(libconfig)
 
-    def bundlegen(self, bdlpath):
-        self.log.bundlegen("API Bundle generator")
-
+    def build_bundle(self):
         self.bdr = self.ctx.new_ir_builder()
 
         self.gen_types()
@@ -185,6 +182,11 @@ class MuAPIBundleGenerator(MuBundleGenerator):
 
         self.log.bundlegen("load bundle into Mu")
         self.bdr.load()
+
+    def bundlegen(self, bdlpath):
+        self.log.bundlegen("API Bundle generator")
+
+        self.build_bundle()
 
         self.log.bundlegen("start initialise heap objects")
         self.init_heap()
@@ -210,6 +212,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         self.extras(bdlpath)
 
     def extras(self, bdlpath):
+        from mar import mu_meta_set
         mu_meta_set(str(bdlpath),
                     extra_libraries=":".join(map(lambda lib: lib._name, self.db.dylibs)))
 

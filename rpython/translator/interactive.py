@@ -127,3 +127,8 @@ class Translation(object):
         self.update_options(kwds)
         self.ensure_backend('mu')
         return self.driver.mutype()
+
+    def compile_mu(self, **kwds):
+        self.update_options(kwds)
+        self.ensure_backend('mu')
+        return self.driver.compile_mu()
