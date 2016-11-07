@@ -218,8 +218,8 @@ def test_uptr_bytestore_load(cmdopt):
         """
         i8 = bldr.gen_sym("@i8"); bldr.new_type_int(i8, 8)
         i32 = bldr.gen_sym("@i32"); bldr.new_type_int(i32, 32)
-        pi8 = bldr.gen_sym("@pi8"); bldr.new_type_uptr(pi8, 8)
-        pi32 = bldr.gen_sym("@pi32"); bldr.new_type_uptr(pi32, 32)
+        pi8 = bldr.gen_sym("@pi8"); bldr.new_type_uptr(pi8, i8)
+        pi32 = bldr.gen_sym("@pi32"); bldr.new_type_uptr(pi32, i32)
 
         c_1_i8 = bldr.gen_sym("@1_i8"); bldr.new_const_int(c_1_i8, i8, 1)
         c_0x8d_i8 = bldr.gen_sym("@0x8d_i8"); bldr.new_const_int(c_0x8d_i8, i8, 0x8d)
@@ -267,6 +267,6 @@ def test_uptr_bytestore_load(cmdopt):
             "@pi32": pi32
         }
 
-    res = impl_jit_test(cmdopt, build_test_bundle, extra_srcs=['entry_test_uptr_bytestore_load.c'])
+    res = impl_jit_test(cmdopt, build_test_bundle)
     if cmdopt.run:
         assert res == 0x8d9f9c1d
