@@ -184,3 +184,89 @@ def test_new_bytestore_load(cmdopt):
     res = impl_jit_test(cmdopt, build_test_bundle)
     if cmdopt.run:
         assert res == 0x8d9f9c1d
+
+def test_uptr_bytestore_load(cmdopt):
+    def build_test_bundle(bldr, rmu):
+        """
+        Builds the following test bundle.
+            .typedef @i8 = int<8>
+            .typedef @i32 = int<32>
+            .typedef @pi8 = uptr<@i8>
+            .typedef @pi32 = uptr<@i32>
+            .const @1_i8 <@i8> = 1
+            .const @0x8d_i8 <@i8> = 0x8d
+            .const @0x9f_i8 <@i8> = 0x9f
+            .const @0x9c_i8 <@i8> = 0x9c
+            .const @0x1d_i8 <@i8> = 0x1d
+            .funcsig @sig_pi32_i32 = (@pi32) -> (@i32)
+            .funcdef @test_fnc VERSION @test_fnc.v1 <@sig_pi32_i32> {
+                %blk0(<@pi32> %pi32x):
+                    %pi8x_0 = PTRCAST <@pi32 @pi8> %pi32x
+                    STORE PTR <@i8> %pi8x_0 @0x1d_i8
+                    %pi8x_1 = SHIFTIREF PTR <@i8 @i8> %pi8x_0 @1_i8
+                    STORE PTR <@i8> %pi8x_1 @0x9c_i8
+                    %pi8x_2 = SHIFTIREF PTR <@i8 @i8> %pi8x_1 @1_i8
+                    STORE PTR <@i8> %pi8x_2 @0x9f_i8
+                    %pi8x_3 = SHIFTIREF PTR <@i8 @i8> %pi8x_2 @1_i8
+                    STORE PTR <@i8> %pi8x_3 @0x8d_i8
+                    %res = LOAD PTR <@i32> %pi32x
+                    RET %res
+            }
+        :type bldr: rpython.rlib.rmu.MuIRBuilder
+        :type rmu: rpython.rlib.rmu
+        :return: (rmu.MuVM(), rmu.MuCtx, rmu.MuIRBuilder, MuID, MuID)
+        """
+        i8 = bldr.gen_sym("@i8"); bldr.new_type_int(i8, 8)
+        i32 = bldr.gen_sym("@i32"); bldr.new_type_int(i32, 32)
+        pi8 = bldr.gen_sym("@pi8"); bldr.new_type_uptr(pi8, 8)
+        pi32 = bldr.gen_sym("@pi32"); bldr.new_type_uptr(pi32, 32)
+
+        c_1_i8 = bldr.gen_sym("@1_i8"); bldr.new_const_int(c_1_i8, i8, 1)
+        c_0x8d_i8 = bldr.gen_sym("@0x8d_i8"); bldr.new_const_int(c_0x8d_i8, i8, 0x8d)
+        c_0x9f_i8 = bldr.gen_sym("@0x9f_i8"); bldr.new_const_int(c_0x9f_i8, i8, 0x9f)
+        c_0x9c_i8 = bldr.gen_sym("@0x9c_i8"); bldr.new_const_int(c_0x9c_i8, i8, 0x9c)
+        c_0x1d_i8 = bldr.gen_sym("@0x1d_i8"); bldr.new_const_int(c_0x1d_i8, i8, 0x1d)
+
+        sig_pi32_i32 = bldr.gen_sym("@sig_pi32_i32"); bldr.new_funcsig(sig_pi32_i32, [pi32], [i32])
+
+        test_fnc = bldr.gen_sym("@test_fnc"); bldr.new_func(test_fnc, sig_pi32_i32)
+
+        test_fnc_v1 = bldr.gen_sym("@test_fnc.v1")
+        blk0 = bldr.gen_sym("@test_fnc.v1.blk0")
+        pi32x = bldr.gen_sym("@test_fnc.v1.blk0.pi32x")
+        pi8x_0 = bldr.gen_sym("@test_fnc.v1.blk0.pi8x_0")
+        pi8x_1 = bldr.gen_sym("@test_fnc.v1.blk0.pi8x_1")
+        pi8x_2 = bldr.gen_sym("@test_fnc.v1.blk0.pi8x_2")
+        pi8x_3 = bldr.gen_sym("@test_fnc.v1.blk0.pi8x_3")
+        res = bldr.gen_sym("@test_fnc.v1.blk0.res")
+        op_cast = bldr.gen_sym(); bldr.new_conv(op_cast, pi8x_0, rmu.MuConvOptr.PTRCAST, pi32, pi8, pi32x)        
+        op_store_0 = bldr.gen_sym(); bldr.new_store(op_store_0, True, rmu.MuMemOrd.NOT_ATOMIC, i8, pi8x_0, c_0x1d_i8)
+        op_shift_1 = bldr.gen_sym(); bldr.new_shiftiref(op_shift_1, pi8x_1, True, i8, i8, pi8x_0, c_1_i8)
+        op_store_1 = bldr.gen_sym(); bldr.new_store(op_store_1, True, rmu.MuMemOrd.NOT_ATOMIC, i8, pi8x_1, c_0x9c_i8)
+        op_shift_2 = bldr.gen_sym(); bldr.new_shiftiref(op_shift_2, pi8x_2, True, i8, i8, pi8x_1, c_1_i8)
+        op_store_2 = bldr.gen_sym(); bldr.new_store(op_store_2, True, rmu.MuMemOrd.NOT_ATOMIC, i8, pi8x_2, c_0x9f_i8)
+        op_shift_3 = bldr.gen_sym(); bldr.new_shiftiref(op_shift_3, pi8x_3, True, i8, i8, pi8x_2, c_1_i8)
+        op_store_3 = bldr.gen_sym(); bldr.new_store(op_store_3, True, rmu.MuMemOrd.NOT_ATOMIC, i8, pi8x_3, c_0x8d_i8)
+        op_load = bldr.gen_sym(); bldr.new_load(op_load, res, True, rmu.MuMemOrd.NOT_ATOMIC, i32, pi32x)
+        op_ret = bldr.gen_sym(); bldr.new_ret(op_ret, [res])
+        bldr.new_bb(blk0, [pi32x], [pi32], rmu.MU_NO_ID, [op_cast, op_store_0,
+                                                          op_shift_1, op_store_1,
+                                                          op_shift_2, op_store_2,
+                                                          op_shift_3, op_store_3,
+                                                          op_load, op_ret])
+
+        bldr.new_func_ver(test_fnc_v1, test_fnc, [blk0])
+
+        return {
+            "test_fnc": test_fnc,
+            "test_fnc_sig": sig_pi32_i32,
+            "result_type": i32,
+            "@i8": i8,
+            "@pi8": pi8,
+            "@i32": i32,
+            "@pi32": pi32
+        }
+
+    res = impl_jit_test(cmdopt, build_test_bundle, extra_srcs=['entry_test_uptr_bytestore_load.c'])
+    if cmdopt.run:
+        assert res == 0x8d9f9c1d
