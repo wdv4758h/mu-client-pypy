@@ -498,20 +498,21 @@ class LL2MuMapper:
         :param llop: SpaceOperation
         :return: [SpaceOperation]
         """
-        try:
+        if hasattr(self, 'map_op_' + llop.opname):
             return getattr(self, 'map_op_' + llop.opname)(llop)
-        except AttributeError:
-            if llop.opname in IgnoredLLOp._llops:  # Making ignoring explicit
-                raise IgnoredLLOp(llop.opname)
 
-            if llop.opname in _binop_map:   # a binop
-                if any(cmpop in llop.opname for cmpop in 'lt le eq ne ge gt'.split(' ')):
-                    return self._map_cmpop(llop)
-                else:
-                    return self._map_binop(llop)
-            if llop.opname in _prim_castop_map:  # a convop
-                return self._map_convop(llop)
+        elif llop.opname in IgnoredLLOp._llops:  # Making ignoring explicit
+            raise IgnoredLLOp(llop.opname)
 
+        elif llop.opname in _binop_map:   # a binop
+            if any(cmpop in llop.opname for cmpop in 'lt le eq ne ge gt'.split(' ')):
+                return self._map_cmpop(llop)
+            else:
+                return self._map_binop(llop)
+        elif llop.opname in _prim_castop_map:  # a convop
+            return self._map_convop(llop)
+
+        else:
             raise NotImplementedError("Has not implemented specialisation for operation '%s'" % llop)
 
     def dest_clause(self, blk, args):
@@ -782,14 +783,11 @@ class LL2MuMapper:
             ops.append(SpaceOperation('mu_getiref', [var], iref))
         else:
             iref = var
-        if isinstance(MuT.TO, mutype.MuHybrid) and fldname == MuT.TO._varfld:
-            iref_fld = self.var('ir%s_%s' % (var.name, fldname_c), mutype.MuIRef(MuT.TO._vartype.OF))
-            ops.append(SpaceOperation('mu_getvarpartiref', [iref], iref_fld))
-        else:
-            assert isinstance(MuT.TO, (mutype.MuStruct, mutype.MuHybrid))
-            idx = MuT.TO._index_of(fldname)     # NOTE: may throw AttributeError
-            iref_fld = self.var('irf%s_%s' % (var.name, fldname), mutype.MuIRef(getattr(MuT.TO, fldname)))
-            ops.append(SpaceOperation('mu_getfieldiref', [iref, fldname_c], iref_fld))  # preserve field name until the end
+
+        assert isinstance(MuT.TO, (mutype.MuStruct, mutype.MuHybrid))
+        idx = MuT.TO._index_of(fldname)     # NOTE: may throw AttributeError
+        iref_fld = self.var('irf%s_%s' % (var.name, fldname), mutype.MuIRef(getattr(MuT.TO, fldname)))
+        ops.append(SpaceOperation('mu_getfieldiref', [iref, fldname_c], iref_fld))  # preserve field name until the end
         return iref_fld, ops
 
     def map_op_getfield(self, llop):
@@ -818,6 +816,75 @@ class LL2MuMapper:
 
         llop.__init__('mu_store', [iref_fld, val_c,
                                    self.mapped_const({'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})],
+                      llop.result)
+        ops.append(llop)
+        return ops
+
+    def map_op_getsubstruct(self, llop):
+        var, fldname_c = llop.args
+        try:
+            iref_fld, ops = self._getfieldiref(var, fldname_c)
+        except AttributeError:
+            log.error("Field '%s' not found in type '%s'." % (fldname_c.value, var.concretetype.TO))
+            raise IgnoredLLOp
+
+        if isinstance(iref_fld.concretetype.TO, (mutype.MuRef, mutype.MuUPtr)):
+            res = self.var("%s_substt" % (var.name, iref_fld.concretetype.TO))
+            ops.append(SpaceOperation('mu_load', [iref_fld,
+                                                  self.mapped_const(
+                                                      {'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})], res))
+        return ops
+
+    def _getarrayitemiref(self, var, idx_vc):
+        ops = []
+        MuT = var.concretetype
+        if isinstance(MuT, mutype.MuRef):
+            iref = self.var('ir%s' % var.name, mutype.MuIRef(MuT.TO))
+            ops.append(SpaceOperation('mu_getiref', [var], iref))
+        else:
+            iref = var
+
+        if isinstance(MuT.TO, mutype.MuHybrid):
+            iref_itm0 = self.var('ira%s' % var.name, mutype.MuIRef(MuT.TO._vartype.OF))
+            ops.append(SpaceOperation('mu_getvarpartiref', [iref], iref_itm0))
+        else:
+            assert isinstance(MuT.TO, mutype.MuArray)
+            iref_itm0 = self.var('ira%s' % var.name, mutype.MuIRef(MuT.TO.OF))
+            ops.extend(self.map_op(SpaceOperation('cast_pointer', [
+                self.mapped_const(iref_itm0.concretetype), iref
+            ],
+                                                  iref_itm0)))
+
+        iref_itm = self.var('ir%s_itm' % var.name, mutype.MuIRef(iref_itm0.concretetype.TO))
+        ops.append(SpaceOperation('mu_shiftiref', [iref_itm0, idx_vc], iref_itm))
+        return iref_itm, ops
+
+    def map_op_getarrayitem(self, llop):
+        var, idx_vc = llop.args
+        iref_itm, ops = self._getarrayitemiref(var, idx_vc)
+        llop.__init__('mu_load', [iref_itm,
+                                  self.mapped_const({'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})],
+                      llop.result)
+        ops.append(llop)
+        return ops
+
+    def map_op_setarrayitem(self, llop):
+        var, idx_vc, val_vc = llop.args
+        iref_itm, ops = self._getarrayitemiref(var, idx_vc)
+        llop.__init__('mu_store', [iref_itm, val_vc,
+                                   self.mapped_const({'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})],
+                      llop.result)
+        ops.append(llop)
+        return ops
+
+    def map_op_getarraysubstruct(self, llop):
+        _iref_itm, ops = self._getarrayitemiref(*llop.args)
+        return ops
+
+    def map_op_getarraysize(self, llop):
+        iref_fld, ops = self._getfieldiref(llop.args[0], Constant('length', mutype.MU_VOID))
+        llop.__init__('mu_load', [iref_fld,
+                                  self.mapped_const({'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})],
                       llop.result)
         ops.append(llop)
         return ops

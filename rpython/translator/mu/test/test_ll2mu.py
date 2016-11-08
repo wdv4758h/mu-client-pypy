@@ -667,3 +667,14 @@ def test_malloc_varsize():
     assert [op.opname for op in muops] == ['mu_newhybrid', 'mu_getiref', 'mu_getfieldiref', 'mu_store']
     for op in muops:
         check_muop(op)
+
+def test_setarrayitem():
+    ll2mu = LL2MuMapper()
+    Hyb = mutype.MuHybrid('string', ('hash', mutype.MU_INT64), ('length', mutype.MU_INT64), ('chars', mutype.MU_INT8))
+    rs = ll2mu.var("rs", mutype.MuRef(Hyb))
+    res = Variable('res')
+    llop = SpaceOperation('setarrayitem', [rs, ll2mu.mapped_const(5), ll2mu.mapped_const('c')], res)
+    muops = ll2mu.map_op(llop)
+    assert [op.opname for op in muops] == ['mu_getiref', 'mu_getvarpartiref', 'mu_shiftiref', 'mu_store']
+    for op in muops:
+        check_muop(op)
