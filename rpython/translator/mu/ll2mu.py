@@ -558,7 +558,7 @@ class LL2MuMapper:
                                           res))
         else:
             v = llop.args[0]
-        SpaceOperation.__init__(llop, 'mu_binop', [
+        llop.__init__('mu_binop', [
             self.mapped_const(rmu.MuBinOptr.XOR),
             v,
             self.mapped_const(True),
@@ -570,7 +570,7 @@ class LL2MuMapper:
 
     def map_op_int_is_true(self, llop):
         cmp_res = self.var('cmp_res', mutype.MU_INT1)
-        SpaceOperation.__init__(llop, 'mu_select', [
+        llop.__init__('mu_select', [
             cmp_res,
             self.mapped_const(True),
             self.mapped_const(False)
@@ -584,7 +584,7 @@ class LL2MuMapper:
 
     def map_op_int_neg(self, llop):
         MuT = llop.args[0].concretetype
-        SpaceOperation.__init__(llop, 'int_sub', [
+        llop.__init__('int_sub', [
             Constant(MuT._val_type(0), MuT),
             llop.args[0],
         ],
@@ -611,7 +611,7 @@ class LL2MuMapper:
                                 cmp_res)
         ops.append(op_cmp)
         # True -> x, False -> -x
-        SpaceOperation.__init__(llop, 'mu_select', [cmp_res, x, neg_x], llop.result)
+        llop.__init__('mu_select', [cmp_res, x, neg_x], llop.result)
         ops.append(llop)
 
         return [op_neg, op_cmp, llop]
@@ -642,7 +642,7 @@ class LL2MuMapper:
         muops.extend(self.map_op(op_ge))
         op_lt = SpaceOperation('int_lt', [llop.args[1], llop.args[2]], lt_res)
         muops.extend(self.map_op(op_lt))
-        SpaceOperation.__init__(llop, 'int_and', [ge_res, lt_res], llop.result)
+        llop.__init__('int_and', [ge_res, lt_res], llop.result)
         muops.extend(self.map_op(llop))
         return muops
 
@@ -657,14 +657,14 @@ class LL2MuMapper:
             a, zero
         ],
                                 lt_zero)
-        SpaceOperation.__init__(llop, 'mu_select', [lt_zero, zero, a], llop.result)
+        llop.__init__('mu_select', [lt_zero, zero, a], llop.result)
         return [op_cmp, llop]
 
     def map_op_int_add_ovf(self, llop):
         flag_v = self.var('ovf_V', mutype.MU_INT1)
         flag = self.mapped_const(rmu.MuBinOpStatus.V)
 
-        SpaceOperation.__init__(llop, 'mu_binop', [
+        llop.__init__('mu_binop', [
             self.mapped_const(rmu.MuBinOptr.ADD),
             llop.args[0], llop.args[1],
             self.mapped_const({
@@ -680,7 +680,7 @@ class LL2MuMapper:
         flag_v = self.var('ovf_V', mutype.MU_INT1)
         flag = self.mapped_const(rmu.MuBinOpStatus.V)
 
-        SpaceOperation.__init__(llop, 'mu_binop', [
+        llop.__init__('mu_binop', [
             self.mapped_const(rmu.MuBinOptr.SUB),
             llop.args[0], llop.args[1],
             self.mapped_const({
@@ -694,7 +694,7 @@ class LL2MuMapper:
         flag_v = self.var('ovf_V', mutype.MU_INT1)
         flag = self.mapped_const(rmu.MuBinOpStatus.V)
 
-        SpaceOperation.__init__(llop, 'mu_binop', [
+        llop.__init__('mu_binop', [
             self.mapped_const(rmu.MuBinOptr.MUL),
             llop.args[0], llop.args[1],
             self.mapped_const({
@@ -705,7 +705,7 @@ class LL2MuMapper:
         return [llop]
 
     def _map_binop(self, llop):
-        SpaceOperation.__init__(llop, 'mu_binop', [
+        llop.__init__('mu_binop', [
             self.mapped_const(_binop_map[llop.opname]),
             llop.args[0],
             llop.args[1],
@@ -723,7 +723,7 @@ class LL2MuMapper:
             llop.args[1],
         ],
                                 cmpres))
-        SpaceOperation.__init__(llop, 'mu_convop', [
+        llop.__init__('mu_convop', [
             self.mapped_const(rmu.MuConvOptr.ZEXT),
             cmpres,
             self.mapped_const(mutype.MU_INT8)
@@ -733,13 +733,94 @@ class LL2MuMapper:
         return muops
 
     def _map_convop(self, llop):
-        SpaceOperation.__init__(llop, 'mu_convop', [
+        llop.__init__('mu_convop', [
             self.mapped_const(_prim_castop_map[llop.opname]),
             llop.args[0],
             self.mapped_const(llop.result.concretetype)
         ],
                                 llop.result)
         return [llop]
+
+    # ----------------
+    # memory and pointer ops
+    def map_op_malloc(self, llop):
+        flavor = llop.args[-1].value['flavor']
+        if flavor == 'gc':
+            assert isinstance(llop.result.concretetype, mutype.MuRef)
+            llop.__init__('mu_new', [llop.args[0]], llop.result)
+            return [llop]
+        else:
+            assert isinstance(llop.result.concretetype, mutype.MuUPtr)
+            raise NotImplementedError
+
+    def map_op_malloc_varsize(self, llop):
+        ops = []
+        MuT_c, hints_c, n_c = llop.args
+        flavor = hints_c.value['flavor']
+        if flavor == 'gc':
+            assert isinstance(llop.result.concretetype, mutype.MuRef)
+            llop.__init__('mu_newhybrid', [MuT_c, n_c], llop.result)
+            ops.append(llop)
+        else:
+            assert isinstance(llop.result.concretetype, mutype.MuUPtr)
+            raise NotImplementedError
+        MuT = MuT_c.value
+        if 'length' in MuT._names:
+            ops.extend(self.map_op(SpaceOperation('setfield', [
+                llop.result, Constant('length', mutype.MU_VOID), n_c
+            ],
+                                                  self.var('dummy', mutype.MU_VOID))))
+
+        return ops
+
+    def _getfieldiref(self, var, fldname_c):
+        ops = []
+        MuT = var.concretetype
+        fldname = fldname_c.value
+        if isinstance(MuT, mutype.MuRef):
+            iref = self.var('ir%s' % var.name, mutype.MuIRef(MuT.TO))
+            ops.append(SpaceOperation('mu_getiref', [var], iref))
+        else:
+            iref = var
+        if isinstance(MuT.TO, mutype.MuHybrid) and fldname == MuT.TO._varfld:
+            iref_fld = self.var('ir%s_%s' % (var.name, fldname_c), mutype.MuIRef(MuT.TO._vartype.OF))
+            ops.append(SpaceOperation('mu_getvarpartiref', [iref], iref_fld))
+        else:
+            assert isinstance(MuT.TO, (mutype.MuStruct, mutype.MuHybrid))
+            idx = MuT.TO._index_of(fldname)     # NOTE: may throw AttributeError
+            iref_fld = self.var('irf%s_%s' % (var.name, fldname), mutype.MuIRef(getattr(MuT.TO, fldname)))
+            ops.append(SpaceOperation('mu_getfieldiref', [iref, fldname_c], iref_fld))  # preserve field name until the end
+        return iref_fld, ops
+
+    def map_op_getfield(self, llop):
+        var, fldname_c = llop.args
+        try:
+            iref_fld, ops = self._getfieldiref(var, fldname_c)
+        except AttributeError:
+            log.error("Field '%s' not found in type '%s'." % (fldname_c.value, var.concretetype.TO))
+            raise IgnoredLLOp
+
+        llop.__init__('mu_load', [iref_fld,
+                                  self.mapped_const({'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})],
+                      llop.result)
+        ops.append(llop)
+        return ops
+
+    def map_op_setfield(self, llop):
+        var, fldname_c, val_c = llop.args
+        try:
+            iref_fld, ops = self._getfieldiref(var, fldname_c)
+        except AttributeError:
+            log.error("Field '%s' not found in type '%s'." % (fldname_c.value, var.concretetype.TO))
+            raise IgnoredLLOp
+        assert iref_fld.concretetype.TO == val_c.concretetype, \
+            "cannot store value %s of type %s to %s" % (val_c.value, val_c.concretetype, iref_fld.concretetype)
+
+        llop.__init__('mu_store', [iref_fld, val_c,
+                                   self.mapped_const({'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})],
+                      llop.result)
+        ops.append(llop)
+        return ops
 
 def _init_binop_map():
     __binop_map = {

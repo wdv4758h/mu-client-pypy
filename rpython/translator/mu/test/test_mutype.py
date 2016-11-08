@@ -39,6 +39,7 @@ def test_containers():
     assert s.x == mu_int64(10)
     hash(s.x) == mu_int64(10)
     assert s[0] == s.x
+    assert S._index_of('y') == 1
 
     H = MuHybrid("String", ("hash", MU_INT64),
                  ("length", MU_INT64), ("chars", MU_INT8))
@@ -56,6 +57,9 @@ def test_containers():
         h.chars[0] = mu_int64(ord('c'))
     h.chars[0] = mu_int8(ord('c'))
     assert h.chars[0] == mu_int8(ord('c'))
+    assert H._index_of('length') == 1
+    with pytest.raises(AttributeError):
+        H._index_of('chars')    # cannot get index of variable part
 
     A = MuArray(S, 5)
     assert A.OF == S

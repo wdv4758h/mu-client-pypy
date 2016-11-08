@@ -448,6 +448,13 @@ class MuHybrid(MuContainerType):
     def __getitem__(self, idx):  # support indexing into the fixed part only
         return self._flds[self._names[:-1][idx]]
 
+    def _index_of(self, fld):
+        if fld not in self._names:
+            self._nofield(fld)
+        if fld == self._varfld:
+            raise AttributeError("cannot index variable field %s in %s" % (fld, self))
+        return self._names.index(fld)
+
     def _container_example(self):
         return _muhybrid(self, 1)
 
