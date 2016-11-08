@@ -381,6 +381,10 @@ class MuVM:
             if extra_srcs_arr:
                 rffi.free_charpp(extra_srcs_arr)
 
+    def current_thread_as_mu_thread(self, threadlocal):
+        # type: (MuCPtr) -> None
+        self._mu.c_current_thread_as_mu_thread(self._mu, threadlocal)
+
 
 class MuCtx:
     def __init__(self, mu, rffi_ctx_ptr):
@@ -1324,6 +1328,7 @@ _MuVM.become(rffi.CStruct(
     ('name_of', rffi.CCallback([_MuVMPtr, MuID], MuName)),
     ('set_trap_handler', rffi.CCallback([_MuVMPtr, MuTrapHandler, MuCPtr], lltype.Void)),
     ('compile_to_sharedlib', rffi.CCallback([_MuVMPtr, MuCString, MuCStringPtr, MuArraySize], lltype.Void)),
+    ('current_thread_as_mu_thread', rffi.CCallback([_MuVMPtr, MuCPtr], lltype.Void)),
 ))
 _MuCtx.become(rffi.CStruct(
     'MuCtx',
