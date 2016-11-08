@@ -147,4 +147,4 @@ if __name__ == '__main__':
             raise argparse.ArgumentError(arg_vmargs,
                                          "must be specified with '--impl ref'.")
 
-    impl_jit_test(opts, build_test_bundle, extend_with_entrypoint, ["test_ccall_fnc.c"])
+    impl_jit_test(opts, build_test_bundle, extend_with_entrypoint, ["../suite/test_ccall_fnc.c"])
