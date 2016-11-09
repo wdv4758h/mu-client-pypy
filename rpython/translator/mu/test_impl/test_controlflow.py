@@ -235,7 +235,7 @@ def test_ccall(cmdopt):
             .typedef @i64 = int<64>
             .funcsig @sig_i64_i64 = (@i64) -> (@i64)
             .typedef @fnpsig_i64_i64 = ufuncptr<@sig_i64_i64>
-            .const @c_fnc = "fnc"
+            .const @c_fnc <@fnpsig_i64_i64> = EXTERN "fnc"
             .funcdef @test_ccall VERSION @test_ccall_v1 <@sig_i64_i64> {
                 @test_ccall_v1.blk0(<@i64> @test_ccall_v1.blk0.k):
                     @test_ccall_v1.blk0.res = CCALL <@sig_i64_i64> @c_fnc (@test_ccall_v1.blk0.k)
@@ -352,3 +352,66 @@ def test_ccall(cmdopt):
         })
 
     impl_jit_test(cmdopt, build_test_bundle, extend_with_entrypoint, ["../suite/test_ccall_fnc.c"])
+
+
+def test_extern_func(cmdopt):
+    def build_test_bundle(bldr, rmu):
+        """
+        Builds the following test bundle.
+            .typedef @i32 = int<32>
+            .typedef @i64 = int<64>
+            .typedef @void = void
+            .typedef @voidp = uptr<@void>
+            .const @fd_stdout <@i32> = 1
+            .funcsig @sig_voidpi64_i64 = (@voidp @i64) -> ()
+            .funcsig @sig_i32voidpi64_i64 = (@i32 @voidp @i64) -> (@i64)
+            .typedef @fnpsig_i32voidpi64_i64 = ufuncptr<@sig_i32voidpi64_i64>
+            .const c_write <@fnpsig_voidpi64_i64> = EXTERN "write"
+            .funcdef @test_write VERSION @test_write_v1 <@sig_voidpi64_i64> {
+                %blk0(<@voidp> %buf <@i64> %sz):
+                    %res = CCALL <@sig_i32voidpi64_i64> @c_write (@fd_stdout %buf %sz)
+                    RET %res
+            }
+
+        :type bldr: rpython.rlib.rmu.MuIRBuilder
+        :type rmu: rpython.rlib.rmu
+        :return: (rmu.MuVM(), rmu.MuCtx, rmu.MuIRBuilder, MuID, MuID)
+        """
+        i32 = bldr.gen_sym("@i32"); bldr.new_type_int(i32, 32)
+        i64 = bldr.gen_sym("@i64"); bldr.new_type_int(i64, 64)
+        void = bldr.gen_sym("@void"); bldr.new_type_void(void)
+        voidp = bldr.gen_sym("@voidp"); bldr.new_type_uptr(voidp, void)
+
+        fd_stdout = bldr.gen_sym("@fd_stdout"); bldr.new_const_int(fd_stdout, i32, 1)
+        sig_voidpi64_i64 = bldr.gen_sym("@sig_voidpi64_i64"); bldr.new_funcsig(sig_voidpi64_i64, [voidp, i64], [i64])
+        sig_i32voidpi64_i64 = bldr.gen_sym("@sig_i32voidpi64_i64"); bldr.new_funcsig(sig_i32voidpi64_i64, [i32, voidp, i64], [i64])
+
+        fnpsig_i32voidpi64_i64 = bldr.gen_sym("@fnpsig_i32voidpi64_i64"); bldr.new_type_ufuncptr(fnpsig_i32voidpi64_i64, sig_i32voidpi64_i64)
+
+        c_write = bldr.gen_sym("@c_write"); bldr.new_const_extern(c_write, fnpsig_i32voidpi64_i64, "write")
+
+        test_write = bldr.gen_sym("@test_write"); bldr.new_func(test_write, sig_voidpi64_i64)
+
+        # function body
+        v1 = bldr.gen_sym("@test_write_v1")
+        blk0 = bldr.gen_sym("@test_write_v1.blk0")
+
+        # blk0
+        buf = bldr.gen_sym("@test_write_v1.blk0.buf")
+        sz = bldr.gen_sym("@test_write_v1.blk0.sz")
+        res = bldr.gen_sym("@test_write_v1.blk0.res")
+        op_ccall = bldr.gen_sym(); bldr.new_ccall(op_ccall, [res], rmu.MuCallConv.DEFAULT, fnpsig_i32voidpi64_i64, sig_i32voidpi64_i64, c_write,
+                                                  [fd_stdout, buf, sz])
+        op_ret = bldr.gen_sym(); bldr.new_ret(op_ret, [res])
+        bldr.new_bb(blk0, [buf, sz], [voidp, i64], rmu.MU_NO_ID, [op_ccall, op_ret])
+        bldr.new_func_ver(v1, test_write, [blk0])
+
+        return {
+            "@i32": i32,
+            "@i64": i64,
+            "test_fnc_sig": sig_voidpi64_i64,
+            "test_fnc": test_write,
+            "fncs": [test_write],
+            "result_type": i64
+        }
+    impl_jit_test(cmdopt, build_test_bundle)
