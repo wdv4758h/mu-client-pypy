@@ -485,11 +485,6 @@ class LL2MuMapper:
         c = Constant(muv, MuT)
         return c
 
-    def var(self, name, MuT):
-        v = Variable(name)
-        v.concretetype = MuT
-        return v
-
     def map_op(self, llop):
         """
         May RTyped operations to Mu operations.
@@ -550,7 +545,7 @@ class LL2MuMapper:
     def map_op_bool_not(self, llop):
         ops = []
         if llop.args[0].concretetype is mutype.MU_INT1:
-            res = self.var('res', mutype.MU_INT8)
+            res = varof(mutype.MU_INT8, 'res')
             v = ops.append(SpaceOperation('mu_convop', [
                 self.mapped_const(rmu.MuConvOptr.ZEXT),
                 llop.args[0],
@@ -570,7 +565,7 @@ class LL2MuMapper:
         return ops
 
     def map_op_int_is_true(self, llop):
-        cmp_res = self.var('cmp_res', mutype.MU_INT1)
+        cmp_res = varof(mutype.MU_INT1, 'cmp_res')
         llop.__init__('mu_select', [
             cmp_res,
             self.mapped_const(True),
@@ -600,11 +595,11 @@ class LL2MuMapper:
         x = llop.args[0]
         MuT = x.concretetype
         # -x = 0 - x
-        neg_x = self.var('neg_x', x.concretetype)
+        neg_x = varof(x.concretetype, 'neg_x')
         op_neg = SpaceOperation('int_neg', [x], neg_x)
         ops.extend(self.map_op(op_neg))
         # x > 0 ?
-        cmp_res = self.var('cmp_res', mutype.MU_INT1)
+        cmp_res = varof(mutype.MU_INT1, 'cmp_res')
         op_cmp = SpaceOperation('mu_cmpop', [
             self.mapped_const(rmu.MuCmpOptr.SGT),
             x, Constant(MuT._val_type(0), MuT)
@@ -626,7 +621,7 @@ class LL2MuMapper:
         ops = []
         x = llop.args[0]
 
-        neg_x = self.var('neg_x', x.concretetype)
+        neg_x = varof(x.concretetype, 'neg_x')
         op_neg = SpaceOperation('int_neg', [x], neg_x)
         ops.extend(self.map_op(op_neg))
 
@@ -637,8 +632,8 @@ class LL2MuMapper:
 
     def map_op_int_between(self, llop):
         muops = []
-        ge_res = self.var('ge_res', mutype.MU_INT8)
-        lt_res = self.var('lt_res', mutype.MU_INT8)
+        ge_res = varof(mutype.MU_INT8, 'ge_res')
+        lt_res = varof(mutype.MU_INT8, 'lt_res')
         op_ge = SpaceOperation('int_ge', [llop.args[1], llop.args[0]], ge_res)
         muops.extend(self.map_op(op_ge))
         op_lt = SpaceOperation('int_lt', [llop.args[1], llop.args[2]], lt_res)
@@ -652,7 +647,7 @@ class LL2MuMapper:
         a = llop.args[0]
         MuT = a.concretetype
         zero = Constant(MuT._val_type(0), MuT)
-        lt_zero = self.var('lt_zero', mutype.MU_INT1)
+        lt_zero = varof(mutype.MU_INT1, 'lt_zero')
         op_cmp = SpaceOperation('mu_cmpop', [
             self.map_op(rmu.MuCmpOptr.SLT),
             a, zero
@@ -662,7 +657,7 @@ class LL2MuMapper:
         return [op_cmp, llop]
 
     def map_op_int_add_ovf(self, llop):
-        flag_v = self.var('ovf_V', mutype.MU_INT1)
+        flag_v = varof(mutype.MU_INT1, 'ovf_V')
         flag = self.mapped_const(rmu.MuBinOpStatus.V)
 
         llop.__init__('mu_binop', [
@@ -678,7 +673,7 @@ class LL2MuMapper:
     map_op_int_add_nonneg_ovf = map_op_int_add_ovf
 
     def map_op_int_sub_ovf(self, llop):
-        flag_v = self.var('ovf_V', mutype.MU_INT1)
+        flag_v = varof(mutype.MU_INT1, 'ovf_V')
         flag = self.mapped_const(rmu.MuBinOpStatus.V)
 
         llop.__init__('mu_binop', [
@@ -692,7 +687,7 @@ class LL2MuMapper:
         return [llop]
 
     def map_op_int_mul_ovf(self, llop):
-        flag_v = self.var('ovf_V', mutype.MU_INT1)
+        flag_v = varof(mutype.MU_INT1, 'ovf_V')
         flag = self.mapped_const(rmu.MuBinOpStatus.V)
 
         llop.__init__('mu_binop', [
@@ -717,7 +712,7 @@ class LL2MuMapper:
 
     def _map_cmpop(self, llop):
         muops = []
-        cmpres = self.var('cmpres', mutype.MU_INT1)
+        cmpres = varof(mutype.MU_INT1, 'cmpres')
         muops.append(SpaceOperation('mu_cmpop', [
             self.mapped_const(_binop_map[llop.opname]),
             llop.args[0],
@@ -770,7 +765,7 @@ class LL2MuMapper:
             ops.extend(self.map_op(SpaceOperation('setfield', [
                 llop.result, Constant('length', mutype.MU_VOID), n_c
             ],
-                                                  self.var('dummy', mutype.MU_VOID))))
+                                                  varof(mutype.MU_VOID, 'dummy'))))
 
         return ops
 
@@ -778,15 +773,16 @@ class LL2MuMapper:
         ops = []
         MuT = var.concretetype
         fldname = fldname_c.value
+        cls = mutype.MuUPtr if isinstance(MuT, mutype.MuUPtr) else mutype.MuIRef
         if isinstance(MuT, mutype.MuRef):
-            iref = self.var('ir%s' % var.name, mutype.MuIRef(MuT.TO))
+            iref = varof(cls(MuT.TO), 'ir%s' % var.name)
             ops.append(SpaceOperation('mu_getiref', [var], iref))
         else:
             iref = var
 
         assert isinstance(MuT.TO, (mutype.MuStruct, mutype.MuHybrid))
         idx = MuT.TO._index_of(fldname)     # NOTE: may throw AttributeError
-        iref_fld = self.var('irf%s_%s' % (var.name, fldname), mutype.MuIRef(getattr(MuT.TO, fldname)))
+        iref_fld = varof(cls(getattr(MuT.TO, fldname)), 'irf%s_%s' % (var.name, fldname))
         ops.append(SpaceOperation('mu_getfieldiref', [iref, fldname_c], iref_fld))  # preserve field name until the end
         return iref_fld, ops
 
@@ -829,7 +825,7 @@ class LL2MuMapper:
             raise IgnoredLLOp
 
         if isinstance(iref_fld.concretetype.TO, (mutype.MuRef, mutype.MuUPtr)):
-            res = self.var("%s_substt" % (var.name, iref_fld.concretetype.TO))
+            res = varof("%s_substt" % (var.name, iref_fld.concretetype.TO))
             ops.append(SpaceOperation('mu_load', [iref_fld,
                                                   self.mapped_const(
                                                       {'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})], res))
@@ -838,24 +834,25 @@ class LL2MuMapper:
     def _getarrayitemiref(self, var, idx_vc):
         ops = []
         MuT = var.concretetype
+        cls = mutype.MuUPtr if isinstance(MuT, mutype.MuUPtr) else mutype.MuIRef
         if isinstance(MuT, mutype.MuRef):
-            iref = self.var('ir%s' % var.name, mutype.MuIRef(MuT.TO))
+            iref = varof(cls(MuT.TO), 'ir%s' % var.name)
             ops.append(SpaceOperation('mu_getiref', [var], iref))
         else:
             iref = var
 
         if isinstance(MuT.TO, mutype.MuHybrid):
-            iref_itm0 = self.var('ira%s' % var.name, mutype.MuIRef(MuT.TO._vartype.OF))
+            iref_itm0 = varof(cls(MuT.TO._vartype.OF), 'ira%s' % var.name)
             ops.append(SpaceOperation('mu_getvarpartiref', [iref], iref_itm0))
         else:
             assert isinstance(MuT.TO, mutype.MuArray)
-            iref_itm0 = self.var('ira%s' % var.name, mutype.MuIRef(MuT.TO.OF))
+            iref_itm0 = varof(cls(MuT.TO.OF), 'ira%s' % var.name)
             ops.extend(self.map_op(SpaceOperation('cast_pointer', [
                 self.mapped_const(iref_itm0.concretetype), iref
             ],
                                                   iref_itm0)))
 
-        iref_itm = self.var('ir%s_itm' % var.name, mutype.MuIRef(iref_itm0.concretetype.TO))
+        iref_itm = varof(cls(iref_itm0.concretetype.TO), 'ir%s_itm' % var.name)
         ops.append(SpaceOperation('mu_shiftiref', [iref_itm0, idx_vc], iref_itm))
         return iref_itm, ops
 
@@ -888,6 +885,89 @@ class LL2MuMapper:
                       llop.result)
         ops.append(llop)
         return ops
+
+    def _getinterioriref(self, var, offsets):
+        ops = []
+        MuT = var.concretetype
+        cls = mutype.MuUPtr if isinstance(MuT, mutype.MuUPtr) else mutype.MuIRef
+        if isinstance(MuT, mutype.MuRef):
+            iref = varof(cls(MuT.TO), 'ir%s' % var.name)
+            ops.append(SpaceOperation('mu_getiref', [var], iref))
+        else:
+            iref = var
+
+        for o in offsets:
+            if o.concretetype == mutype.MU_VOID:
+                assert isinstance(o, Constant)
+                assert isinstance(o.value, str)
+                T = iref.concretetype.TO
+                if isinstance(T, mutype.MuHybrid) and o.value == T._varfld:
+                    iref_var = varof(cls(T._vartype.OF), 'ira%s' % var.name)
+                    ops.append(SpaceOperation('mu_getvarpartiref', [iref], iref_var))
+                    iref = iref_var
+                else:
+                    iref, subops = self._getfieldiref(iref, o)
+                    ops.extend(subops)
+            else:
+                assert isinstance(o.concretetype, mutype.MuIntType)
+                if len(ops) == 0 or ops[-1].opname != 'mu_getvarpartiref':
+                    # This case happens when the outer container is array,
+                    # and rtyper assumes it can respond to indexing.
+                    # For translated hybrid type however, we need to get the variable part reference first.
+                    assert isinstance(iref.concretetype.TO, mutype.MuHybrid)
+                    iref_var = varof(cls(T._vartype.OF), 'ira%s' % var.name)
+                    ops.append(SpaceOperation('mu_getvarpartiref', [iref], iref_var))
+                    iref = iref_var
+                iref_itm = varof(cls(iref.concretetype.TO), 'ir%s_itm' % var.name)
+                ops.append(SpaceOperation('mu_shiftiref', [iref, o], iref_itm))
+                iref = iref_itm
+
+        return iref, ops
+
+    def map_op_getinteriorfield(self, llop):
+        var = llop.args[0]
+        offsets = llop.args[1:]
+        try:
+            iref, ops = self._getinterioriref(var, offsets)
+        except AttributeError:
+            raise IgnoredLLOp
+
+        llop.__init__('mu_load', [iref, self.mapped_const({'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})],
+                      llop.result)
+        ops.append(llop)
+        return ops
+
+    def map_op_setinteriorfield(self, llop):
+        var = llop.args[0]
+        offsets = llop.args[1:-1]
+        val_vc = llop.args[-1]
+        try:
+            iref, ops = self._getinterioriref(var, offsets)
+        except AttributeError:
+            raise IgnoredLLOp
+
+        llop.__init__('mu_store', [iref, val_vc,
+                                   self.mapped_const({'memord': self.mapped_const(rmu.MuMemOrd.NOT_ATOMIC)})],
+                      llop.result)
+        ops.append(llop)
+        return ops
+
+    def map_op_getinteriorarraysize(self, llop):
+        iref, ops = self._getinterioriref(llop.args[0], llop.args[1:-1])
+        o = llop.args[-1]
+        assert o.concretetype == mutype.MU_VOID and isinstance(o.value, str)
+        Hyb = iref.concretetype.TO
+        assert isinstance(Hyb, mutype.MuHybrid) and o.value == Hyb._varfld
+
+        ops.extend(self.map_op(SpaceOperation('getarraysize', [iref], llop.result)))
+        return ops
+
+
+def varof(MuT, name=None):
+    v = Variable(name)
+    v.concretetype = MuT
+    return v
+
 
 def _init_binop_map():
     __binop_map = {

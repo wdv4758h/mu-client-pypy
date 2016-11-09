@@ -1,5 +1,6 @@
 from rpython.translator.mu.ll2mu import *
-from rpython.translator.mu.ll2mu import _init_binop_map
+from rpython.translator.mu.ll2mu import _init_binop_map, varof
+
 
 def test_map_type_prim():
     ll2mu = LL2MuMapper()
@@ -506,7 +507,7 @@ def test_bool_not():
     ll2mu = LL2MuMapper()
     llop = SpaceOperation('bool_not',
                           [ll2mu.mapped_const(True)],
-                          ll2mu.var('res', mutype.MU_INT8))
+                          varof(mutype.MU_INT8, 'res'))
     muops = ll2mu.map_op(llop)
     assert len(muops) == 1
     binop = muops[0]
@@ -519,7 +520,7 @@ def test_int_abs():
     ll2mu = LL2MuMapper()
     llop = SpaceOperation('int_abs',
                           [ll2mu.mapped_const(-125)],
-                          ll2mu.var('res', mutype.MU_INT64))
+                          varof(mutype.MU_INT64, 'res'))
     muops = ll2mu.map_op(llop)
     assert len(muops) == 3
     assert [op.opname for op in muops] == ['mu_binop', 'mu_cmpop', 'mu_select']
@@ -529,8 +530,8 @@ def test_int_abs():
 def test_int_between():
     ll2mu = LL2MuMapper()
     llop = SpaceOperation('int_between',
-                          [ll2mu.mapped_const(42), ll2mu.var('x', mutype.MU_INT64), ll2mu.mapped_const(100)],
-                          ll2mu.var('res', ll2mu.map_type(lltype.Bool)))
+                          [ll2mu.mapped_const(42), varof(mutype.MU_INT64, 'x'), ll2mu.mapped_const(100)],
+                          varof(ll2mu.map_type(lltype.Bool), 'res'))
     muops = ll2mu.map_op(llop)
     assert len(muops) == 5
     assert [op.opname for op in muops] == ['mu_cmpop', 'mu_convop', 'mu_cmpop', 'mu_convop', 'mu_binop']
@@ -540,8 +541,8 @@ def test_int_between():
 def test_int_mul_ovf():
     ll2mu = LL2MuMapper()
     llop = SpaceOperation('int_mul_ovf',
-                          [ll2mu.var('a', mutype.MU_INT64), ll2mu.var('b', mutype.MU_INT64)],
-                          ll2mu.var('res', mutype.MU_INT64))
+                          [varof(mutype.MU_INT64, 'a'), varof(mutype.MU_INT64, 'b')],
+                          varof(mutype.MU_INT64, 'res'))
     muops = ll2mu.map_op(llop)
     assert len(muops) == 1
     muop = muops[0]
@@ -549,7 +550,8 @@ def test_int_mul_ovf():
 
 def test_cast_char_to_int():
     ll2mu = LL2MuMapper()
-    llop = SpaceOperation('cast_char_to_int', [ll2mu.var('c', ll2mu.map_type(lltype.Char))], ll2mu.var('res', mutype.MU_INT64))
+    llop = SpaceOperation('cast_char_to_int', [varof(ll2mu.map_type(lltype.Char), 'c')],
+                          varof(mutype.MU_INT64, 'res'))
     check_muop(ll2mu.map_op(llop)[0])
 
 def test_binop_map():
@@ -658,7 +660,7 @@ def test_binop_map():
 def test_malloc_varsize():
     ll2mu = LL2MuMapper()
     Hyb = mutype.MuHybrid('string', ('hash', mutype.MU_INT64), ('length', mutype.MU_INT64), ('chars', mutype.MU_INT8))
-    rs = ll2mu.var("rs", mutype.MuRef(Hyb))
+    rs = varof(mutype.MuRef(Hyb), "rs")
     llop = SpaceOperation('malloc_varsize', [ll2mu.mapped_const(Hyb),
                                              ll2mu.mapped_const({'flavor': 'gc'}),
                                              ll2mu.mapped_const(10)],
@@ -671,10 +673,36 @@ def test_malloc_varsize():
 def test_setarrayitem():
     ll2mu = LL2MuMapper()
     Hyb = mutype.MuHybrid('string', ('hash', mutype.MU_INT64), ('length', mutype.MU_INT64), ('chars', mutype.MU_INT8))
-    rs = ll2mu.var("rs", mutype.MuRef(Hyb))
+    rs = varof(mutype.MuRef(Hyb), "rs")
     res = Variable('res')
     llop = SpaceOperation('setarrayitem', [rs, ll2mu.mapped_const(5), ll2mu.mapped_const('c')], res)
     muops = ll2mu.map_op(llop)
     assert [op.opname for op in muops] == ['mu_getiref', 'mu_getvarpartiref', 'mu_shiftiref', 'mu_store']
+    for op in muops:
+        check_muop(op)
+
+def test_getinteriorarraysize():
+    ll2mu = LL2MuMapper()
+    Str = mutype.MuHybrid('string', ('hash', mutype.MU_INT64), ('length', mutype.MU_INT64), ('chars', mutype.MU_INT8))
+    ps = varof(mutype.MuUPtr(Str), 'rs')
+    res = varof(mutype.MU_INT64, 'res')
+    llop = SpaceOperation('getinteriorarraysize', [ps, Constant('chars', mutype.MU_VOID)], res)
+    muops = ll2mu.map_op(llop)
+    assert [op.opname for op in muops] == ['mu_getfieldiref', 'mu_load']
+    assert isinstance(muops[0].result.concretetype, mutype.MuUPtr)
+    for op in muops:
+        check_muop(op)
+
+def test_setinteriorfield():
+    ll2mu = LL2MuMapper()
+    Stt = mutype.MuStruct('point', ('x', mutype.MU_INT64), ('y', mutype.MU_INT64))
+    Hyb = mutype.MuHybrid('array', ('length', mutype.MU_INT64), ('points', Stt))
+    rh = varof(mutype.MuRef(Hyb))
+    res = varof(mutype.MU_VOID)
+    llop = SpaceOperation('setinteriorfield', [rh, Constant('points', mutype.MU_VOID),
+                                               Constant(5, mutype.MU_INT64), Constant('x', mutype.MU_VOID),
+                                               Constant(42, mutype.MU_INT64)], res)
+    muops = ll2mu.map_op(llop)
+    assert [op.opname for op in muops] == ['mu_getiref', 'mu_getvarpartiref', 'mu_shiftiref', 'mu_getfieldiref', 'mu_store']
     for op in muops:
         check_muop(op)
