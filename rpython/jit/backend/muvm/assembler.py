@@ -150,6 +150,8 @@ class AssemblerMu(BaseAssembler):
             clt.asmmemmgr_blocks = []
         return clt.asmmemmgr_blocks
 
+    # at the end we need to store dirty vars to a frame (or something) in the
+    # heap
     def assemble_loop(self, jd_id, unique_id, logger, loopname, inputargs,
                       operations, looptoken, log):
         # TODO: this is copied from arm
@@ -163,6 +165,7 @@ class AssemblerMu(BaseAssembler):
 
         self.setup(looptoken)
 
+        # TODO: need to allocate appropriate mu object
         # set clt.frame_info to a newly allocated jitframe.JITFRAMEINFOPTR
         # frame_info = self.datablockwrapper.malloc_aligned(
         #         jitframe.JITFRAMEINFO_SIZE)
@@ -177,32 +180,35 @@ class AssemblerMu(BaseAssembler):
         allgcrefs = []
         operations = regalloc.prepare_loop(inputargs, operations, looptoken,
                                            allgcrefs)
-        functionpos = self.mc.get_relative_pos()
+        # functionpos = self.mc.get_relative_pos()
 
-        self._call_header_with_stack_check()
-        self._check_frame_depth_debug(self.mc)
+        # self._call_header_with_stack_check()
+        # self._check_frame_depth_debug(self.mc)
 
-        loop_head = self.mc.get_relative_pos()
-        looptoken._ll_loop_code = loop_head
+        # loop_head = self.mc.get_relative_pos()
+        # looptoken._ll_loop_code = loop_head
+
+        # frame_depth is probably frame size
+        # frame_depth_no_fixed_size = self._assemble(regalloc, inputargs,
+        #                                            operations)
+        # self.update_frame_depth(frame_depth_no_fixed_size + JITFRAME_FIXED_SIZE)
         #
-        frame_depth_no_fixed_size = self._assemble(regalloc, inputargs,
-                                                   operations)
-        self.update_frame_depth(frame_depth_no_fixed_size + JITFRAME_FIXED_SIZE)
-        #
-        size_excluding_failure_stuff = self.mc.get_relative_pos()
+        # size_excluding_failure_stuff = self.mc.get_relative_pos()
 
-        self.write_pending_failure_recoveries()
+        # self.write_pending_failure_recoveries()
 
-        full_size = self.mc.get_relative_pos()
+        # full_size = self.mc.get_relative_pos()
+        # TODO: this is where we actually toss the bundle into Mu
         rawstart = self.materialize_loop(looptoken)
-        looptoken._ll_function_addr = rawstart + functionpos
+        # looptoken._ll_function_addr = rawstart + functionpos
 
-        self.patch_gcref_table(looptoken, rawstart)
-        self.process_pending_guards(rawstart)
-        self.fixup_target_tokens(rawstart)
+        # TODO: Remove all of this. No Pypy GC + naming stuff
+        # self.patch_gcref_table(looptoken, rawstart)
+        # self.process_pending_guards(rawstart)
+        # self.fixup_target_tokens(rawstart)
 
-        if log and not we_are_translated():
-            self.mc._dump_trace(rawstart, 'loop.mu')
+        # if log and not we_are_translated():
+        #     self.mc._dump_trace(rawstart, 'loop.mu')
 
         ops_offset = self.mc.ops_offset
         if logger is not None:
@@ -212,21 +218,21 @@ class AssemblerMu(BaseAssembler):
         self.teardown()
 
         debug_start("jit-backend-addr")
-        debug_print("Loop %d (%s) has address 0x%x to 0x%x (bootstrap 0x%x)" % (
-            looptoken.number, loopname,
-            r_uint(rawstart + loop_head),
-            r_uint(rawstart + size_excluding_failure_stuff),
-            r_uint(rawstart + functionpos)))
+        # debug_print("Loop %d (%s) has address 0x%x to 0x%x (bootstrap 0x%x)" % (
+        #     looptoken.number, loopname,
+        #     r_uint(rawstart + loop_head),
+        #     r_uint(rawstart + size_excluding_failure_stuff),
+        #     r_uint(rawstart + functionpos)))
         debug_print("       gc table: 0x%x" % r_uint(rawstart))
-        debug_print("       function: 0x%x" % r_uint(rawstart + functionpos))
-        debug_print("         resops: 0x%x" % r_uint(rawstart + loop_head))
-        debug_print("       failures: 0x%x" % r_uint(rawstart +
-                                                     size_excluding_failure_stuff))
-        debug_print("            end: 0x%x" % r_uint(rawstart + full_size))
+        # debug_print("       function: 0x%x" % r_uint(rawstart + functionpos))
+        # debug_print("         resops: 0x%x" % r_uint(rawstart + loop_head))
+        # debug_print("       failures: 0x%x" % r_uint(rawstart +
+        #                                              size_excluding_failure_stuff))
+        # debug_print("            end: 0x%x" % r_uint(rawstart + full_size))
         debug_stop("jit-backend-addr")
 
-        return AsmInfo(ops_offset, rawstart + loop_head,
-                       size_excluding_failure_stuff - loop_head)
+        # return AsmInfo(ops_offset, rawstart + loop_head,
+        #                size_excluding_failure_stuff - loop_head)
 
     def _assemble(self, regalloc, inputargs, operations):
         # TODO: copied from ARM
