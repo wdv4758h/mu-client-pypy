@@ -216,343 +216,51 @@ def test_mapped_const():
     assert f.value == mutype.mu_int8(10)
     assert f.concretetype == mutype.MU_INT8
 
-def check_muop(muop):
-    for arg in muop.args:
-        assert isinstance(arg, (Variable, Constant))
-        assert isinstance(arg.concretetype, mutype.MuType)
-
-    def check_flag(const, cls):
-        assert isinstance(const, Constant)
-        assert const.concretetype == mutype.MU_INT32
-        flags = filter(lambda k: k.isupper(), cls.__dict__.keys())
-        assert any(const.value == getattr(cls, flag) for flag in flags)
-
-    res = muop.result
-    args = muop.args
-    if muop.opname == 'mu_binop':
-        """
-        The arguments of mu_binops are:
-            0: optr(Constant(rmu.MuBinOptr)>
-            1: operand 1
-            2: operand 2
-            3: metainfo(Constant(dict))
-                - 'exc': exception clause
-                - 'status': (ORed rmu.BinOpStatus, list of result Variables)
-        """
-        assert len(args) == 4
-        check_flag(args[0], rmu.MuBinOptr)
-
-        assert args[1].concretetype == args[2].concretetype == res.concretetype
-
-        assert isinstance(args[3], Constant)
-        assert isinstance(args[3].value, dict)
-        d = args[3].value
-        if 'exc' in d:
-            assert isinstance(d['exc'], tuple)
-            assert isinstance(d['exc'][0], Link)
-            assert isinstance(d['exc'][1], Link)
-        if 'status' in d:
-            assert isinstance(d['status'][0], Constant)
-            assert d['status'][0].concretetype == mutype.MU_INT32
-            assert isinstance(d['status'][1], list)
-            for v in d['status'][1]:
-                assert isinstance(v, Variable)
-
-    elif muop.opname == 'mu_cmpop':
-        """
-        The arguments of mu_cmpop are:
-            0: optr(Constant(rmu.MuCmpOptr)>
-            1: operand 1
-            2: operand 2
-        """
-        assert len(args) == 3
-        check_flag(args[0], rmu.MuCmpOptr)
-
-        assert args[1].concretetype == args[2].concretetype
-        assert res.concretetype == mutype.MU_INT1
-
-    elif muop.opname == 'mu_convop':
-        """
-        The arguments of mu_convop are:
-        0: optr(Constant(rmu.MuConvOptr)>
-        1: operand
-        2: to_ty (Constant(MuType))
-        """
-        assert len(args) == 3
-        check_flag(args[0], rmu.MuConvOptr)
-
-        assert isinstance(args[2], Constant)
-        assert isinstance(args[2].value, mutype.MuType)
-        assert res.concretetype == args[2].value
-
-    elif muop.opname == 'mu_select':
-        assert len(args) == 3
-        assert args[0].concretetype == mutype.MU_INT1
-        assert args[1].concretetype == args[2].concretetype == res.concretetype
-
-    elif muop.opname == 'mu_branch':
-        assert len(args) == 1
-        assert isinstance(args[0], Constant)
-        assert isinstance(args[0].value, Link)
-
-    elif muop.opname == 'mu_branch2':
-        assert len(args) == 3
-        assert args[0].concretetype == mutype.MU_INT1
-        assert isinstance(args[1], Constant)
-        assert isinstance(args[1].value, Link)
-        assert isinstance(args[2], Constant)
-        assert isinstance(args[2].value, Link)
-
-    elif muop.opname == 'mu_switch':
-        MuT = args[0].concretetype
-        # 1: default case
-        assert isinstance(args[1], Constant)
-        assert isinstance(args[1].value, Link)
-        for arg in args[2:]:
-            assert isinstance(arg, Constant)
-            assert isinstance(arg.value, Link)
-            assert isinstance(arg.value.exitcase, (Variable, Constant))
-            assert arg.value.exitcase.concretetype == MuT
-
-    elif muop.opname == 'mu_call':
-        assert isinstance(args[0].concretetype, mutype.MuGeneralFunctionReference)
-        Sig = args[0].concretetype.Sig
-        assert len(args[1:-1]) == len(Sig.ARGS)
-        for i, arg in enumerate(args[1:]):
-            assert arg.concretetype == Sig.ARGS[i]
-        assert res.concretetype == Sig.RESULTS[0]   # still assumes call only return 1 value
-
-        # last argument as meta info
-        assert isinstance(args[-1], Constant)
-        assert isinstance(args[-1].value, dict)
-        metainfo = args[-1].value
-        if 'keepalive' in metainfo:
-            lst = metainfo['keepalive']
-            for v in lst:
-                assert isinstance(v, (Constant, Variable))
-        if 'excclause' in metainfo:
-            nor, exc = metainfo['excclause']
-            assert isinstance(nor, Link)
-            assert isinstance(exc, Link)
-
-    elif muop.opname == 'mu_tailcall':
-        assert isinstance(args[0].concretetype, mutype.MuGeneralFunctionReference)
-        Sig = args[0].concretetype.Sig
-        assert len(args[1:-1]) == len(Sig.ARGS)
-        for i, arg in enumerate(args[1:]):
-            assert arg.concretetype == Sig.ARGS[i]
-        assert res.concretetype == Sig.RESULTS[0]  # still assumes call only return 1 value
-
-        # last argument as meta info
-        assert isinstance(args[-1], Constant)
-        assert isinstance(args[-1].value, dict)
-        metainfo = args[-1].value
-        if 'keepalive' in metainfo:
-            lst = metainfo['keepalive']
-            for v in lst:
-                assert isinstance(v, (Constant, Variable))
-        if 'excclause' in metainfo:
-            nor, exc = metainfo['excclause']
-            assert isinstance(nor, Link)
-            assert isinstance(exc, Link)
-
-    elif muop.opname == 'mu_ret':
-        assert len(args) in (0, 1)  # assume only return 1 value
-
-    elif muop.opname == 'mu_throw':
-        assert len(args) == 1
-        assert isinstance(args[0].concretetype, mutype.MuReferenceType)
-
-    # don't think it will ever appear
-    elif muop.opname == 'mu_extractvalue':
-        raise NotImplementedError
-    elif muop.opname == 'mu_insertvalue':
-        raise NotImplementedError
-    elif muop.opname == 'mu_extractelement':
-        raise NotImplementedError
-    elif muop.opname == 'mu_insertelement':
-        raise NotImplementedError
-
-    elif muop.opname == 'mu_new':
-        assert isinstance(args[0], Constant)
-        assert isinstance(args[0].value, mutype.MuType)
-        assert not isinstance(args[0].value, mutype.MuHybrid)
-        assert res.concretetype == mutype.MuRef(args[0].value)
-
-    elif muop.opname == 'mu_alloca':
-        assert isinstance(args[0], Constant)
-        assert isinstance(args[0].value, mutype.MuType)
-        assert not isinstance(args[0].value, mutype.MuHybrid)
-        assert res.concretetype == mutype.MuIRef(args[0].value)
-
-    elif muop.opname == 'mu_newhybrid':
-        assert isinstance(args[0], Constant)
-        assert isinstance(args[0].value, mutype.MuHybrid)
-        assert isinstance(args[1].concretetype, mutype.MuIntType)
-        assert res.concretetype == mutype.MuRef(args[0].value)
-
-    elif muop.opname == 'mu_allocahybrid':
-        assert isinstance(args[0], Constant)
-        assert isinstance(args[0].value, mutype.MuHybrid)
-        assert isinstance(args[1].concretetype, mutype.MuIntType)
-        assert res.concretetype == mutype.MuIRef(args[0].value)
-
-    elif muop.opname == 'mu_getiref':
-        assert isinstance(args[0].concretetype, mutype.MuRef)
-        assert res.concretetype == mutype.MuIRef(args[0].concretetype.TO)
-
-    elif muop.opname == 'mu_getfieldiref':
-        assert isinstance(args[0].concretetype, (mutype.MuIRef, mutype.MuUPtr))
-        MuT = args[0].concretetype.TO
-        fld = args[1].value
-        assert isinstance(fld, str)
-        assert fld in MuT._names
-        if isinstance(MuT, mutype.MuHybrid):
-            assert fld != MuT._varfld   # use getvarpartiref instead
-        FLD = getattr(MuT, fld)
-        cls = args[0].concretetype.__class__
-        assert res.concretetype == cls(FLD)
-
-    elif muop.opname == 'mu_getelemiref':
-        assert isinstance(args[0].concretetype, (mutype.MuIRef, mutype.MuUPtr))
-        MuT = args[0].concretetype.TO
-        assert isinstance(MuT, mutype.MuArray)
-        assert isinstance(args[1].concretetype, mutype.MuIntType)
-        ELM = MuT.OF
-        cls = args[0].concretetype.__class__
-        assert res.concretetype == cls(ELM)
-
-    elif muop.opname == 'mu_shiftiref':
-        assert isinstance(args[0].concretetype, (mutype.MuIRef, mutype.MuUPtr))
-        assert isinstance(args[1].concretetype, mutype.MuIntType)
-        assert res.concretetype == args[0].concretetype
-
-    elif muop.opname == 'mu_getvarpartiref':
-        assert isinstance(args[0].concretetype, (mutype.MuIRef, mutype.MuUPtr))
-        MuT = args[0].concretetype.TO
-        assert isinstance(MuT, mutype.MuHybrid)
-        cls = args[0].concretetype.__class__
-        assert res.concretetype == cls(MuT._vartype.OF)
-
-    elif muop.opname == 'mu_load':
-        assert isinstance(args[0].concretetype, mutype.MuObjectRef)
-        MuT = args[0].concretetype.TO
-        assert res.concretetype == MuT
-
-        assert isinstance(args[1].value, dict)
-        check_flag(args[1].value['memord'], rmu.MuMemOrd)
-
-    elif muop.opname == 'mu_store':
-        assert isinstance(args[0].concretetype, mutype.MuObjectRef)
-        MuT = args[0].concretetype.TO
-        assert args[1].concretetype == MuT
-
-        assert isinstance(args[2].value, dict)
-        check_flag(args[2].value['memord'], rmu.MuMemOrd)
-
-    elif muop.opname == 'mu_trap':      # not used at the moment
-        raise NotImplementedError
-
-    elif muop.opname == 'mu_ccall':
-        assert isinstance(args[0].concretetype, mutype.MuGeneralFunctionReference)
-        Sig = args[0].concretetype.Sig
-        assert len(args[1:-1]) == len(Sig.ARGS)
-        for i, arg in enumerate(args[1:]):
-            assert arg.concretetype == Sig.ARGS[i]
-        assert res.concretetype == Sig.RESULTS[0]  # still assumes call only return 1 value
-
-        # last argument as meta info
-        assert isinstance(args[-1], Constant)
-        assert isinstance(args[-1].value, dict)
-        metainfo = args[-1].value
-        if 'keepalive' in metainfo:
-            lst = metainfo['keepalive']
-            for v in lst:
-                assert isinstance(v, (Constant, Variable))
-        if 'excclause' in metainfo:
-            nor, exc = metainfo['excclause']
-            assert isinstance(nor, Link)
-            assert isinstance(exc, Link)
-        if 'callconv' in metainfo:
-            check_flag(metainfo['callconv'], rmu.MuCallConv)
-
-    elif muop.opname == 'mu_comminst':
-        """
-        0: Constant(rmu.MuCommInst)
-        1..n-2: arguments
-        n-1: metainfo
-        """
-        check_flag(args[0], rmu.MuCommInst)
-        metainfo = args[-1].value
-        assert isinstance(metainfo, dict)
-        if 'flags' in metainfo:
-            for flag in metainfo['flags']:
-                assert isinstance(flag, mutype.mu_int32)
-        if 'types' in metainfo:
-            for T in metainfo['types']:
-                assert isinstance(T, mutype.MuType)
-        if 'sigs' in metainfo:
-            for Sig in metainfo['sigs']:
-                assert isinstance(Sig, mutype.MuFuncSig)
-        if 'keepalive' in metainfo:
-            lst = metainfo['keepalive']
-            for v in lst:
-                assert isinstance(v, (Constant, Variable))
-        if 'excclause' in metainfo:
-            nor, exc = metainfo['excclause']
-            assert isinstance(nor, Link)
-            assert isinstance(exc, Link)
-
 def test_bool_not():
     ll2mu = LL2MuMapper()
+    res = varof(mutype.MU_INT8, 'res')
     llop = SpaceOperation('bool_not',
                           [ll2mu.mapped_const(True)],
-                          varof(mutype.MU_INT8, 'res'))
+                          res)
     muops = ll2mu.map_op(llop)
     assert len(muops) == 1
     binop = muops[0]
     assert binop.opname == 'mu_binop'
 
-    for op in muops:
-        check_muop(op)
-
 def test_int_abs():
     ll2mu = LL2MuMapper()
+    res = varof(mutype.MU_INT64, 'res')
     llop = SpaceOperation('int_abs',
                           [ll2mu.mapped_const(-125)],
-                          varof(mutype.MU_INT64, 'res'))
+                          res)
     muops = ll2mu.map_op(llop)
     assert len(muops) == 3
     assert [op.opname for op in muops] == ['mu_binop', 'mu_cmpop', 'mu_select']
-    for op in muops:
-        check_muop(op)
 
 def test_int_between():
     ll2mu = LL2MuMapper()
+    res = varof(ll2mu.map_type(lltype.Bool), 'res')
     llop = SpaceOperation('int_between',
                           [ll2mu.mapped_const(42), varof(mutype.MU_INT64, 'x'), ll2mu.mapped_const(100)],
-                          varof(ll2mu.map_type(lltype.Bool), 'res'))
+                          res)
     muops = ll2mu.map_op(llop)
     assert len(muops) == 5
     assert [op.opname for op in muops] == ['mu_cmpop', 'mu_convop', 'mu_cmpop', 'mu_convop', 'mu_binop']
-    for op in muops:
-        check_muop(op)
 
 def test_int_mul_ovf():
     ll2mu = LL2MuMapper()
+    res = varof(mutype.MU_INT64, 'res')
     llop = SpaceOperation('int_mul_ovf',
                           [varof(mutype.MU_INT64, 'a'), varof(mutype.MU_INT64, 'b')],
-                          varof(mutype.MU_INT64, 'res'))
+                          res)
     muops = ll2mu.map_op(llop)
     assert len(muops) == 1
-    muop = muops[0]
-    check_muop(muop)
 
 def test_cast_char_to_int():
     ll2mu = LL2MuMapper()
+    res = varof(mutype.MU_INT64, 'res')
     llop = SpaceOperation('cast_char_to_int', [varof(ll2mu.map_type(lltype.Char), 'c')],
-                          varof(mutype.MU_INT64, 'res'))
-    check_muop(ll2mu.map_op(llop)[0])
+                          res)
 
 def test_binop_map():
     llbinops = {
@@ -667,8 +375,7 @@ def test_malloc_varsize():
                           rs)
     muops = ll2mu.map_op(llop)
     assert [op.opname for op in muops] == ['mu_newhybrid', 'mu_getiref', 'mu_getfieldiref', 'mu_store']
-    for op in muops:
-        check_muop(op)
+    assert muops[0].result is rs    # the result is of the first instruction rather than the last
 
 def test_setarrayitem():
     ll2mu = LL2MuMapper()
@@ -678,8 +385,6 @@ def test_setarrayitem():
     llop = SpaceOperation('setarrayitem', [rs, ll2mu.mapped_const(5), ll2mu.mapped_const('c')], res)
     muops = ll2mu.map_op(llop)
     assert [op.opname for op in muops] == ['mu_getiref', 'mu_getvarpartiref', 'mu_shiftiref', 'mu_store']
-    for op in muops:
-        check_muop(op)
 
 def test_getinteriorarraysize():
     ll2mu = LL2MuMapper()
@@ -690,8 +395,6 @@ def test_getinteriorarraysize():
     muops = ll2mu.map_op(llop)
     assert [op.opname for op in muops] == ['mu_getfieldiref', 'mu_load']
     assert isinstance(muops[0].result.concretetype, mutype.MuUPtr)
-    for op in muops:
-        check_muop(op)
 
 def test_setinteriorfield():
     ll2mu = LL2MuMapper()
@@ -704,5 +407,12 @@ def test_setinteriorfield():
                                                Constant(42, mutype.MU_INT64)], res)
     muops = ll2mu.map_op(llop)
     assert [op.opname for op in muops] == ['mu_getiref', 'mu_getvarpartiref', 'mu_shiftiref', 'mu_getfieldiref', 'mu_store']
-    for op in muops:
-        check_muop(op)
+
+
+def test_ptr_nonzero():
+    ll2mu = LL2MuMapper()
+    Stt = mutype.MuStruct('point', ('x', mutype.MU_INT64), ('y', mutype.MU_INT64))
+    rs = varof(mutype.MuRef(Stt))
+    res = varof(mutype.MU_INT8)
+    muops = ll2mu.map_op(SpaceOperation('ptr_nonzero', [rs], res))
+    assert [op.opname for op in muops] == ['mu_cmpop', 'mu_convop']

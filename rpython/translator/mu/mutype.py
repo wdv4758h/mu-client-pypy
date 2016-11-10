@@ -1210,3 +1210,13 @@ def newhybrid(T, n):
 
 isCompatibleType = lltype.isCompatibleType
 enforce = lltype.enforce
+
+
+def mu_barebonearray(ARRAY):
+    # counterpart of rpython.translator.c.support.barebonearray
+    assert isinstance(ARRAY, MuHybrid)
+    return len(ARRAY._names) == 1 and \
+           (not'length' in ARRAY._names) and \
+           ARRAY._vartype.OF is not MU_VOID
+
+# TODO: follow the pattern in lltype, write implementations of mu instructions based on mutype
