@@ -3,6 +3,7 @@ from __future__ import with_statement
 from rpython.jit.backend.arm import conditions as c
 from rpython.jit.backend.arm.arch import (JITFRAME_FIXED_SIZE)
 from rpython.jit.backend.arm.regalloc import (Regalloc)
+from rpython.jit.backend.llsupport import jitframe
 from rpython.jit.backend.llsupport.assembler import BaseAssembler, GuardToken
 from rpython.jit.backend.llsupport.gcmap import allocate_gcmap
 from rpython.jit.backend.model import CompiledLoopToken
@@ -16,6 +17,7 @@ from rpython.rlib.objectmodel import we_are_translated
 from rpython.rlib.rarithmetic import r_uint
 from rpython.rlib.rmu import MuBinOptr, MuCmpOptr, MuConvOptr, MuVM, \
     MuBinOpStatus
+from rpython.rtyper.lltypesystem import rffi
 
 
 class MuGuardToken(GuardToken):
@@ -165,7 +167,10 @@ class AssemblerMu(BaseAssembler):
 
         self.setup(looptoken)
 
-        # TODO: need to allocate appropriate mu object
+        clt.frame_info = jitframe.NULLFRAMEINFO
+        # TODO: figure out how to directly create a jitframe.JITFRAMEINFO() or
+        # an object that can cast to it
+        # clt.frame_info = jitframe.JITFRAMEINFO()
         # set clt.frame_info to a newly allocated jitframe.JITFRAMEINFOPTR
         # frame_info = self.datablockwrapper.malloc_aligned(
         #         jitframe.JITFRAMEINFO_SIZE)
@@ -199,7 +204,9 @@ class AssemblerMu(BaseAssembler):
 
         # full_size = self.mc.get_relative_pos()
         # TODO: this is where we actually toss the bundle into Mu
-        rawstart = self.materialize_loop(looptoken)
+        # rawstart = self.materialize_loop(looptoken)
+        self.mc.load()
+        looptoken._ll_function_addr = 0
         # looptoken._ll_function_addr = rawstart + functionpos
 
         # TODO: Remove all of this. No Pypy GC + naming stuff
@@ -210,11 +217,10 @@ class AssemblerMu(BaseAssembler):
         # if log and not we_are_translated():
         #     self.mc._dump_trace(rawstart, 'loop.mu')
 
-        ops_offset = self.mc.ops_offset
-        if logger is not None:
-            logger.log_loop(inputargs, operations, 0, "rewritten",
-                            name=loopname, ops_offset=ops_offset)
-        self.mc.load()
+        # ops_offset = self.mc.ops_offset
+        # if logger is not None:
+        #     logger.log_loop(inputargs, operations, 0, "rewritten",
+        #                     name=loopname, ops_offset=ops_offset)
         self.teardown()
 
         debug_start("jit-backend-addr")
@@ -223,7 +229,7 @@ class AssemblerMu(BaseAssembler):
         #     r_uint(rawstart + loop_head),
         #     r_uint(rawstart + size_excluding_failure_stuff),
         #     r_uint(rawstart + functionpos)))
-        debug_print("       gc table: 0x%x" % r_uint(rawstart))
+        # debug_print("       gc table: 0x%x" % r_uint(rawstart))
         # debug_print("       function: 0x%x" % r_uint(rawstart + functionpos))
         # debug_print("         resops: 0x%x" % r_uint(rawstart + loop_head))
         # debug_print("       failures: 0x%x" % r_uint(rawstart +
