@@ -97,6 +97,7 @@ def get_zero_division_error(self):
 
 class CustomBaseTestRegalloc(BaseTestRegalloc, JitMuMixin):
     cpu = CPU(None, None)
+    cpu.setup()
     cpu.setup_once()
 
     def raising_func(i):

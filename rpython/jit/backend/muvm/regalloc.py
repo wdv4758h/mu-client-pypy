@@ -134,13 +134,13 @@ class MuVMRegisterManager(RegisterManager):
                 tp = REF64
                 val = v.getref()
 
-            if (tp, val) in global_const_loc_bindings:
-                c = global_const_loc_bindings[(tp, val)]
-            elif (tp, val) in local_const_loc_bindings:
-                c = local_const_loc_bindings[(tp, val)]
+            if (tp, val) in self.global_const_loc_bindings:
+                c = self.global_const_loc_bindings[(tp, val)]
+            elif (tp, val) in self.local_const_loc_bindings:
+                c = self.local_const_loc_bindings[(tp, val)]
             else:
                 c = ConstLocation(tp, val)
-                local_const_loc_bindings[(tp,val)] = c
+                self.local_const_loc_bindings[(tp,val)] = c
             self.assembler.load(c, v.value)
             return c
             
@@ -167,12 +167,12 @@ class MuVMRegisterManager(RegisterManager):
                 self.frame_manager.mark_as_free(v)
         """
         #TODO: This is wrong
-        assert isinstance(v, SSALocation)
-        if isinstance(v, ConstLocation):
+        if isinstance(v, Const) or isinstance(v, ConstLocation):
             return
-        if v not in self.longevity or self.longevity[v][1] <= position:
-            self.live_regs.remove(self.reg_bindings[v])
-            del self.reg_bindings[v]
+        if v not in self.longevity or self.longevity[v][1] <= self.position:
+            if v in self.reg_bindings:
+                self.live_regs.remove(self.reg_bindings[v])
+                del self.reg_bindings[v]
     
     def _pick_variable_to_spill(self, v, forbidden_vars, selected_reg=None,
                                 need_lower_byte=False):
@@ -219,8 +219,8 @@ class MuVMRegisterManager(RegisterManager):
 
     def get_scratch_reg(self, ty=INT, forbidden_vars=[], selected_reg=None):
         #TODO: Tentatively in -- may take out if not needed.
-        res = try_allocate_reg(ty)
-        temp_boxes.append(res)
+        res = self.try_allocate_reg(ty)
+        self.temp_boxes.append(res)
         return res
     
     def possibly_free_var(self, v):
@@ -238,9 +238,6 @@ class MuVMRegisterManager(RegisterManager):
                 del self.reg_bindings[v]
             if self.frame_manager is not None:
                 self.frame_manager.mark_as_free(v)
-
-    def _check_type(self, v):
-        assert isinstance(v, SSALocation) # We may be able to refine this
 
 class Regalloc(BaseRegalloc):
     def __init__(self, assembler):
@@ -328,7 +325,7 @@ class Regalloc(BaseRegalloc):
 
     def _prepare(self, inputargs, operations, allgcrefs):
         ''' Copied from arm/regalloc.py as a placeholder '''
-        #TODO
+        #TODO: Test this for proper functionality
         cpu = self.cpu
         operations = cpu.gc_ll_descr.rewrite_assembler(cpu, operations, 
                                                         allgcrefs)
@@ -344,8 +341,8 @@ class Regalloc(BaseRegalloc):
     def prepare_loop(self, inputargs, operations, looptoken, allgcrefs):
         operations = self._prepare(inputargs, operations, allgcrefs)
         self._set_initial_bindings(inputargs, looptoken)
-        # XXX: Removing since unnecessary
-        # self.possibly_free_vars(list(inputargs))
+        # TODO: Possibly remove following line? Kept for now to avoid updating tests
+        self.possibly_free_vars(list(inputargs))
         return operations
 
     def prepare_bridge(self, inputargs, arglocs, operations, allgcrefs,
