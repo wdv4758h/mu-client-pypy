@@ -416,3 +416,16 @@ def test_ptr_nonzero():
     res = varof(mutype.MU_INT8)
     muops = ll2mu.map_op(SpaceOperation('ptr_nonzero', [rs], res))
     assert [op.opname for op in muops] == ['mu_cmpop', 'mu_convop']
+
+def test_raw_memcopy():
+    ll2mu = LL2MuMapper()
+    VOIDP = ll2mu.map_type(rffi.VOIDP)
+    src = varof(VOIDP, 'src')
+    dst = varof(VOIDP, 'dst')
+    sz = varof(mutype.MU_INT64, 'sz')
+    llop = SpaceOperation('raw_memcopy', [src, dst, sz], varof(mutype.MU_VOID))
+    muops = ll2mu.map_op(llop)
+    assert [op.opname for op in muops] == ['mu_ccall']
+    ccall = muops[0]
+    assert ccall.args[0].value._name == 'memcpy'
+    assert ccall.args[1] is dst and ccall.args[2] is src

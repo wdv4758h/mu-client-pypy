@@ -196,7 +196,7 @@ class LL2MuMapper:
             MuObjT.become(self.map_type(LLObjT))
 
     def map_type_addr(self, LLT):
-        return mutype.MU_INT64  # all Address types are mapped to int<64>
+        return mutype.MU_INT64  # NOTE: all Address types are mapped to int<64>
 
     def map_type_opq(self, LLT):
         if LLT is lltype.RuntimeTypeInfo:
@@ -756,7 +756,7 @@ class LL2MuMapper:
             assert isinstance(MuT.TO, mutype.MuArray)
             iref_itm0 = varof(cls(MuT.TO.OF), 'ira%s' % var.name)
             ops.extend(self.map_op(SpaceOperation('cast_pointer', [
-                self.mapped_const(iref_itm0.concretetype), iref
+                Constant(iref_itm0.concretetype, mutype.MU_VOID), iref
             ],
                                                   iref_itm0)))
 
@@ -887,9 +887,15 @@ class LL2MuMapper:
         llop.__init__('ptr_eq', [llop.args[0], NULL_c], llop.result)
         return self.map_op(llop)
 
-    def map_op_shrink_array(self, llop):
+    def _same_as_false(self, llop):
         llop.__init__('same_as', [self.mapped_const(False)], llop.result)
         return [llop]
+
+    def _same_as_true(self, llop):
+        llop.__init__('same_as', [self.mapped_const(True)], llop.result)
+        return [llop]
+
+    map_op_shrink_array = _same_as_false
 
     # TODO: reconsider direct_ptradd and direct_arrayitems, based on the semantic in lltype
     def map_op_direct_ptradd(self, llop):
@@ -914,6 +920,113 @@ class LL2MuMapper:
             return [self._gen_mu_comminst('NATIVE_UNPIN', ref, llop.result)]
         else:
             return []
+
+    def _map_rawmemop(self, llop):
+        llfnp = _llrawop_c_externfncs[llop.opname[4:]]
+        mufnp = self.map_value(llfnp)
+        self.resolve_ptr_types()
+        self.resolve_ptr_values()
+        callee = Constant(mufnp, mutype.mutypeOf(mufnp))
+
+        args = llop.args
+        # correct memcpy and memmove argument order
+        if mufnp._name in ('memcpy', 'memmove'):
+            args = [args[1], args[0], args[2]]
+        return [self._gen_mu_ccall(callee, args, llop.result)]
+    map_op_raw_malloc = _map_rawmemop
+    map_op_raw_free = _map_rawmemop
+    map_op_raw_memset = _map_rawmemop
+    map_op_raw_memcopy = _map_rawmemop
+    map_op_raw_memmove = _map_rawmemop
+
+    def map_op_free(self, llop):
+        llop.opname = 'raw_free'
+        return self.map_op_raw_free(llop)
+
+    def map_op_memclear(self, llop):
+        llop.__init__('raw_memset', [llop.args[0], Constant(mutype.mu_int8(0), mutype.MU_INT8), llop.args[1]], llop.result)
+        return self._map_rawmemop(llop)
+
+    def map_op_raw_load(self, llop):
+        ops = []
+        adr_v, ofs_c = llop.args
+        assert isinstance(adr_v.concretetype, mutype.MuIntType)
+
+        loc_adr = varof(adr_v.concretetype, 'loc_adr')
+        ops.extend(self.map_op(SpaceOperation('adr_add', [adr_v, ofs_c], loc_adr)))
+        PTR = mutype.MuUPtr(llop.result.concretetype)
+        loc_ptr = varof(PTR, 'loc_ptr')
+        ops.append(self._gen_mu_convop('PTRCAST', PTR, loc_adr, loc_ptr))
+        ops.append(self._gen_mu_load(loc_ptr, llop.result))
+        return ops
+
+    def map_op_raw_store(self, llop):
+        ops = []
+        adr_v, ofs_c, val_vc = llop.args
+        assert isinstance(adr_v.concretetype, mutype.MuIntType)
+
+        loc_adr = varof(adr_v.concretetype, 'loc_adr')
+        ops.extend(self.map_op(SpaceOperation('adr_add', [adr_v, ofs_c], loc_adr)))
+        PTR = mutype.MuUPtr(llop.result.concretetype)
+        loc_ptr = varof(PTR, 'loc_ptr')
+        ops.append(self._gen_mu_convop('PTRCAST', PTR, loc_adr, loc_ptr))
+        ops.append(self._gen_mu_store(loc_ptr, val_vc, llop.result))
+        return ops
+
+    def map_op_adr_delta(self, llop):
+        llop.__init__('int_sub', llop.args, llop.result)
+        return self.map_op(llop)
+
+    def map_op_cast_ptr_to_adr(self, llop):
+        ops = []
+        if isinstance(llop.args[0].concretetype, mutype.MuRef):
+            ptr = varof(mutype.MuUPtr(llop.args[0].concretetype.TO), 'ptr')
+            ops.append(self._gen_mu_comminst('NATIVE_PIN', [llop.args[0]], ptr))
+        else:
+            assert isinstance(llop.args[0].concretetype, mutype.MuUPtr)
+            ptr = llop.args[0]
+
+        ops.append(self._gen_mu_convop('PTRCAST', llop.result.concretetype, ptr), llop.result)
+        return ops
+
+    def map_op_cast_ptr_to_int(self, llop):
+        ops = self.map_op_cast_ptr_to_adr(llop)
+        if len(ops) == 2:   # pinned
+            ops.extend(self.map_op_keepalive(llop))
+
+    def map_op_cast_adr_to_ptr(self, llop):
+        assert isinstance(llop.result.concretetype, mutype.MuUPtr)
+        return [self._gen_mu_convop('PTRCAST', llop.result.concretetype, llop.args[0], llop.result)]
+
+    def map_op_cast_adr_to_int(self, llop):
+        llop.opname = 'same_as'
+        return [llop]
+    map_op_cast_int_to_adr = map_op_cast_adr_to_int
+
+    map_op_gc_can_move = _same_as_true
+    map_op_gc_pin = _same_as_true
+    map_op_gc_writebarrier_before_copy = _same_as_true
+
+    def map_op_gc_load_indexed(self, llop):
+        ops = []
+        buf, idx_c, scale_c, base_ofs_c, = llop.args
+        adr = varof(mutype.MU_INT64)
+        base_adr = varof(mutype.MU_INT64)
+        ofs = varof(scale_c.concretetype)
+        llops = [
+            SpaceOperation('cast_ptr_to_adr', [buf], adr),
+            SpaceOperation('adr_add', [adr, base_ofs_c], base_adr),
+            SpaceOperation('int_mul', [idx_c, scale_c], ofs),
+            SpaceOperation('raw_load', [base_adr, ofs], llop.result),
+            SpaceOperation('keepalive', [buf], varof(mutype.MU_VOID)),
+        ]
+        for op in llops:
+            ops.extend(self.map_op(op))
+
+        return ops
+
+    def map_op_gc_identityhash(self, llop):
+        raise NotImplementedError
 
     # -----------------------------------------------------------------------------
     # helper functions for constructing muops
@@ -1197,6 +1310,15 @@ def _init_binop_map():
 
         'ptr_eq': 'EQ',
         'ptr_ne': 'NE',
+
+        'adr_add': 'ADD',
+        'adr_sub': 'SUB',
+        'adr_lt': 'SLT',
+        'adr_le': 'SLE',
+        'adr_eq': 'EQ',
+        'adr_ne': 'NE',
+        'adr_gt': 'SGT',
+        'adr_ge': 'SGE',
     }
 
     for org_type, coer_type in {
@@ -1234,3 +1356,20 @@ _prim_castop_map = {
     'convert_float_bytes_to_longlong': 'BITCAST',
     'convert_longlong_bytes_to_float': 'BITCAST',
 }
+
+from rpython.rlib.rposix import eci
+def external(name, args, res):
+    return rffi.llexternal(name, args, res, compilation_info=eci, _nowrapper=True)
+c_malloc = external("malloc", [rffi.SIZE_T], rffi.VOIDP)
+c_free = external("free", [rffi.VOIDP], lltype.Void)
+c_memcpy = external("memcpy", [rffi.VOIDP, rffi.VOIDP, rffi.SIZE_T], lltype.Void)
+c_memset = external("memset", [rffi.VOIDP, lltype.Signed, rffi.SIZE_T], lltype.Void)
+c_memmove = external("memmove", [rffi.CCHARP, rffi.CCHARP, rffi.SIZE_T], lltype.Void)
+_llrawop_c_externfncs = {
+    "malloc": c_malloc,
+    "free": c_free,
+    "memset": c_memset,
+    "memcpy": c_memcpy,
+    "memmove": c_memmove,
+}
+_llrawop_c_externfncs['memcopy'] = _llrawop_c_externfncs['memcpy']
