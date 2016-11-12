@@ -45,7 +45,10 @@ class IgnoredLLOp(NotImplementedError):
 class LL2MuMapper:
     GC_IDHASH_FIELD = ('gc_idhash', mutype.MU_INT64)
 
-    def __init__(self):
+    def __init__(self, mlha=None):
+        """
+        :type mlha: rpython.rtyper.annlowlevel.MixLevelHelperAnnotator
+        """
         self._type_cache = {}
         self._pending_ptr_types = []
         self._name_cache = {}
@@ -53,6 +56,7 @@ class LL2MuMapper:
         self._ptr_cache = {}
         self._topstt_map = {}
         self._pending_ptr_values = []
+        self.mlha = mlha
 
     def _new_typename(self, name):
         if name not in self._name_cache:
@@ -1026,7 +1030,29 @@ class LL2MuMapper:
         return ops
 
     def map_op_gc_identityhash(self, llop):
-        raise NotImplementedError
+        def _ll_identityhash(obj):
+            from rpython.rlib.objectmodel import keepalive_until_here
+            from rpython.rtyper.rclass import OBJECT
+            from rpython.rtyper.lltypesystem.lloperation import llop
+
+            # obj = lltype.cast_pointer(lltype.Ptr(OBJECT), obj)
+            h = llop.mu_getgcidhash(lltype.Signed, obj)
+            if h == 0:
+                addr = llmemory.cast_ptr_to_adr(obj)
+                addr_int = llmemory.cast_adr_to_int(addr)
+                h = addr_int
+                llop.mu_setgcidhash(lltype.Void, obj)
+                keepalive_until_here(obj)
+            return h
+
+        callee_c = self.mlha.constfunc(_ll_identityhash, [llop.args[0].annotation], llop.result.annotation)
+        self.mlha.finish()
+        self.mlha.backend_optimize()
+        callee_c.value = self.map_value(callee_c.value)
+        callee_c.concretetype = mutype.mutypeOf(callee_c.value)
+
+        llop.__init__('direct_call', [callee_c, llop.args[0]], llop.result)
+        return self.map_op(llop)
 
     # -----------------------------------------------------------------------------
     # helper functions for constructing muops

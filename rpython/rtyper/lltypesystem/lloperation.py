@@ -595,6 +595,9 @@ LL_OPERATIONS = {
     'mu_trap':              LLOp(),
     'mu_ccall':             LLOp(),
     'mu_comminst':          LLOp(),
+    # hacks for gc id hash
+    'mu_getgcidhash':       LLOp(),
+    'mu_setgcidhash':       LLOp(),
 }
 # ***** Run test_lloperation after changes. *****
 

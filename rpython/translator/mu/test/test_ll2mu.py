@@ -429,3 +429,40 @@ def test_raw_memcopy():
     ccall = muops[0]
     assert ccall.args[0].value._name == 'memcpy'
     assert ccall.args[1] is dst and ccall.args[2] is src
+
+def test_gc_identityhash():
+    from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
+    from rpython.translator.interactive import Translation
+
+    def f(pobj):
+        return lltype.identityhash(pobj)
+
+    Point = lltype.GcStruct('Point', ('x', lltype.Signed), ('y', lltype.Signed))
+    PointPtr = lltype.Ptr(Point)
+
+    t = Translation(f, [PointPtr])
+    t.rtype()
+
+    mlha = MixLevelHelperAnnotator(t.context.rtyper)
+    ll2mu = LL2MuMapper(mlha)
+
+    llop = t.context.graphs[0].startblock.operations[0]
+    print llop
+    assert llop.opname == 'gc_identityhash'
+
+    llop.args[0].concretetype = ll2mu.map_type(llop.args[0].concretetype)
+    llop.result.concretetype = ll2mu.map_type(llop.result.concretetype)
+
+    muops = ll2mu.map_op(llop)
+    assert [op.opname for op in muops] == ['mu_call']
+
+    call = muops[0]
+    callee_c = call.args[0]
+    assert isinstance(callee_c.concretetype, mutype.MuFuncRef)
+    assert isinstance(callee_c.value, mutype._mufuncref)
+    callee = callee_c.value
+    assert callee.graph in t.context.graphs
+    assert 'mu_getgcidhash' in [op.opname for _, op in callee.graph.iterblockops()]
+    assert 'mu_setgcidhash' in [op.opname for _, op in callee.graph.iterblockops()]
+
+    # TODO: might need another test to overcome the duplication of rtyper specialisation
