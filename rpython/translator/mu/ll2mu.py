@@ -1054,6 +1054,92 @@ class LL2MuMapper:
         llop.__init__('direct_call', [callee_c, llop.args[0]], llop.result)
         return self.map_op(llop)
 
+    def map_op_mu_getgcidhash(self, llop):
+        llop.__init__('getfield', [llop.args[0], Constant(self.GC_IDHASH_FIELD[0], mutype.MU_VOID)], llop.result)
+        return self.map_op(llop)
+
+    def map_op_mu_setgcidhash(self, llop):
+        llop.__init__('setfield', [llop.args[0], Constant(self.GC_IDHASH_FIELD[0], mutype.MU_VOID), llop.args[1]],
+                      llop.result)
+        return self.map_op(llop)
+
+    map_op_gc_id = map_op_gc_identityhash
+    map_op_gc__collect = _same_as_true
+
+    def map_op_length_of_simple_gcarray_from_opaque(self, llop):
+        ops = []
+        MuT = self.map_type(lltype.Ptr(lltype.GcArray(lltype.Signed)))
+        self.resolve_ptr_types()
+        ref = varof(MuT)
+        ops.extend(self.map_op_cast_pointer(SpaceOperation('cast_pointer', [Constant(MuT, mutype.MU_VOID), llop.args[0]], ref)))
+        ops.extend(self.map_op_getarraysize(SpaceOperation('getarraysize', [ref], llop.result)))
+        return ops
+
+    def set_threadlocal_struct_type(self, TYPE):
+        self.TLStt = TYPE
+
+    def map_op_threadlocalref_get(self, llop):
+        ops = []
+
+        tlref_void = varof(mutype.MuRef(mutype.MU_VOID))
+        ops.append(self._gen_mu_comminst('GET_THREADLOCAL', [], tlref_void))
+        RefStt = mutype.MuRef(self.TLStt)
+        tlref_stt = varof(RefStt)
+        ops.extend(self.map_op(SpaceOperation('cast_pointer', [Constant(RefStt, mutype.MU_VOID), tlref_void], tlref_stt)))
+        fld = llop.args[0].value.expr[10:]
+        ops.extend(self.map_op(SpaceOperation('getfield', [tlref_stt, Constant(fld, mutype.MU_VOID)], llop.result)))
+        return ops
+
+    def map_op_threadlocalref_set(self, llop):
+        ops = []
+
+        tlref_void = varof(mutype.MuRef(mutype.MU_VOID))
+        ops.append(self._gen_mu_comminst('GET_THREADLOCAL', [], tlref_void))
+        RefStt = mutype.MuRef(self.TLStt)
+        tlref_stt = varof(RefStt)
+        ops.extend(self.map_op(SpaceOperation('cast_pointer', [Constant(RefStt, mutype.MU_VOID), tlref_void], tlref_stt)))
+        fld = llop.args[0].value.expr[10:]
+        ops.extend(self.map_op(SpaceOperation('setfield', [tlref_stt, Constant(fld, mutype.MU_VOID), llop.args[1]], llop.result)))
+        return ops
+
+    def map_op_mu_threadlocalref_init(self, llop):
+        ops = []
+
+        ops.append(self._gen_mu_new(self.TLStt))
+        ref = ops[-1].result
+        ops.append(self._gen_mu_comminst('SET_THREADLOCAL', [ref], varof(mutype.MU_VOID)))
+        return ops
+
+    def map_op_weakref_create(self, llop):
+        ops = []
+
+        Stt = self.map_type(llmemory.WeakRef)
+        ops.append(self._gen_mu_new(Stt, llop.result))
+        ops.extend(self.map_op(SpaceOperation('setfield', [llop.result, Constant('wref'), llop.args[0]],
+                                              varof(mutype.MU_VOID))))
+        return ops
+
+    def map_op_weakref_deref(self, llop):
+        llop.__init__('getfield', [llop.args[0], Constant('wref')], llop.result)
+        return self.map_op(llop)
+
+    # ----------------
+    # Some dummy gc operations
+    def map_op_gc_get_rpy_memory_usage(self, llop):
+        MuT = llop.result.concretetype
+        llop.__init__('same_as', [Constant(MuT._val_type(-1), MuT)], llop.result)
+        return [llop]
+    map_op_gc_get_rpy_type_index = map_op_gc_get_rpy_memory_usage
+
+    map_op_gc_get_rpy_roots = _same_as_false
+    map_op_gc_get_rpy_referents = _same_as_false
+    map_op_gc_is_rpy_instance = _same_as_false
+    map_op_gc_dump_rpy_heap = _same_as_false
+    map_op_gc_thread_before_fork = _same_as_false
+
+    map_op_gc_stack_bottom = lambda self, llop: []  # no-op
+
+
     # -----------------------------------------------------------------------------
     # helper functions for constructing muops
     def _gen_mu_binop(self, optr, opnd1, opnd2, res=None, status=None, status_results=None, excclause=None):
