@@ -47,12 +47,11 @@ class MuTyper:
 
 # -----------------------------------------------------------------------------
 # preparation before mutyper
-def prune(graphs, g_entry):
+def prune(g_entry):
     """
     Remove all the graphs in the list (after inlining)
     that cannot be reached from the entry point.
 
-    :param graphs: A list of rpython.flowspace.model.FunctionGraph (after backendopt.inline)
     :param g_entry: the graph in the list that is the entry point
     :return: a chopped down list of graphs
     """
@@ -173,7 +172,7 @@ def prepare(graphs, entry_graph):
 
     # Task 1: prune and remove inlined graphs
     n0 = len(graphs)
-    graphs = prune(graphs, entry_graph)
+    graphs = prune(entry_graph)
     log.prune("%d -> %d graphs" % (n0, len(graphs)))
 
     for g in graphs:

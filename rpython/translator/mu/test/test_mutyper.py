@@ -15,9 +15,9 @@ def test_prune():
     graphs = t.context.graphs
     graph_f = graph_of(f, t)
 
-    assert len(prune(graphs, graph_f)) == 2     # pruned out ll_runtime_type_info, ll_issubclass, ll_type
+    assert len(prune(graph_f)) == 2     # pruned out ll_runtime_type_info, ll_issubclass, ll_type
     t.backendopt()  # this should inline g
-    assert len(prune(graphs, graph_f)) == 1     # pruned g
+    assert len(prune(graph_f)) == 1     # pruned g
 
 
 def test_prune_preserve_func_references():
@@ -42,7 +42,7 @@ def test_prune_preserve_func_references():
     graph_add2 = graph_of(add2, t)
     graph_add3 = graph_of(add3, t)
 
-    assert len(prune(graphs, graph_f)) < len(graphs)
+    assert len(prune(graph_f)) < len(graphs)
     assert graph_add1 in graphs
     assert graph_add2 in graphs
     assert graph_add3 in graphs
