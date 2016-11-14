@@ -431,7 +431,6 @@ def test_raw_memcopy():
     assert ccall.args[1] is dst and ccall.args[2] is src
 
 def test_gc_identityhash():
-    from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
     from rpython.translator.interactive import Translation
 
     def f(pobj):
@@ -443,8 +442,7 @@ def test_gc_identityhash():
     t = Translation(f, [PointPtr])
     t.rtype()
 
-    mlha = MixLevelHelperAnnotator(t.context.rtyper)
-    ll2mu = LL2MuMapper(mlha)
+    ll2mu = LL2MuMapper(t.context.rtyper)
 
     llop = t.context.graphs[0].startblock.operations[0]
     print llop

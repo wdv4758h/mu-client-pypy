@@ -1,6 +1,7 @@
 from rpython.rtyper.lltypesystem import lltype, llmemory, rffi
 from rpython.translator.mu import mutype, layout
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
+from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
 from rpython.rlib import rarithmetic, rmu
 from rpython.flowspace.model import Variable, Constant, SpaceOperation, Link
@@ -45,7 +46,7 @@ class IgnoredLLOp(NotImplementedError):
 class LL2MuMapper:
     GC_IDHASH_FIELD = ('gc_idhash', mutype.MU_INT64)
 
-    def __init__(self, mlha=None):
+    def __init__(self, rtyper=None):
         """
         :type mlha: rpython.rtyper.annlowlevel.MixLevelHelperAnnotator
         """
@@ -56,7 +57,10 @@ class LL2MuMapper:
         self._ptr_cache = {}
         self._topstt_map = {}
         self._pending_ptr_values = []
-        self.mlha = mlha
+        if rtyper:
+            self.mlha = MixLevelHelperAnnotator(rtyper)
+        else:
+            self.mlha = None
 
     def _new_typename(self, name):
         if name not in self._name_cache:
