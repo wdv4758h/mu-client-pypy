@@ -530,9 +530,9 @@ class LL2MuMapper:
     def map_op_direct_call(self, llop):
         fr = llop.args[0].value
         if isinstance(fr, mutype._muufuncptr):  # external function
-            return [self._gen_mu_ccall(llop.args[0], llop.args[1:], llop.result)]
+            return [self.gen_mu_ccall(llop.args[0], llop.args[1:], llop.result)]
         else:
-            return [self._gen_mu_call(llop.args[0], llop.args[1:], llop.result)]
+            return [self.gen_mu_call(llop.args[0], llop.args[1:], llop.result)]
 
     def map_op_indirect_call(self, llop):
         last = llop.args[-1]
@@ -540,18 +540,18 @@ class LL2MuMapper:
             args = llop.args[:-1]
         else:
             args = llop.args
-        return [self._gen_mu_call(llop.args[0], args, llop.result)]
+        return [self.gen_mu_call(llop.args[0], args, llop.result)]
 
     # ----------------
     # primitive ops
     def map_op_bool_not(self, llop):
         ops = []
         if llop.args[0].concretetype is mutype.MU_INT1:
-            ops.append(self._gen_mu_convop('ZEXT', mutype.MU_INT8, llop.args[0]))
+            ops.append(self.gen_mu_convop('ZEXT', mutype.MU_INT8, llop.args[0]))
             v = ops[-1].result
         else:
             v = llop.args[0]
-        ops.append(self._gen_mu_binop('XOR', v, self.mapped_const(True), llop.result))
+        ops.append(self.gen_mu_binop('XOR', v, self.mapped_const(True), llop.result))
         return ops
 
     def map_op_int_is_true(self, llop):
@@ -587,9 +587,9 @@ class LL2MuMapper:
         ops.extend(self.map_op(op_neg))
         # x > 0 ?
         cmp_res = varof(mutype.MU_INT1, 'cmp_res')
-        ops.append(self._gen_mu_cmpop('SGT', x, Constant(MuT._val_type(0), MuT), cmp_res))
+        ops.append(self.gen_mu_cmpop('SGT', x, Constant(MuT._val_type(0), MuT), cmp_res))
         # True -> x, False -> -x
-        ops.append(self._gen_mu_select(cmp_res, x, neg_x, llop.result))
+        ops.append(self.gen_mu_select(cmp_res, x, neg_x, llop.result))
         return ops
 
     map_op_llong_abs = map_op_int_abs
@@ -628,39 +628,39 @@ class LL2MuMapper:
         MuT = a.concretetype
         zero = Constant(MuT._val_type(0), MuT)
         lt_zero = varof(mutype.MU_INT1, 'lt_zero')
-        muops.append(self._gen_mu_cmpop('SLT', a, zero, lt_zero))
-        muops.append(self._gen_mu_select(lt_zero, zero, a, llop.result))
+        muops.append(self.gen_mu_cmpop('SLT', a, zero, lt_zero))
+        muops.append(self.gen_mu_select(lt_zero, zero, a, llop.result))
         return muops
 
     def map_op_int_add_ovf(self, llop):
         flag_v = varof(mutype.MU_INT1, 'ovf_V')
         flag = 'V'
-        return [self._gen_mu_binop('ADD', llop.args[0], llop.args[1], llop.result, flag, [flag_v])]
+        return [self.gen_mu_binop('ADD', llop.args[0], llop.args[1], llop.result, flag, [flag_v])]
 
     map_op_int_add_nonneg_ovf = map_op_int_add_ovf
 
     def map_op_int_sub_ovf(self, llop):
         flag_v = varof(mutype.MU_INT1, 'ovf_V')
         flag = 'V'
-        return [self._gen_mu_binop('SUB', llop.args[0], llop.args[1], llop.result, flag, [flag_v])]
+        return [self.gen_mu_binop('SUB', llop.args[0], llop.args[1], llop.result, flag, [flag_v])]
 
     def map_op_int_mul_ovf(self, llop):
         flag_v = varof(mutype.MU_INT1, 'ovf_V')
         flag = 'V'
-        return [self._gen_mu_binop('MUL', llop.args[0], llop.args[1], llop.result, flag, [flag_v])]
+        return [self.gen_mu_binop('MUL', llop.args[0], llop.args[1], llop.result, flag, [flag_v])]
 
     def _map_binop(self, llop):
-        return [self._gen_mu_binop(_binop_map[llop.opname], llop.args[0], llop.args[1], llop.result)]
+        return [self.gen_mu_binop(_binop_map[llop.opname], llop.args[0], llop.args[1], llop.result)]
 
     def _map_cmpop(self, llop):
         muops = []
         cmpres = varof(mutype.MU_INT1, 'cmpres')
-        muops.append(self._gen_mu_cmpop(_binop_map[llop.opname], llop.args[0], llop.args[1], cmpres))
-        muops.append(self._gen_mu_convop('ZEXT', mutype.MU_INT8, cmpres, llop.result))
+        muops.append(self.gen_mu_cmpop(_binop_map[llop.opname], llop.args[0], llop.args[1], cmpres))
+        muops.append(self.gen_mu_convop('ZEXT', mutype.MU_INT8, cmpres, llop.result))
         return muops
 
     def _map_convop(self, llop):
-        return [self._gen_mu_convop(_prim_castop_map[llop.opname],
+        return [self.gen_mu_convop(_prim_castop_map[llop.opname],
                                     llop.result.concretetype, llop.args[0], llop.result)]
 
     # ----------------
@@ -669,7 +669,7 @@ class LL2MuMapper:
         flavor = llop.args[-1].value['flavor']
         if flavor == 'gc':
             assert isinstance(llop.result.concretetype, mutype.MuRef)
-            return [self._gen_mu_new(llop.args[0].value, llop.result)]
+            return [self.gen_mu_new(llop.args[0].value, llop.result)]
         else:
             assert isinstance(llop.result.concretetype, mutype.MuUPtr)
             raise NotImplementedError
@@ -681,7 +681,7 @@ class LL2MuMapper:
         flavor = hints_c.value['flavor']
         if flavor == 'gc':
             assert isinstance(llop.result.concretetype, mutype.MuRef)
-            ops.append(self._gen_mu_newhybrid(MuT, n_c, llop.result))
+            ops.append(self.gen_mu_newhybrid(MuT, n_c, llop.result))
         else:
             assert isinstance(llop.result.concretetype, mutype.MuUPtr)
             raise NotImplementedError
@@ -701,14 +701,14 @@ class LL2MuMapper:
         cls = mutype.MuUPtr if isinstance(MuT, mutype.MuUPtr) else mutype.MuIRef
         if isinstance(MuT, mutype.MuRef):
             iref = varof(cls(MuT.TO), 'ir%s' % var.name)
-            ops.append(self._gen_mu_getiref(var, iref))
+            ops.append(self.gen_mu_getiref(var, iref))
         else:
             iref = var
 
         assert isinstance(MuT.TO, (mutype.MuStruct, mutype.MuHybrid))
         idx = MuT.TO._index_of(fldname)     # NOTE: may throw AttributeError
         iref_fld = varof(cls(getattr(MuT.TO, fldname)), 'irf%s_%s' % (var.name, fldname))
-        ops.append(self._gen_mu_getfieldiref(iref, fldname, iref_fld))
+        ops.append(self.gen_mu_getfieldiref(iref, fldname, iref_fld))
         return iref_fld, ops
 
     def map_op_getfield(self, llop):
@@ -719,7 +719,7 @@ class LL2MuMapper:
             log.error("Field '%s' not found in type '%s'." % (fldname_c.value, var.concretetype.TO))
             raise IgnoredLLOp
 
-        ops.append(self._gen_mu_load(iref_fld, llop.result))
+        ops.append(self.gen_mu_load(iref_fld, llop.result))
         return ops
 
     def map_op_setfield(self, llop):
@@ -732,7 +732,7 @@ class LL2MuMapper:
         assert iref_fld.concretetype.TO == val_c.concretetype, \
             "cannot store value %s of type %s to %s" % (val_c.value, val_c.concretetype, iref_fld.concretetype)
 
-        ops.append(self._gen_mu_store(iref_fld, val_c, llop.result))
+        ops.append(self.gen_mu_store(iref_fld, val_c, llop.result))
         return ops
 
     def map_op_getsubstruct(self, llop):
@@ -744,7 +744,7 @@ class LL2MuMapper:
             raise IgnoredLLOp
 
         if isinstance(iref_fld.concretetype.TO, (mutype.MuRef, mutype.MuUPtr)):
-            ops.append(self._gen_mu_load(iref_fld, llop.result))
+            ops.append(self.gen_mu_load(iref_fld, llop.result))
         return ops
 
     def _getarrayitemiref(self, var, idx_vc):
@@ -753,13 +753,13 @@ class LL2MuMapper:
         cls = mutype.MuUPtr if isinstance(MuT, mutype.MuUPtr) else mutype.MuIRef
         if isinstance(MuT, mutype.MuRef):
             iref = varof(cls(MuT.TO), 'ir%s' % var.name)
-            ops.append(self._gen_mu_getiref(var, iref))
+            ops.append(self.gen_mu_getiref(var, iref))
         else:
             iref = var
 
         if isinstance(MuT.TO, mutype.MuHybrid):
             iref_itm0 = varof(cls(MuT.TO._vartype.OF), 'ira%s' % var.name)
-            ops.append(self._gen_mu_getvarpartiref(iref, iref_itm0))
+            ops.append(self.gen_mu_getvarpartiref(iref, iref_itm0))
         else:
             assert isinstance(MuT.TO, mutype.MuArray)
             iref_itm0 = varof(cls(MuT.TO.OF), 'ira%s' % var.name)
@@ -769,19 +769,19 @@ class LL2MuMapper:
                                                   iref_itm0)))
 
         iref_itm = varof(cls(iref_itm0.concretetype.TO), 'ir%s_itm' % var.name)
-        ops.append(self._gen_mu_shiftiref(iref_itm0, idx_vc, iref_itm))
+        ops.append(self.gen_mu_shiftiref(iref_itm0, idx_vc, iref_itm))
         return iref_itm, ops
 
     def map_op_getarrayitem(self, llop):
         var, idx_vc = llop.args
         iref_itm, ops = self._getarrayitemiref(var, idx_vc)
-        ops.append(self._gen_mu_load(iref_itm, llop.result))
+        ops.append(self.gen_mu_load(iref_itm, llop.result))
         return ops
 
     def map_op_setarrayitem(self, llop):
         var, idx_vc, val_vc = llop.args
         iref_itm, ops = self._getarrayitemiref(var, idx_vc)
-        ops.append(self._gen_mu_store(iref_itm, val_vc, llop.result))
+        ops.append(self.gen_mu_store(iref_itm, val_vc, llop.result))
         return ops
 
     def map_op_getarraysubstruct(self, llop):
@@ -791,7 +791,7 @@ class LL2MuMapper:
 
     def map_op_getarraysize(self, llop):
         iref_fld, ops = self._getfieldiref(llop.args[0], Constant('length', mutype.MU_VOID))
-        ops.append(self._gen_mu_load(iref_fld, llop.result))
+        ops.append(self.gen_mu_load(iref_fld, llop.result))
         return ops
 
     def _getinterioriref(self, var, offsets):
@@ -800,7 +800,7 @@ class LL2MuMapper:
         cls = mutype.MuUPtr if isinstance(MuT, mutype.MuUPtr) else mutype.MuIRef
         if isinstance(MuT, mutype.MuRef):
             iref = varof(cls(MuT.TO), 'ir%s' % var.name)
-            ops.append(self._gen_mu_getiref(var, iref))
+            ops.append(self.gen_mu_getiref(var, iref))
         else:
             iref = var
 
@@ -811,7 +811,7 @@ class LL2MuMapper:
                 T = iref.concretetype.TO
                 if isinstance(T, mutype.MuHybrid) and o.value == T._varfld:
                     iref_var = varof(cls(T._vartype.OF), 'ira%s' % var.name)
-                    ops.append(self._gen_mu_getvarpartiref(iref, iref_var))
+                    ops.append(self.gen_mu_getvarpartiref(iref, iref_var))
                     iref = iref_var
                 else:
                     iref, subops = self._getfieldiref(iref, o)
@@ -824,10 +824,10 @@ class LL2MuMapper:
                     # For translated hybrid type however, we need to get the variable part reference first.
                     assert isinstance(iref.concretetype.TO, mutype.MuHybrid)
                     iref_var = varof(cls(T._vartype.OF), 'ira%s' % var.name)
-                    ops.append(self._gen_mu_getvarpartiref(iref, iref_var))
+                    ops.append(self.gen_mu_getvarpartiref(iref, iref_var))
                     iref = iref_var
                 iref_itm = varof(cls(iref.concretetype.TO), 'ir%s_itm' % var.name)
-                ops.append(self._gen_mu_shiftiref(iref, o, iref_itm))
+                ops.append(self.gen_mu_shiftiref(iref, o, iref_itm))
                 iref = iref_itm
 
         return iref, ops
@@ -840,7 +840,7 @@ class LL2MuMapper:
         except AttributeError:
             raise IgnoredLLOp
 
-        ops.append(self._gen_mu_load(iref, llop.result))
+        ops.append(self.gen_mu_load(iref, llop.result))
         return ops
 
     def map_op_setinteriorfield(self, llop):
@@ -852,7 +852,7 @@ class LL2MuMapper:
         except AttributeError:
             raise IgnoredLLOp
 
-        ops.append(self._gen_mu_store(iref, val_vc, llop.result))
+        ops.append(self.gen_mu_store(iref, val_vc, llop.result))
         return ops
 
     def map_op_getinteriorarraysize(self, llop):
@@ -877,7 +877,7 @@ class LL2MuMapper:
         else:
             optr = 'REFCAST'
 
-        return [self._gen_mu_convop(optr, MuT_DST_c.value, var, llop.result)]
+        return [self.gen_mu_convop(optr, MuT_DST_c.value, var, llop.result)]
 
     def map_op_cast_opaque_ptr(self, llop):
         llop.__init__('cast_pointer', [Constant(llop.result.concretetype, mutype.MU_VOID), llop.args[0]], llop.result)
@@ -925,7 +925,7 @@ class LL2MuMapper:
     def map_op_keepalive(self, llop):
         ref = llop.args[0]
         if isinstance(ref.concretetype, mutype.MuRef):
-            return [self._gen_mu_comminst('NATIVE_UNPIN', ref, llop.result)]
+            return [self.gen_mu_comminst('NATIVE_UNPIN', ref, llop.result)]
         else:
             return []
 
@@ -940,7 +940,7 @@ class LL2MuMapper:
         # correct memcpy and memmove argument order
         if mufnp._name in ('memcpy', 'memmove'):
             args = [args[1], args[0], args[2]]
-        return [self._gen_mu_ccall(callee, args, llop.result)]
+        return [self.gen_mu_ccall(callee, args, llop.result)]
     map_op_raw_malloc = _map_rawmemop
     map_op_raw_free = _map_rawmemop
     map_op_raw_memset = _map_rawmemop
@@ -964,8 +964,8 @@ class LL2MuMapper:
         ops.extend(self.map_op(SpaceOperation('adr_add', [adr_v, ofs_c], loc_adr)))
         PTR = mutype.MuUPtr(llop.result.concretetype)
         loc_ptr = varof(PTR, 'loc_ptr')
-        ops.append(self._gen_mu_convop('PTRCAST', PTR, loc_adr, loc_ptr))
-        ops.append(self._gen_mu_load(loc_ptr, llop.result))
+        ops.append(self.gen_mu_convop('PTRCAST', PTR, loc_adr, loc_ptr))
+        ops.append(self.gen_mu_load(loc_ptr, llop.result))
         return ops
 
     def map_op_raw_store(self, llop):
@@ -977,8 +977,8 @@ class LL2MuMapper:
         ops.extend(self.map_op(SpaceOperation('adr_add', [adr_v, ofs_c], loc_adr)))
         PTR = mutype.MuUPtr(llop.result.concretetype)
         loc_ptr = varof(PTR, 'loc_ptr')
-        ops.append(self._gen_mu_convop('PTRCAST', PTR, loc_adr, loc_ptr))
-        ops.append(self._gen_mu_store(loc_ptr, val_vc, llop.result))
+        ops.append(self.gen_mu_convop('PTRCAST', PTR, loc_adr, loc_ptr))
+        ops.append(self.gen_mu_store(loc_ptr, val_vc, llop.result))
         return ops
 
     def map_op_adr_delta(self, llop):
@@ -989,12 +989,12 @@ class LL2MuMapper:
         ops = []
         if isinstance(llop.args[0].concretetype, mutype.MuRef):
             ptr = varof(mutype.MuUPtr(llop.args[0].concretetype.TO), 'ptr')
-            ops.append(self._gen_mu_comminst('NATIVE_PIN', [llop.args[0]], ptr))
+            ops.append(self.gen_mu_comminst('NATIVE_PIN', [llop.args[0]], ptr))
         else:
             assert isinstance(llop.args[0].concretetype, mutype.MuUPtr)
             ptr = llop.args[0]
 
-        ops.append(self._gen_mu_convop('PTRCAST', llop.result.concretetype, ptr), llop.result)
+        ops.append(self.gen_mu_convop('PTRCAST', llop.result.concretetype, ptr), llop.result)
         return ops
 
     def map_op_cast_ptr_to_int(self, llop):
@@ -1004,7 +1004,7 @@ class LL2MuMapper:
 
     def map_op_cast_adr_to_ptr(self, llop):
         assert isinstance(llop.result.concretetype, mutype.MuUPtr)
-        return [self._gen_mu_convop('PTRCAST', llop.result.concretetype, llop.args[0], llop.result)]
+        return [self.gen_mu_convop('PTRCAST', llop.result.concretetype, llop.args[0], llop.result)]
 
     def map_op_cast_adr_to_int(self, llop):
         llop.opname = 'same_as'
@@ -1086,7 +1086,7 @@ class LL2MuMapper:
         ops = []
 
         tlref_void = varof(mutype.MuRef(mutype.MU_VOID))
-        ops.append(self._gen_mu_comminst('GET_THREADLOCAL', [], tlref_void))
+        ops.append(self.gen_mu_comminst('GET_THREADLOCAL', [], tlref_void))
         RefStt = mutype.MuRef(self.TLStt)
         tlref_stt = varof(RefStt)
         ops.extend(self.map_op(SpaceOperation('cast_pointer', [Constant(RefStt, mutype.MU_VOID), tlref_void], tlref_stt)))
@@ -1098,7 +1098,7 @@ class LL2MuMapper:
         ops = []
 
         tlref_void = varof(mutype.MuRef(mutype.MU_VOID))
-        ops.append(self._gen_mu_comminst('GET_THREADLOCAL', [], tlref_void))
+        ops.append(self.gen_mu_comminst('GET_THREADLOCAL', [], tlref_void))
         RefStt = mutype.MuRef(self.TLStt)
         tlref_stt = varof(RefStt)
         ops.extend(self.map_op(SpaceOperation('cast_pointer', [Constant(RefStt, mutype.MU_VOID), tlref_void], tlref_stt)))
@@ -1109,16 +1109,16 @@ class LL2MuMapper:
     def map_op_mu_threadlocalref_init(self, llop):
         ops = []
 
-        ops.append(self._gen_mu_new(self.TLStt))
+        ops.append(self.gen_mu_new(self.TLStt))
         ref = ops[-1].result
-        ops.append(self._gen_mu_comminst('SET_THREADLOCAL', [ref], varof(mutype.MU_VOID)))
+        ops.append(self.gen_mu_comminst('SET_THREADLOCAL', [ref], varof(mutype.MU_VOID)))
         return ops
 
     def map_op_weakref_create(self, llop):
         ops = []
 
         Stt = self.map_type(llmemory.WeakRef)
-        ops.append(self._gen_mu_new(Stt, llop.result))
+        ops.append(self.gen_mu_new(Stt, llop.result))
         ops.extend(self.map_op(SpaceOperation('setfield', [llop.result, Constant('wref'), llop.args[0]],
                                               varof(mutype.MU_VOID))))
         return ops
@@ -1146,7 +1146,7 @@ class LL2MuMapper:
 
     # -----------------------------------------------------------------------------
     # helper functions for constructing muops
-    def _gen_mu_binop(self, optr, opnd1, opnd2, res=None, status=None, status_results=None, excclause=None):
+    def gen_mu_binop(self, optr, opnd1, opnd2, res=None, status=None, status_results=None, excclause=None):
         assert hasattr(rmu.MuBinOptr, optr)
         assert opnd1.concretetype == opnd2.concretetype
         if res:
@@ -1170,7 +1170,7 @@ class LL2MuMapper:
         ],
                               res if res else varof(opnd1.concretetype))
 
-    def _gen_mu_cmpop(self, optr, opnd1, opnd2, res=None):
+    def gen_mu_cmpop(self, optr, opnd1, opnd2, res=None):
         assert hasattr(rmu.MuCmpOptr, optr)
         assert opnd1.concretetype == opnd2.concretetype
         if res:
@@ -1179,7 +1179,7 @@ class LL2MuMapper:
         return SpaceOperation('mu_cmpop', [Constant(optr, mutype.MU_VOID), opnd1, opnd2],
                               res if res else varof(mutype.MU_INT1))
 
-    def _gen_mu_convop(self, optr, TYPE, opnd, res=None):
+    def gen_mu_convop(self, optr, TYPE, opnd, res=None):
         assert hasattr(rmu.MuConvOptr, optr)
         if res:
             assert res.concretetype == TYPE
@@ -1191,7 +1191,7 @@ class LL2MuMapper:
         ],
                               res if res else varof(TYPE))
 
-    def _gen_mu_select(self, cond, if_true, if_false, res=None):
+    def gen_mu_select(self, cond, if_true, if_false, res=None):
         assert cond.concretetype == mutype.MU_INT1
         assert if_true.concretetype == if_false.concretetype
         if res:
@@ -1200,11 +1200,11 @@ class LL2MuMapper:
         return SpaceOperation('mu_select', [cond, if_true, if_false],
                               res if res else varof(if_true.concretetype))
 
-    def _gen_mu_branch(self, dst, res=None):
+    def gen_mu_branch(self, dst, res=None):
         assert isinstance(dst, Link)
         return SpaceOperation('mu_branch', [Constant(dst, mutype.MU_VOID)], res if res else varof(mutype.MU_VOID))
 
-    def _gen_mu_branch2(self, cond, dst_true, dst_false, res=None):
+    def gen_mu_branch2(self, cond, dst_true, dst_false, res=None):
         assert cond.concretetype == mutype.MU_INT1
         assert isinstance(dst_true, Link)
         assert isinstance(dst_false, Link)
@@ -1214,7 +1214,7 @@ class LL2MuMapper:
             Constant(dst_false, mutype.MU_VOID)],
                               res if res else varof(mutype.MU_VOID))
 
-    def _gen_mu_switch(self, var, dst_default, dst_cases, res=None):
+    def gen_mu_switch(self, var, dst_default, dst_cases, res=None):
         MuT = var.concretetype
         assert isinstance(dst_default, Link)
         for case in dst_cases:
@@ -1225,7 +1225,7 @@ class LL2MuMapper:
         return SpaceOperation('mu_switch', [var, Constant(dst_default, mutype.MU_VOID)] + cases,
                               res if res else varof(mutype.MU_VOID))
 
-    def _gen_mu_call(self, callee, args, res=None, keepalive=None, excclause=None):
+    def gen_mu_call(self, callee, args, res=None, keepalive=None, excclause=None):
         assert isinstance(callee.concretetype, mutype.MuFuncRef)
         Sig = callee.concretetype.Sig
         assert len(args) == len(Sig.ARGS)
@@ -1243,21 +1243,21 @@ class LL2MuMapper:
         return SpaceOperation('mu_call', [callee] + args + [Constant(metainfo, mutype.MU_VOID)],
                               res if res else varof(Sig.RESULTS[0]))
 
-    def _gen_mu_ret(self, val=None, res=None):
+    def gen_mu_ret(self, val=None, res=None):
         return SpaceOperation('mu_ret', [val] if val else [], res if res else varof(mutype.MU_VOID))
 
-    def _gen_mu_throw(self, excobj, res=None):
+    def gen_mu_throw(self, excobj, res=None):
         assert isinstance(excobj.concretetype, mutype.MuRef)
         return SpaceOperation('mu_throw', [excobj], res if res else varof(mutype.MU_VOID))
 
-    def _gen_mu_new(self, TYPE, res=None):
+    def gen_mu_new(self, TYPE, res=None):
         assert not isinstance(TYPE, mutype.MuHybrid)
         if res:
             assert res.concretetype == mutype.MuRef(TYPE)
         return SpaceOperation('mu_new', [Constant(TYPE, mutype.MU_VOID)],
                               res if res else mutype.MuRef(TYPE))
 
-    def _gen_mu_newhybrid(self, TYPE, n_vc, res=None):
+    def gen_mu_newhybrid(self, TYPE, n_vc, res=None):
         assert isinstance(TYPE, mutype.MuHybrid)
         assert isinstance(n_vc.concretetype, mutype.MuIntType)
         if res:
@@ -1265,14 +1265,14 @@ class LL2MuMapper:
         return SpaceOperation('mu_newhybrid', [Constant(TYPE, mutype.MU_VOID), n_vc],
                               res if res else mutype.MuRef(TYPE))
 
-    def _gen_mu_getiref(self, ref, res=None):
+    def gen_mu_getiref(self, ref, res=None):
         assert isinstance(ref.concretetype, mutype.MuRef)
         if res:
             assert res.concretetype == mutype.MuIRef(ref.concretetype.TO)
         return SpaceOperation('mu_getiref', [ref],
                               res if res else mutype.MuIRef(ref.concretetype.TO))
 
-    def _gen_mu_getfieldiref(self, iref, fldname, res=None):
+    def gen_mu_getfieldiref(self, iref, fldname, res=None):
         assert isinstance(iref.concretetype, (mutype.MuIRef, mutype.MuUPtr))
         MuT = iref.concretetype.TO
         assert fldname in MuT._names
@@ -1286,7 +1286,7 @@ class LL2MuMapper:
         return SpaceOperation('mu_getfieldiref', [iref, Constant(fldname, mutype.MU_VOID)],
                               res if res else varof(cls(FLD)))
 
-    def _gen_mu_getelemiref(self, iref, idx_vc, res=None):
+    def gen_mu_getelemiref(self, iref, idx_vc, res=None):
         assert isinstance(iref.concretetype, (mutype.MuIRef, mutype.MuUPtr))
         MuT = iref.concretetype.TO
         assert isinstance(MuT, mutype.MuArray)
@@ -1299,7 +1299,7 @@ class LL2MuMapper:
         return SpaceOperation('mu_getelemiref', [iref, idx_vc],
                               res if res else varof(cls(ELM)))
 
-    def _gen_mu_shiftiref(self, iref, ofs_vc, res=None):
+    def gen_mu_shiftiref(self, iref, ofs_vc, res=None):
         assert isinstance(iref.concretetype, (mutype.MuIRef, mutype.MuUPtr))
         assert isinstance(ofs_vc.concretetype, mutype.MuIntType)
         if res:
@@ -1308,7 +1308,7 @@ class LL2MuMapper:
         return SpaceOperation('mu_shiftiref', [iref, ofs_vc],
                               res if res else varof(iref.concretetype))
 
-    def _gen_mu_getvarpartiref(self, irefhyb, res=None):
+    def gen_mu_getvarpartiref(self, irefhyb, res=None):
         assert isinstance(irefhyb.concretetype, (mutype.MuIRef, mutype.MuUPtr))
         assert isinstance(irefhyb.concretetype.TO, mutype.MuHybrid)
         Hyb = irefhyb.concretetype.TO
@@ -1319,7 +1319,7 @@ class LL2MuMapper:
         return SpaceOperation('mu_getvarpartiref', [irefhyb],
                               res if res else cls(Hyb._vartype.OF))
 
-    def _gen_mu_load(self, ref, res=None, memord='NOT_ATOMIC'):
+    def gen_mu_load(self, ref, res=None, memord='NOT_ATOMIC'):
         assert isinstance(ref.concretetype, mutype.MuObjectRef)
         if res:
             assert res.concretetype == ref.concretetype.TO
@@ -1327,14 +1327,14 @@ class LL2MuMapper:
         return SpaceOperation('mu_load', [ref, Constant(metainfo, mutype.MU_VOID)],
                               res if res else varof(ref.concretetype.TO))
 
-    def _gen_mu_store(self, ref, val_vc, res=None, memord='NOT_ATOMIC'):
+    def gen_mu_store(self, ref, val_vc, res=None, memord='NOT_ATOMIC'):
         assert isinstance(ref.concretetype, mutype.MuObjectRef)
         assert val_vc.concretetype == ref.concretetype.TO
         metainfo = {'memord': memord}
         return SpaceOperation('mu_store', [ref, val_vc, Constant(metainfo, mutype.MU_VOID)],
                               res if res else varof(mutype.MU_VOID))
 
-    def _gen_mu_ccall(self, callee, args, res=None, keepalive=None, excclause=None,
+    def gen_mu_ccall(self, callee, args, res=None, keepalive=None, excclause=None,
                       callconv='DEFAULT'):
         assert isinstance(callee.concretetype, mutype.MuUFuncPtr)
         Sig = callee.concretetype.Sig
@@ -1354,7 +1354,7 @@ class LL2MuMapper:
         return SpaceOperation('mu_ccall', [callee] + args + [Constant(metainfo, mutype.MU_VOID)],
                               res if res else varof(Sig.RESULTS[0]))
 
-    def _gen_mu_comminst(self, inst, args, res, flags=[], types=[], sigs=[], keepalive=None, excclause=None):
+    def gen_mu_comminst(self, inst, args, res, flags=[], types=[], sigs=[], keepalive=None, excclause=None):
         assert hasattr(rmu.MuCommInst, inst)
         metainfo = {}
         if flags:
