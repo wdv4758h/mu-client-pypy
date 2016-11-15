@@ -270,3 +270,56 @@ def test_uptr_bytestore_load(cmdopt):
     res = impl_jit_test(cmdopt, build_test_bundle)
     if cmdopt.run:
         assert res == 0x8d9f9c1d
+
+
+def test_getfieldiref(cmdopt):
+    def build_test_bundle(bldr, rmu):
+        """
+        Builds the following test bundle.
+            .typedef @i8 = int<8>
+            .typedef @i32 = int<32>
+            .typedef @i64 = int<64>
+            .typedef @stt = struct<@i8 @i64 @i32>
+            .typdef @pstt = uptr<@stt>
+            .funcsig @sig_pstt_i32 = (@pi32) -> (@i32)
+            .funcdef @test_fnc VERSION @test_fnc.v1 <@sig_pstt_i32> {
+                %blk0(<@pstt> %ps):
+                    %pfld = GETFIELDIREF PTR <@stt 2> %ps
+                    %res = LOAD PTR <@i32> %pfld
+                    RET %res
+            }
+        :type bldr: rpython.rlib.rmu.MuIRBuilder
+        :type rmu: rpython.rlib.rmu
+        :return: (rmu.MuVM(), rmu.MuCtx, rmu.MuIRBuilder, MuID, MuID)
+        """
+        i8 = bldr.gen_sym("@i8"); bldr.new_type_int(i8, 8)
+        i32 = bldr.gen_sym("@i32"); bldr.new_type_int(i32, 32)
+        i64 = bldr.gen_sym("@i64"); bldr.new_type_int(i64, 64)
+        stt = bldr.gen_sym("@stt"); bldr.new_type_struct(stt, [i8, i64, i32])
+        pstt = bldr.gen_sym("@pstt"); bldr.new_type_uptr(pstt, stt)
+
+        sig_pstt_i32 = bldr.gen_sym("@sig_pstt_i32"); bldr.new_funcsig(sig_pstt_i32, [pstt], [i32])
+
+        test_fnc = bldr.gen_sym("@test_fnc"); bldr.new_func(test_fnc, sig_pstt_i32)
+
+        test_fnc_v1 = bldr.gen_sym("@test_fnc.v1")
+        blk0 = bldr.gen_sym("@test_fnc.v1.blk0")
+        ps = bldr.gen_sym("@test_fnc.v1.blk0.ps")
+        pfld = bldr.gen_sym("@test_fnc.v1.blk0.pfld")
+        res = bldr.gen_sym("@test_fnc.v1.blk0.res")
+        op_getfieldiref = bldr.gen_sym(); bldr.new_getfieldiref(op_getfieldiref, pfld, True, stt, 2, ps)
+        op_load = bldr.gen_sym(); bldr.new_load(op_load, res, True, rmu.MuMemOrd.NOT_ATOMIC, i32, pfld)
+        op_ret = bldr.gen_sym(); bldr.new_ret(op_ret, [res])
+        bldr.new_bb(blk0, [ps], [pstt], rmu.MU_NO_ID, [op_getfieldiref, op_load, op_ret])
+
+        bldr.new_func_ver(test_fnc_v1, test_fnc, [blk0])
+
+        return {
+            "test_fnc": test_fnc,
+            "test_fnc_sig": sig_pstt_i32,
+            "result_type": i32,
+            "@i8": i8,
+            "@i32": i32,
+            "@i64": i64,
+        }
+    impl_jit_test(cmdopt, build_test_bundle)
