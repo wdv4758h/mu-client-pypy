@@ -64,7 +64,7 @@ def test_sext(cmdopt):
             .funcsig @sig__i64 = () -> (@i64)
             .funcdef @test_fnc VERSION @test_fnc_v1 <@sig__i64> {
                 @test_fnc_v1.blk0():
-                    @test_fnc_v1.blk0.res = SEXT <@i32 @i64> @0xa8324b55_i64
+                    @test_fnc_v1.blk0.res = SEXT <@i32 @i64> @0xa8324b55_i32
                     RET @test_fnc_v1.blk0.res
             }
         :type bldr: rpython.rlib.rmu.MuIRBuilder
@@ -77,7 +77,7 @@ def test_sext(cmdopt):
         bldr.new_type_int(i64, 64)
 
         c_0xa8324b55_i32 = bldr.gen_sym("@0xa8324b55_i32")
-        bldr.new_const_int(c_0xa8324b55_i32, i64, 0xa8324b55)
+        bldr.new_const_int(c_0xa8324b55_i32, i32, 0xa8324b55)
 
         sig__i64 = bldr.gen_sym("@sig__i64")
         bldr.new_funcsig(sig__i64, [], [i64])
@@ -118,7 +118,7 @@ def test_zext(cmdopt):
             .funcsig @sig__i64 = () -> (@i64)
             .funcdef @test_fnc VERSION @test_fnc_v1 <@sig__i64> {
                 @test_fnc_v1.blk0():
-                    @test_fnc_v1.blk0.res = ZEXT <@i32 @i64> @0xa8324b55_i64
+                    @test_fnc_v1.blk0.res = ZEXT <@i32 @i64> @0xa8324b55_i32
                     RET @test_fnc_v1.blk0.res
             }
         :type bldr: rpython.rlib.rmu.MuIRBuilder
@@ -131,7 +131,7 @@ def test_zext(cmdopt):
         bldr.new_type_int(i64, 64)
 
         c_0xa8324b55_i32 = bldr.gen_sym("@0xa8324b55_i32")
-        bldr.new_const_int(c_0xa8324b55_i32, i64, 0xa8324b55)
+        bldr.new_const_int(c_0xa8324b55_i32, i32, 0xa8324b55)
 
         sig__i64 = bldr.gen_sym("@sig__i64")
         bldr.new_funcsig(sig__i64, [], [i64])
