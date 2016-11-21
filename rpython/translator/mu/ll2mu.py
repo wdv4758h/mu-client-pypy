@@ -1371,9 +1371,9 @@ class LL2MuMapper:
         return SpaceOperation('mu_comminst', [Constant(inst, mutype.MU_VOID)] + args +
                               [Constant(metainfo, mutype.MU_VOID)], res)
 
-def varof(MuT, name=None):
+def varof(TYPE, name=None):
     v = Variable(name)
-    v.concretetype = MuT
+    v.concretetype = TYPE
     return v
 
 

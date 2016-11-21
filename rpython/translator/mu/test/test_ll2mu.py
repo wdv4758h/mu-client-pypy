@@ -255,6 +255,12 @@ def test_int_mul_ovf():
                           res)
     muops = ll2mu.map_op(llop)
     assert len(muops) == 1
+    op = muops[0]
+    assert op.opname == 'mu_binop'
+    metainfo = op.args[-1].value
+    assert metainfo['status'][0] == 'V'
+    assert len(metainfo['status'][1]) == 1
+    assert isinstance(metainfo['status'][1][0], Variable)
 
 def test_cast_char_to_int():
     ll2mu = LL2MuMapper()
