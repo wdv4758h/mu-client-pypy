@@ -783,7 +783,11 @@ class MuObjectRef(MuReferenceType):
     def __str__(self):
         return "%s %s" % (self._symbol, self.TO)
 
+
 class _muobject_reference(_mugeneral_reference):
+    def _non_null_str(self):
+        return "%s %s" % (self._TYPE._symbol, self._obj)
+
     def _cast_to(self, REFTYPE):
         CURTYPE = self._TYPE
         down_or_up = castable(REFTYPE, CURTYPE)
@@ -821,7 +825,6 @@ class _muobject_reference(_mugeneral_reference):
             raise RuntimeError("widening %r inside %r instead of %r" %
                                (CURTYPE, PARENTTYPE, REFTYPE.TO))
         return cls(REFTYPE, struc)
-
 
 
 class MuRef(MuObjectRef):
