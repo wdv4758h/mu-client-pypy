@@ -380,7 +380,7 @@ class LL2MuMapper:
         hyb = mutype._muhybrid(MuT, self.map_value(llv.getlength()))
 
         _memarr = getattr(hyb, MuT._varfld)
-        for i in range(hyb.length.val):
+        for i in range(hyb.length):
             _memarr[i] = self.map_value(llv.getitem(i))
 
         return hyb

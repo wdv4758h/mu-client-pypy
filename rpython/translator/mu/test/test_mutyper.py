@@ -117,6 +117,32 @@ def test_specialise_op():
                     assert mutype.mutypeOf(arg.value) == arg.concretetype
 
 
+def test_load_gcell():
+    lst = [1, 2, 3, 4, 5]
+    def f(n):
+        return lst[n]
+
+    t = Translation(f, [int])
+    t.rtype()
+    t.backendopt(remove_asserts=True, really_remove_asserts=True)
+
+    graph_f = graph_of(f, t)
+    blk = graph_f.startblock.exits[0].target
+    assert blk.operations[-1].opname == 'getarrayitem'
+    assert isinstance(blk.operations[-1].args[0].value, lltype._ptr)
+
+    mutyper = MuTyper(t.context)
+
+    muops = mutyper.specialise_operation(blk.operations[-1])
+
+    op_load = muops[0]
+    assert op_load.opname == 'mu_load'
+    assert isinstance(op_load.args[0].concretetype, mutype.MuGlobalCell)
+    assert op_load.result.concretetype == op_load.args[0].concretetype.TO
+    assert muops[1].opname == 'mu_getiref'
+    assert op_load.result is muops[1].args[0]
+
+
 def test_specialise_block():
     def fac(x):
         if x <= 1:
