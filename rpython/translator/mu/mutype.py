@@ -680,7 +680,7 @@ class _muopqref(_mugeneral_reference):
         self.__dict__.update(attrs)
 
     def _non_null_str(self):
-        return "%s (%s)" % (self._symbol, self.ref_name)
+        return "%s (%s)" % (self._TYPE._symbol, self.ref_name)
 
     def _is_null(self):
         return hasattr(self, '_nullref') and self._nullref
@@ -709,7 +709,7 @@ class _mufunction_reference(_muopqref):
                 attrs['_callable']._compilation_info
 
     def _non_null_str(self):
-        return "%s %s" % (self._symbol, self._name)
+        return "%s %s" % (self._TYPE._symbol, self._name)
 
     def __call__(self, *args):
         Sig = self._TYPE.Sig

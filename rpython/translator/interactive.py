@@ -122,3 +122,6 @@ class Translation(object):
         self.ensure_backend('c')
         self.driver.compile_c()
         return self.driver.c_entryp
+
+    def mutype(self):
+        self.driver.mutype()

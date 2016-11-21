@@ -37,7 +37,7 @@ class MuTyper:
 
         processed = []
         while len(self.graphs) > 0:
-            g = self.graphs.pop(0)
+            g = self.graphs.pop()
             self.specialise_graph(g)
             processed.append(g)
 
@@ -62,7 +62,7 @@ class MuTyper:
         if blk.exitswitch is not c_last_exception:
             if len(blk.exits) == 0:
                 if len(muops) == 0 or muops[-1].opname not in ("mu_throw", "mu_comminst"):
-                    muops.append(self.ll2mu.gen_mu_ret(blk.mu_inputargs[0] if len(blk.mu_inputargs) == 1 else None))
+                    muops.append(self.ll2mu.gen_mu_ret(blk.inputargs[0] if len(blk.inputargs) == 1 else None))
 
             elif len(blk.exits) == 1:
                 muops.append(self.ll2mu.gen_mu_branch(blk.exits[0]))

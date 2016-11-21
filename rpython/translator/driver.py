@@ -541,7 +541,14 @@ class TranslationDriver(SimpleTaskEngine):
 
     @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
     def task_mutype_mu(self):
-        raise NotImplementedError
+        from rpython.translator.mu.exctran import MuExceptionTransformer
+        from rpython.translator.mu.mutyper import MuTyper
+        exctran = MuExceptionTransformer(self.translator)
+        exctran.transform_all()
+
+        self.mutyper = MuTyper(self.translator)
+        self.mutyper.prepare_all()
+        self.mutyper.specialise_all()
 
     @taskdef(["mutype_mu"], "Mu backend optimisations.")
     def task_optimise_mu(self):
