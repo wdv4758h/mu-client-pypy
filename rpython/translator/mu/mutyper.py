@@ -1,7 +1,8 @@
 from rpython.flowspace.model import Variable, Constant, c_last_exception
 from rpython.rtyper.lltypesystem import lltype, llmemory
 from rpython.translator.mu import mutype
-from rpython.translator.mu.ll2mu import LL2MuMapper, IgnoredLLOp, IgnoredLLVal
+from rpython.translator.mu.ll2mu import LL2MuMapper, IgnoredLLOp, IgnoredLLVal, varof
+from rpython.rlib import rmu
 from rpython.tool.ansi_mandelbrot import Driver
 from rpython.tool.ansi_print import AnsiLogger
 log = AnsiLogger("MuTyper")
@@ -14,8 +15,9 @@ class MuTyper:
         self.tlc = tlc
         self.ll2mu = LL2MuMapper(tlc.rtyper)
 
+    def init_threadlocal_struct_type(self):
         # determine thread local struct type
-        tlflds = tlc.annotator.bookkeeper.thread_local_fields
+        tlflds = self.tlc.annotator.bookkeeper.thread_local_fields
         if len(tlflds) == 0:
             # self.TLSTT = mutype.MuStruct('mu_tlstt', ('dummy', mutype.char_t))  # use a dummy struct when empty
             self.TLStt = mutype.MU_VOID
@@ -41,8 +43,114 @@ class MuTyper:
 
         self.tlc.graphs = self.graphs = processed
 
-    def specialise_graph(self):
-        raise NotImplementedError
+    def specialise_graph(self, g):
+        for blk in g.iterblocks():
+            self.specialise_block(blk)
+
+    def specialise_block(self, blk):
+        # specialise inputargs
+        blk.inputargs = [self.specialise_arg(arg) for arg in blk.inputargs]
+
+        # specialise operations
+        muops = []
+        for op in blk.operations:
+            muops.extend(self.specialise_operation(op))
+
+        # specialise exits
+        for e in blk.exits:
+            e.args = [self.specialise_arg(arg) for arg in e.args]
+        if blk.exitswitch is not c_last_exception:
+            if len(blk.exits) == 0:
+                if len(muops) == 0 or muops[-1].opname not in ("mu_throw", "mu_comminst"):
+                    muops.append(self.ll2mu.gen_mu_ret(blk.mu_inputargs[0] if len(blk.mu_inputargs) == 1 else None))
+
+            elif len(blk.exits) == 1:
+                muops.append(self.ll2mu.gen_mu_branch(blk.exits[0]))
+
+            elif len(blk.exits) == 2:
+                blk.exitswitch = self.specialise_arg(blk.exitswitch)
+                if blk.exitswitch.concretetype is mutype.MU_INT8:
+                    flag = varof(mutype.MU_INT1)
+                    muops.append(self.ll2mu.gen_mu_cmpop('EQ', blk.exitswitch, self.ll2mu.mapped_const(True), flag))
+                    blk.exitswitch = flag
+                muops.append(self.ll2mu.gen_mu_branch2(blk.exitswitch, blk.exits[1], blk.exits[0]))
+
+            else:  # more than 2 exits -> use SWITCH statement
+                blk.exitswitch = self.specialise_arg(blk.exitswitch)
+                cases = filter(lambda e: e.exitcase != 'default', blk.exits)
+                for e in cases:
+                    e.exitcase = self.specialise_arg(Constant(e.llexitcase, lltype.typeOf(e.llexitcase)))
+                defl_exit = next((e for e in blk.exits if e.exitcase == 'default'), cases[-1])
+                muops.append(self.ll2mu.gen_mu_switch(blk.exitswitch, defl_exit, cases))
+
+        elif muops[-1].opname == 'mu_ccall':
+            # NOTE: CCALL will NEVER throw a Mu exception.
+            # still not sure why calling a native C library function will throw an RPython exception...
+            # So in this case just branch the normal case
+            muops.append(self.ll2mu.gen_mu_branch(blk.exits[0]))
+        elif muops[-1].opname == 'mu_binop':    # binop overflow
+            metainfo = muops[-1].args[-1].value
+            statres_V = metainfo['status'][1][0]     # only V is used at this moment
+            blk.exitswitch = statres_V
+        else:   # exceptional branching for mu_call, mu_comminst
+            metainfo = muops[-1].args[-1].value
+            metainfo['excclause'] = self.ll2mu.exc_clause(blk.exits[0], blk.exits[1])
+
+        blk.operations = muops
+
+    def specialise_arg(self, arg):
+        if isinstance(arg.concretetype, lltype.LowLevelType):   # has not been processed
+            if isinstance(arg, Variable):
+                arg.concretetype = self.ll2mu.map_type(arg.concretetype)
+                self.ll2mu.resolve_ptr_types()
+            elif isinstance(arg, Constant):
+                if arg.concretetype is lltype.Void:
+                    if isinstance(arg.value, lltype.LowLevelType):  # a type constant
+                        arg.__init__(self.ll2mu.map_type(arg.value), mutype.MU_VOID)
+                        self.ll2mu.resolve_ptr_types()
+                    else:   # for other non-translation constants, just keep the value
+                        arg.__init__(arg.value, mutype.MU_VOID)
+                else:
+                    MuT = self.ll2mu.map_type(arg.concretetype)
+                    muv = self.ll2mu.map_value(arg.value)
+                    self.ll2mu.resolve_ptr_types()
+                    self.ll2mu.resolve_ptr_values()
+
+                    if isinstance(muv, mutype._muufuncptr):
+                        MuT = mutype.mutypeOf(muv)
+
+                    assert mutype.mutypeOf(muv) == MuT
+
+                    if isinstance(muv, mutype._muobject_reference):
+                        GCl_T = mutype.MuGlobalCell(MuT)
+                        arg.__init__(mutype._muglobalcell(GCl_T, mutype._muref(MuT, muv), []), GCl_T)
+                    else:
+                        arg.__init__(muv, MuT)
+
+        return arg
+
+    def specialise_operation(self, llop):
+        llop.args = [self.specialise_arg(arg) for arg in llop.args]
+        llop.result = self.specialise_arg(llop.result)
+
+        muops = []
+        muops.extend(self.extract_load_gcell(llop))
+        try:
+            muops.extend(self.ll2mu.map_op(llop))
+        except IgnoredLLOp:
+            log.specialise_operation('ignored operation %s' % llop)
+            return []
+        return muops
+
+    def extract_load_gcell(self, llop):
+        loadops = []
+        for i, arg in enumerate(llop.args):
+            if isinstance(arg, Constant) and isinstance(arg.concretetype, mutype.MuGlobalCell):
+                ldvar = Variable('ldgcl')
+                ldvar.concretetype = arg.concretetype.TO
+                loadops.append(self.ll2mu.gen_mu_load(arg, ldvar))
+                llop.args[i] = ldvar
+        return loadops
 
 
 # -----------------------------------------------------------------------------
