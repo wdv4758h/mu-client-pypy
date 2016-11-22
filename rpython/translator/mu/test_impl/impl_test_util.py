@@ -77,10 +77,11 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
             from rpython.rlib import rmu_genc_fast as rmu
         rmu.get_global_apilogger().clear()
 
-    if opts.vmargs:
-        mu = rmu.MuVM(opts.vmargs)
+    if opts.impl == 'ref':
+        vmargs = 'vmLog=ERROR'
     else:
-        mu = rmu.MuVM()
+        vmargs = 'init_mu --log-level=none --aot-emit-dir=emit'
+    mu = rmu.MuVM(vmargs)
     ctx = mu.new_context()
     bldr = ctx.new_ir_builder()
 

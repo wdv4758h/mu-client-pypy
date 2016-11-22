@@ -362,8 +362,9 @@ def gen_oowrapper(opts, db, fp):
     else:
         init_funcs = {
             'MuVM':
-                ("    def __init__(self):\n"
-                 "        self._mu = mu_new()\n"
+                ("    def __init__(self, config_str=\"\"):\n"
+                 "        with rffi.scoped_str2charp('init_mu ' + config_str) as buf:\n"
+                 "            self._mu = mu_fastimpl_new_with_opts(buf)\n"
                  "\n"),
             'MuCtx':
                 ("    def __init__(self, mu, rffi_ctx_ptr):\n"
@@ -401,6 +402,7 @@ mu_close = rffi.llexternal('mu_refimpl2_close', [_MuVMPtr], lltype.Void, compila
         fp.write(
             """\
 mu_new = rffi.llexternal('mu_fastimpl_new', [], _MuVMPtr, compilation_info=eci)
+mu_fastimpl_new_with_opts = rffi.llexternal('mu_fastimpl_new_with_opts', [rffi.CCHARP], _MuVMPtr, compilation_info=eci)
 """)
     fp.write('\n')
     fp.write(

@@ -350,8 +350,9 @@ MU_NO_ID = rffi.cast(MuID, 0)
 # -------------------------------------------------------------------------------------------------------
 # OO wrappers
 class MuVM:
-    def __init__(self):
-        self._mu = mu_new()
+    def __init__(self, config_str=""):
+        with rffi.scoped_str2charp('init_mu ' + config_str) as buf:
+            self._mu = mu_fastimpl_new_with_opts(buf)
 
     def new_context(self):
         # type: () -> MuCtx
@@ -1511,6 +1512,7 @@ _MuIRBuilder.become(rffi.CStruct(
 # -------------------------------------------------------------------------------------------------------
 # Mu fast implementation functions
 mu_new = rffi.llexternal('mu_fastimpl_new', [], _MuVMPtr, compilation_info=eci)
+mu_fastimpl_new_with_opts = rffi.llexternal('mu_fastimpl_new_with_opts', [rffi.CCHARP], _MuVMPtr, compilation_info=eci)
 
 # -------------------------------------------------------------------------------------------------------
 # Helpers

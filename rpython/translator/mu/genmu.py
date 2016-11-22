@@ -157,20 +157,28 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         self._objhdl_map = {}   # used in heap initialisation; NOTE: referent -> handle (not reference)
 
     def get_config_str(self, db):
-        libconfig = []
+        from rpython.config.translationoption import get_translation_config
+        config = get_translation_config()
+        if config.translation.muimpl == 'ref':
+            libconfig = []
 
-        # extraLibs
-        extlibs = []
-        for lib in db.dylibs:
-            extlibs.append(lib._name)
-        libconfig.append("extraLibs=" + ":".join(extlibs))
+            # extraLibs
+            extlibs = []
+            for lib in db.dylibs:
+                extlibs.append(lib._name)
+            libconfig.append("extraLibs=" + ":".join(extlibs))
 
-        # dumpBundle
-        libconfig.append("dumpBundle=%s" % False)
+            # dumpBundle
+            libconfig.append("dumpBundle=%s" % False)
 
-        # silent
-        libconfig.append("vmLog=ERROR")
-        return self.__class__._newline.join(libconfig)
+            # silent
+            libconfig.append("vmLog=ERROR")
+            return self.__class__._newline.join(libconfig)
+        else:
+            loglvl = 'none'
+            emit_dir = '/tmp'
+            opt_str = '--log-level=%(loglvl)s --aot-emit-dir=%(emit_dir)s' % locals()
+            return opt_str
 
     def build_bundle(self):
         self.bdr = self.ctx.new_ir_builder()
