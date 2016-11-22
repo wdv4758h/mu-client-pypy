@@ -80,7 +80,7 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
     if opts.impl == 'ref':
         vmargs = 'vmLog=ERROR'
     else:
-        vmargs = 'init_mu --log-level=none --aot-emit-dir=emit'
+        vmargs = '--log-level=none --aot-emit-dir=emit'
     mu = rmu.MuVM(vmargs)
     ctx = mu.new_context()
     bldr = ctx.new_ir_builder()

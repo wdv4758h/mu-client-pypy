@@ -470,7 +470,7 @@ MU_NO_ID = "MU_NO_ID"
 class MuVM:
     def __init__(self, config_str=""):
         self._mu = CVar('MuVM*', 'mu')
-        _apilog.logcall('mu_fastimpl_new_with_opts', [CStr('init_mu' + config_str)], self._mu)
+        _apilog.logcall('mu_fastimpl_new_with_opts', [CStr('init_mu ' + config_str)], self._mu)
 
     def new_context(self):
         # type: () -> MuCtx

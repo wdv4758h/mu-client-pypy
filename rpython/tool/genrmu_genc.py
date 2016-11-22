@@ -366,7 +366,7 @@ def gen_oowrapper(opts, db, fp):
             'MuVM':
                 ("    def __init__(self, config_str=\"\"):\n"
                  "        self._mu = CVar('MuVM*', 'mu')\n"
-                 "        _apilog.logcall('mu_fastimpl_new_with_opts', [CStr('init_mu' + config_str)], self._mu)\n"
+                 "        _apilog.logcall('mu_fastimpl_new_with_opts', [CStr('init_mu ' + config_str)], self._mu)\n"
                  "\n"),
             'MuCtx':
                 ("    def __init__(self, ctx_var):\n"
