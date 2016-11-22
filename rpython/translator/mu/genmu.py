@@ -148,10 +148,9 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             _, self._rmu = get_rmu()
         else:
             self._rmu, _ = get_rmu()
-        try:
-            self.mu = self._rmu.MuVM(self.get_config_str(db))
-        except TypeError:   # no argument needed -> rmu_fast
-            self.mu = self._rmu.MuVM()
+
+        self.mu = self._rmu.MuVM(self.get_config_str(db))
+
         self.ctx = self.mu.new_context()
         self.bdr = None
         self._objhdl_map = {}   # used in heap initialisation; NOTE: referent -> handle (not reference)

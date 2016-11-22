@@ -351,7 +351,7 @@ def test_ccall(cmdopt):
             '@result': result
         })
 
-    impl_jit_test(cmdopt, build_test_bundle, extend_with_entrypoint, ["../suite/test_ccall_fnc.c"])
+    impl_jit_test(cmdopt, build_test_bundle, extend_with_entrypoint, ["suite/test_ccall_fnc.c"])
 
 
 def test_extern_func(cmdopt):
