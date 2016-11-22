@@ -487,7 +487,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         self.bdr.new_allocahybrid(op_id, varmap[op.result], varmap[op.T], varmap[op.length.mu_type], varmap[op.length])
 
     def _OP_GETIREF(self, op_id, op, varmap, **kwargs):
-        self.bdr.new_getiref(op_id, varmap[op.result], varmap[op.opnd.mu_type], varmap[op.opnd])
+        self.bdr.new_getiref(op_id, varmap[op.result], varmap[op.opnd.mu_type.TO], varmap[op.opnd])
 
     def _OP_GETFIELDIREF(self, op_id, op, varmap, **kwargs):
         self.bdr.new_getfieldiref(op_id, varmap[op.result], isinstance(op.opnd.mu_type, mutype.MuUPtr),
