@@ -165,7 +165,7 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
 
         hres = ctx.load(rmu.MuMemOrd.NOT_ATOMIC, ctx.handle_from_global(result))
         if opts.run:
-            res_val = ctx.handle_to_uint64(hres)
+            res_val = getattr(ctx, 'handle_to_' + id_dict.get('handle_conv_dst_type', 'uint64'))(hres)
             print "result =", res_val
 
             rffi.free_charpp(c_argv)    # clean up
