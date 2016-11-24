@@ -107,7 +107,7 @@ def test_double_mul(cmdopt):
             .funcsig @sig__dbl = () -> (@dbl)
             .funcdef @test_fnc VERSION @test_fnc.v1 <@sig__dbl> {
                 %blk0():
-                    %res = FSUB <@dbl> @pi @e
+                    %res = FMUL <@dbl> @pi @e
                     RET %res
             }
         :type bldr: rpython.rlib.rmu.MuIRBuilder
@@ -153,7 +153,7 @@ def test_double_div(cmdopt):
             .funcsig @sig__dbl = () -> (@dbl)
             .funcdef @test_fnc VERSION @test_fnc.v1 <@sig__dbl> {
                 %blk0():
-                    %res = FSUB <@dbl> @pi @e
+                    %res = FDIV <@dbl> @pi @e
                     RET %res
             }
         :type bldr: rpython.rlib.rmu.MuIRBuilder
@@ -172,7 +172,7 @@ def test_double_div(cmdopt):
         test_fnc_v1 = bldr.gen_sym("@test_fnc.v1")
         blk0 = bldr.gen_sym("@test_fnc.v1.blk0")
         res = bldr.gen_sym("@test_fnc.v1.blk0.res")
-        op_binop = bldr.gen_sym(); bldr.new_binop(op_binop, res, rmu.MuBinOptr.FMUL, dbl, pi, e)
+        op_binop = bldr.gen_sym(); bldr.new_binop(op_binop, res, rmu.MuBinOptr.FDIV, dbl, pi, e)
         op_ret = bldr.gen_sym(); bldr.new_ret(op_ret, [res])
         bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_binop, op_ret])
 
