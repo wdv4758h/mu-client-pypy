@@ -174,7 +174,8 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             libconfig.append("vmLog=ERROR")
             return self.__class__._newline.join(libconfig)
         else:
-            loglvl = 'none'
+            import os
+            loglvl = os.environ.get('MU_LOG_LEVEL', 'none')
             emit_dir = '/tmp'
             opt_str = '--log-level=%(loglvl)s --aot-emit-dir=%(emit_dir)s' % locals()
             return opt_str
