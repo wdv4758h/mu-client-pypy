@@ -663,7 +663,8 @@ def _llop2mu_float_abs(x, res=None, llopname='float_abs'):
 
 def _llop2mu_float_is_true(x, res=None, llopname='float_is_true'):
     ops = _MuOpList()
-    cmp_res = ops.append(muops.FUNE(x, _newprimconst(x.mu_type, 0.0)))
+    # cmp_res = ops.append(muops.FUNE(x, _newprimconst(x.mu_type, 0.0)))
+    cmp_res = ops.append(muops.FONE(x, _newprimconst(x.mu_type, 0.0)))
     ops.append(muops.SELECT(cmp_res,
                             _newprimconst(mutype.bool_t, 1),
                             _newprimconst(mutype.bool_t, 0),
