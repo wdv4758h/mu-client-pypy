@@ -297,7 +297,9 @@ translation_optiondescription = OptionDescription(
                  ["ref", "fast"], default="ref", cmdline="--muimpl"),
     BoolOption("mutestjit", "Generate code suitable for testing Mu JIT",
                requires=[('translation.muimpl', 'fast')],
-               default=False, cmdline="--mutestjit")
+               default=False, cmdline="--mutestjit"),
+    StrOption("muemitdir", "Mu fast implementation temporary emit directory",
+              default='emit', cmdline='--muemitdir')
 ])
 
 def get_combined_translation_config(other_optdescr=None,

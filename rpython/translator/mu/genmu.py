@@ -168,7 +168,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             libconfig.append("extraLibs=" + ":".join(extlibs))
 
             # dumpBundle
-            libconfig.append("dumpBundle=%s" % False)
+            libconfig.append("dumpBundle=%s" % True)
 
             # silent
             libconfig.append("vmLog=ERROR")
@@ -176,7 +176,7 @@ class MuAPIBundleGenerator(MuBundleGenerator):
         else:
             import os
             loglvl = os.environ.get('MU_LOG_LEVEL', 'none')
-            emit_dir = '/tmp'
+            emit_dir = config.translation.muemitdir
             opt_str = '--log-level=%(loglvl)s --aot-emit-dir=%(emit_dir)s' % locals()
             return opt_str
 
