@@ -692,7 +692,7 @@ __cmpop_map = {
     'unichar_eq':        'EQ',
     'unichar_ne':       'NE',
     'float_eq':         'FOEQ',
-    'float_ne':         'FUNE'
+    'float_ne':         'FONE'
 }
 
 for op in "add sub mul and or xor".split(' '):
