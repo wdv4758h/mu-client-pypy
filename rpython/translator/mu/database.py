@@ -210,7 +210,7 @@ class MuDatabase:
 
             # find symbol in shared lib
             default_libs = ('rpyc', 'c')
-            libdeps = map(libdic.get, extfn.eci.libraries if len(extfn.eci.libraries) > 0 else default_libs)
+            libdeps = map(libdic.get, extfn.eci.libraries + default_libs)
             for lib in libdeps:
                 if sym_in_lib(c_name, lib):
                     return c_name
