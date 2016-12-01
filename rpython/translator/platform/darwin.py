@@ -112,3 +112,4 @@ class Darwin_i386(Darwin):
 class Darwin_x86_64(Darwin):
     name = "darwin_x86_64"
     DEFAULT_CC = 'clang -arch x86_64'
+    so_prefixes = ('lib', '')
