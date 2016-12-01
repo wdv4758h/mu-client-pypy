@@ -325,6 +325,54 @@ def test_getfieldiref(cmdopt):
     impl_jit_test(cmdopt, build_test_bundle)
 
 
+def test_getelemiref(cmdopt):
+    def build_test_bundle(bldr, rmu):
+        """
+        Builds the following test bundle.
+            .typedef @i64 = int<64>
+            .typedef @arr = array<@i64 5>
+            .typdef @parr = uptr<@arr>
+            .funcsig @sig_parri64_i64 = (@parr @i64) -> (@i64)
+            .funcdef @test_fnc VERSION @test_fnc.v1 <@sig_parri64_i64> {
+                %blk0(<@parr> %pa <@i64> %idx):
+                    %pelm = GETELEMIREF PTR <parr @i64> %pa %idx
+                    %res = LOAD PTR <@i64> %pelm
+                    RET %res
+            }
+        :type bldr: rpython.rlib.rmu.MuIRBuilder
+        :type rmu: rpython.rlib.rmu
+        :return: (rmu.MuVM(), rmu.MuCtx, rmu.MuIRBuilder, MuID, MuID)
+        """
+        i64 = bldr.gen_sym("@i64"); bldr.new_type_int(i64, 64)
+        arr = bldr.gen_sym("@arr"); bldr.new_type_array(arr, i64, 5)
+        parr = bldr.gen_sym("@parr"); bldr.new_type_uptr(parr, arr)
+
+        sig_parri64_i64 = bldr.gen_sym("@sig_parri64_i64"); bldr.new_funcsig(sig_parri64_i64, [parr, i64], [i64])
+
+        test_fnc = bldr.gen_sym("@test_fnc"); bldr.new_func(test_fnc, sig_parri64_i64)
+
+        test_fnc_v1 = bldr.gen_sym("@test_fnc.v1")
+        blk0 = bldr.gen_sym("@test_fnc.v1.blk0")
+        pa = bldr.gen_sym("@test_fnc.v1.blk0.pa")
+        idx = bldr.gen_sym("@test_fnc.v1.blk0.idx")
+        pelm = bldr.gen_sym("@test_fnc.v1.blk0.pelm")
+        res = bldr.gen_sym("@test_fnc.v1.blk0.res")
+        op_getelemiref = bldr.gen_sym(); bldr.new_getelemiref(op_getelemiref, pelm, True, arr, i64, pa, idx)
+        op_load = bldr.gen_sym(); bldr.new_load(op_load, res, True, rmu.MuMemOrd.NOT_ATOMIC, i64, pelm)
+        op_ret = bldr.gen_sym(); bldr.new_ret(op_ret, [res])
+        bldr.new_bb(blk0, [pa, idx], [parr, i64], rmu.MU_NO_ID, [op_getelemiref, op_load, op_ret])
+
+        bldr.new_func_ver(test_fnc_v1, test_fnc, [blk0])
+
+        return {
+            "test_fnc": test_fnc,
+            "test_fnc_sig": sig_parri64_i64,
+            "result_type": i64,
+            "@i64": i64,
+        }
+    impl_jit_test(cmdopt, build_test_bundle)
+
+
 def test_getvarpartiref(cmdopt):
     def build_test_bundle(bldr, rmu):
         """

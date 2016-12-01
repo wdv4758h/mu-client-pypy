@@ -520,6 +520,75 @@ def test_slt(cmdopt):
     if cmdopt.run:
         assert res == 0
 
+def test_ule(cmdopt):
+    def build_test_bundle(bldr, rmu):
+        """
+        Builds the following test bundle.
+            .typedef @i8 = int<64>
+            .const @0xff_i8 <@i8> = 0xff
+            .const @0x0a_i8 <@i8> = 0x0a
+            .funcsig @sig__i8 = () -> (@i8)
+            .funcdecl @fnc <@fnrsig__i8>
+            .funcdef @fnc VERSION @fnc_v1 <@sig__i8> {
+                @fnc_v1.blk0():
+                    @fnc_v1.blk0.cmp_res_1 = ULE <@i8> @0x0a_i8s @0xff_i8
+                    @fnc_v1.blk0.cmp_res_2 = ULE <@i8> @0xff_i8s @0xff_i8s
+                    @fnc_v1.blk0.bin_res = AND <@i1> @fnc_v1.blk0.cmp_res_1 @fnc_v1.blk0.cmp_res_2
+                    @fnc_v1.blk0.res = ZEXT <@i1 @i8> @fnc_v1.blk0.bin_res
+                    RET @fnc_v1.blk0.res
+            }
+        :type bldr: rpython.rlib.rmu.MuIRBuilder
+        :type rmu: rpython.rlib.rmu
+        :return: (rmu.MuVM(), rmu.MuCtx, rmu.MuIRBuilder, MuID, MuID)
+        """
+        i1 = bldr.gen_sym("@i1")
+        bldr.new_type_int(i1, 1)
+        i8 = bldr.gen_sym("@i8")
+        bldr.new_type_int(i8, 8)
+
+        c_0xff_i8 = bldr.gen_sym("@0xff_i8")
+        bldr.new_const_int(c_0xff_i8, i8, 0xff)
+        c_0x0a_i8 = bldr.gen_sym("@0x0a_i8")
+        bldr.new_const_int(c_0x0a_i8, i8, 0x0a)
+
+        sig__i8 = bldr.gen_sym("@sig__i8")
+        bldr.new_funcsig(sig__i8, [], [i8])
+
+        test_fnc = bldr.gen_sym("@test_fnc")
+        bldr.new_func(test_fnc, sig__i8)
+
+        # function body
+        v1 = bldr.gen_sym("@test_fnc_v1")
+        blk0 = bldr.gen_sym("@test_fnc_v1.blk0")
+        cmp_res_1 = bldr.gen_sym("@test_fnc_v1.blk0.cmp_res_1")
+        cmp_res_2 = bldr.gen_sym("@test_fnc_v1.blk0.cmp_res_2")
+        bin_res = bldr.gen_sym("@test_fnc_v1.blk0.bin_res")
+        res = bldr.gen_sym("@test_fnc_v1.blk0.res")
+        op_cmpop_1 = bldr.gen_sym()
+        bldr.new_cmp(op_cmpop_1, cmp_res_1, rmu.MuCmpOptr.ULE, i8, c_0x0a_i8, c_0xff_i8)
+        op_cmpop_2 = bldr.gen_sym()
+        bldr.new_cmp(op_cmpop_2, cmp_res_2, rmu.MuCmpOptr.ULE, i8, c_0xff_i8, c_0xff_i8)
+        op_binop = bldr.gen_sym()
+        bldr.new_binop(op_binop, bin_res, rmu.MuBinOptr.AND, i1, cmp_res_1, cmp_res_2)
+        op_convop = bldr.gen_sym()
+        bldr.new_conv(op_convop, res, rmu.MuConvOptr.ZEXT, i1, i8, bin_res)
+        op_ret = bldr.gen_sym()
+        bldr.new_ret(op_ret, [res])
+        bldr.new_bb(blk0, [], [], rmu.MU_NO_ID, [op_cmpop_1, op_cmpop_2, op_binop, op_convop, op_ret])
+        bldr.new_func_ver(v1, test_fnc, [blk0])
+
+        return {
+            "@i8": i8,
+            "test_fnc_sig": sig__i8,
+            "test_fnc": test_fnc,
+            "result_type": i8
+        }
+
+    res = impl_jit_test(cmdopt, build_test_bundle)
+    if cmdopt.run:
+        assert res == 1
+
+
 def test_ult(cmdopt):
     def build_test_bundle(bldr, rmu):
         """
