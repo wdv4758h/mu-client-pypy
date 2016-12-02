@@ -61,6 +61,25 @@ class CArrayConst(object):
 
     __repr__ = __str__
 
+class CFloatConst(object):
+    def __init__(self, flt, ctype_str):
+        self.flt = flt
+        self.c_type = ctype_str
+
+    def __str__(self):
+        c_flt_t = self.c_type
+        c_int_t = 'uint64_t' if c_flt_t == 'double' else 'uint32_t'
+        repr_str = ftohstr(self.flt, self.c_type)
+        return '*(%(c_flt_t)s*)(%(c_int_t)s [1]){%(repr_str)s}' % locals()
+
+class CIntConst(object):
+    def __init__(self, i, ctype_str):
+        self.i = i
+        self.c_type = ctype_str
+
+    def __str__(self):
+        return itohstr(self.i, self.c_type)
+
 class CVar(object):
     __slots__ = ('type', 'name')
     _name_dic = {}
@@ -110,6 +129,7 @@ class APILogger:
                  '#include <stdio.h>\n'
                  '#include <stdlib.h>\n'
                  '#include <stdbool.h>\n'
+                 '#include <stdint.h>\n'
                  '#include "muapi.h"\n'
                  '#include "refimpl2-start.h"\n')
         fp.write('''
@@ -548,71 +568,88 @@ class MuCtx:
 
     def handle_from_sint8(self, num, len):
         # type: (int, int) -> MuIntValue
+        num_int = CIntConst(num, 'int8_t')
+        len_int = CIntConst(len, 'int')
         res_var = CVar('MuIntValue', 'hintval')
-        _apilog.logcall('handle_from_sint8', [self._ctx, num, len], res_var, self._ctx)
+        _apilog.logcall('handle_from_sint8', [self._ctx, num_int, len_int], res_var, self._ctx)
         return res_var
 
     def handle_from_uint8(self, num, len):
         # type: (int, int) -> MuIntValue
+        num_int = CIntConst(num, 'uint8_t')
+        len_int = CIntConst(len, 'int')
         res_var = CVar('MuIntValue', 'hintval')
-        _apilog.logcall('handle_from_uint8', [self._ctx, num, len], res_var, self._ctx)
+        _apilog.logcall('handle_from_uint8', [self._ctx, num_int, len_int], res_var, self._ctx)
         return res_var
 
     def handle_from_sint16(self, num, len):
         # type: (int, int) -> MuIntValue
+        num_int = CIntConst(num, 'int16_t')
+        len_int = CIntConst(len, 'int')
         res_var = CVar('MuIntValue', 'hintval')
-        _apilog.logcall('handle_from_sint16', [self._ctx, num, len], res_var, self._ctx)
+        _apilog.logcall('handle_from_sint16', [self._ctx, num_int, len_int], res_var, self._ctx)
         return res_var
 
     def handle_from_uint16(self, num, len):
         # type: (int, int) -> MuIntValue
+        num_int = CIntConst(num, 'uint16_t')
+        len_int = CIntConst(len, 'int')
         res_var = CVar('MuIntValue', 'hintval')
-        _apilog.logcall('handle_from_uint16', [self._ctx, num, len], res_var, self._ctx)
+        _apilog.logcall('handle_from_uint16', [self._ctx, num_int, len_int], res_var, self._ctx)
         return res_var
 
     def handle_from_sint32(self, num, len):
         # type: (int, int) -> MuIntValue
+        num_int = CIntConst(num, 'int32_t')
+        len_int = CIntConst(len, 'int')
         res_var = CVar('MuIntValue', 'hintval')
-        _apilog.logcall('handle_from_sint32', [self._ctx, num, len], res_var, self._ctx)
+        _apilog.logcall('handle_from_sint32', [self._ctx, num_int, len_int], res_var, self._ctx)
         return res_var
 
     def handle_from_uint32(self, num, len):
         # type: (int, int) -> MuIntValue
+        num_int = CIntConst(num, 'uint32_t')
+        len_int = CIntConst(len, 'int')
         res_var = CVar('MuIntValue', 'hintval')
-        _apilog.logcall('handle_from_uint32', [self._ctx, num, len], res_var, self._ctx)
+        _apilog.logcall('handle_from_uint32', [self._ctx, num_int, len_int], res_var, self._ctx)
         return res_var
 
     def handle_from_sint64(self, num, len):
         # type: (int, int) -> MuIntValue
+        num_int = CIntConst(num, 'int64_t')
+        len_int = CIntConst(len, 'int')
         res_var = CVar('MuIntValue', 'hintval')
-        _apilog.logcall('handle_from_sint64', [self._ctx, num, len], res_var, self._ctx)
+        _apilog.logcall('handle_from_sint64', [self._ctx, num_int, len_int], res_var, self._ctx)
         return res_var
 
     def handle_from_uint64(self, num, len):
         # type: (int, int) -> MuIntValue
+        num_int = CIntConst(num, 'uint64_t')
+        len_int = CIntConst(len, 'int')
         res_var = CVar('MuIntValue', 'hintval')
-        _apilog.logcall('handle_from_uint64', [self._ctx, num, len], res_var, self._ctx)
+        _apilog.logcall('handle_from_uint64', [self._ctx, num_int, len_int], res_var, self._ctx)
         return res_var
 
     def handle_from_uint64s(self, nums, len):
         # type: ([rffi.ULONG], int) -> MuIntValue
         nums_arr, nums_sz = lst2arr('uint64_t', nums)
+        len_int = CIntConst(len, 'int')
         res_var = CVar('MuIntValue', 'hintval')
-        _apilog.logcall('handle_from_uint64s', [self._ctx, nums_arr, nums_sz, len], res_var, self._ctx)
+        _apilog.logcall('handle_from_uint64s', [self._ctx, nums_arr, nums_sz, len_int], res_var, self._ctx)
         return res_var
 
     def handle_from_float(self, num):
         # type: (float) -> MuFloatValue
-        num_fltstr = '%.20f' % num
+        num_cflt = CFloatConst(num, 'float')
         res_var = CVar('MuFloatValue', 'hfltval')
-        _apilog.logcall('handle_from_float', [self._ctx, num_fltstr], res_var, self._ctx)
+        _apilog.logcall('handle_from_float', [self._ctx, num_cflt], res_var, self._ctx)
         return res_var
 
     def handle_from_double(self, num):
         # type: (float) -> MuDoubleValue
-        num_fltstr = '%.20f' % num
+        num_cflt = CFloatConst(num, 'double')
         res_var = CVar('MuDoubleValue', 'hdblval')
-        _apilog.logcall('handle_from_double', [self._ctx, num_fltstr], res_var, self._ctx)
+        _apilog.logcall('handle_from_double', [self._ctx, num_cflt], res_var, self._ctx)
         return res_var
 
     def handle_from_ptr(self, mu_type, ptr):
@@ -753,14 +790,16 @@ class MuCtx:
 
     def extract_value(self, str, index):
         # type: (MuStructValue, int) -> MuValue
+        index_int = CIntConst(index, 'int')
         res_var = CVar('MuValue', 'hdl')
-        _apilog.logcall('extract_value', [self._ctx, str, index], res_var, self._ctx)
+        _apilog.logcall('extract_value', [self._ctx, str, index_int], res_var, self._ctx)
         return res_var
 
     def insert_value(self, str, index, newval):
         # type: (MuStructValue, int, MuValue) -> MuStructValue
+        index_int = CIntConst(index, 'int')
         res_var = CVar('MuStructValue', 'hstt')
-        _apilog.logcall('insert_value', [self._ctx, str, index, newval], res_var, self._ctx)
+        _apilog.logcall('insert_value', [self._ctx, str, index_int, newval], res_var, self._ctx)
         return res_var
 
     def extract_element(self, str, index):
@@ -801,8 +840,9 @@ class MuCtx:
 
     def get_field_iref(self, opnd, field):
         # type: (MuIRefValue, int) -> MuIRefValue
+        field_int = CIntConst(field, 'int')
         res_var = CVar('MuIRefValue', 'hiref')
-        _apilog.logcall('get_field_iref', [self._ctx, opnd, field], res_var, self._ctx)
+        _apilog.logcall('get_field_iref', [self._ctx, opnd, field_int], res_var, self._ctx)
         return res_var
 
     def get_elem_iref(self, opnd, index):
@@ -1068,7 +1108,8 @@ class MuIRBuilder:
 
     def new_type_int(self, id, len):
         # type: (MuID, int) -> None
-        _apilog.logcall('new_type_int', [self._bldr, id, len], None, self._bldr)
+        len_int = CIntConst(len, 'int')
+        _apilog.logcall('new_type_int', [self._bldr, id, len_int], None, self._bldr)
 
     def new_type_float(self, id):
         # type: (MuID) -> None
@@ -1098,11 +1139,13 @@ class MuIRBuilder:
 
     def new_type_array(self, id, elemty, len):
         # type: (MuID, MuTypeNode, int) -> None
-        _apilog.logcall('new_type_array', [self._bldr, id, elemty, len], None, self._bldr)
+        len_int = CIntConst(len, 'uint64_t')
+        _apilog.logcall('new_type_array', [self._bldr, id, elemty, len_int], None, self._bldr)
 
     def new_type_vector(self, id, elemty, len):
         # type: (MuID, MuTypeNode, int) -> None
-        _apilog.logcall('new_type_vector', [self._bldr, id, elemty, len], None, self._bldr)
+        len_int = CIntConst(len, 'uint64_t')
+        _apilog.logcall('new_type_vector', [self._bldr, id, elemty, len_int], None, self._bldr)
 
     def new_type_void(self, id):
         # type: (MuID) -> None
@@ -1152,7 +1195,8 @@ class MuIRBuilder:
 
     def new_const_int(self, id, ty, value):
         # type: (MuID, MuTypeNode, int) -> None
-        _apilog.logcall('new_const_int', [self._bldr, id, ty, value], None, self._bldr)
+        value_int = CIntConst(value, 'uint64_t')
+        _apilog.logcall('new_const_int', [self._bldr, id, ty, value_int], None, self._bldr)
 
     def new_const_int_ex(self, id, ty, values):
         # type: (MuID, MuTypeNode, [rffi.ULONG]) -> None
@@ -1161,13 +1205,13 @@ class MuIRBuilder:
 
     def new_const_float(self, id, ty, value):
         # type: (MuID, MuTypeNode, float) -> None
-        value_fltstr = '%.20f' % value
-        _apilog.logcall('new_const_float', [self._bldr, id, ty, value_fltstr], None, self._bldr)
+        value_cflt = CFloatConst(value, 'float')
+        _apilog.logcall('new_const_float', [self._bldr, id, ty, value_cflt], None, self._bldr)
 
     def new_const_double(self, id, ty, value):
         # type: (MuID, MuTypeNode, float) -> None
-        value_fltstr = '%.20f' % value
-        _apilog.logcall('new_const_double', [self._bldr, id, ty, value_fltstr], None, self._bldr)
+        value_cflt = CFloatConst(value, 'double')
+        _apilog.logcall('new_const_double', [self._bldr, id, ty, value_cflt], None, self._bldr)
 
     def new_const_null(self, id, ty):
         # type: (MuID, MuTypeNode) -> None
@@ -1297,11 +1341,13 @@ class MuIRBuilder:
 
     def new_extractvalue(self, id, result_id, strty, index, opnd):
         # type: (MuID, MuID, MuTypeNode, int, MuVarNode) -> None
-        _apilog.logcall('new_extractvalue', [self._bldr, id, result_id, strty, index, opnd], None, self._bldr)
+        index_int = CIntConst(index, 'int')
+        _apilog.logcall('new_extractvalue', [self._bldr, id, result_id, strty, index_int, opnd], None, self._bldr)
 
     def new_insertvalue(self, id, result_id, strty, index, opnd, newval):
         # type: (MuID, MuID, MuTypeNode, int, MuVarNode, MuVarNode) -> None
-        _apilog.logcall('new_insertvalue', [self._bldr, id, result_id, strty, index, opnd, newval], None, self._bldr)
+        index_int = CIntConst(index, 'int')
+        _apilog.logcall('new_insertvalue', [self._bldr, id, result_id, strty, index_int, opnd, newval], None, self._bldr)
 
     def new_extractelement(self, id, result_id, seqty, indty, opnd, index):
         # type: (MuID, MuID, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> None
@@ -1338,7 +1384,8 @@ class MuIRBuilder:
     def new_getfieldiref(self, id, result_id, is_ptr, refty, index, opnd):
         # type: (MuID, MuID, bool, MuTypeNode, int, MuVarNode) -> None
         is_ptr_bool = 'true' if is_ptr else 'false'
-        _apilog.logcall('new_getfieldiref', [self._bldr, id, result_id, is_ptr_bool, refty, index, opnd], None, self._bldr)
+        index_int = CIntConst(index, 'int')
+        _apilog.logcall('new_getfieldiref', [self._bldr, id, result_id, is_ptr_bool, refty, index_int, opnd], None, self._bldr)
 
     def new_getelemiref(self, id, result_id, is_ptr, refty, indty, opnd, index):
         # type: (MuID, MuID, bool, MuTypeNode, MuTypeNode, MuVarNode, MuVarNode) -> None
@@ -1425,6 +1472,37 @@ class MuIRBuilder:
 # Helpers
 def null(rmu_t):
     return NULL
+
+
+def ftohstr(flt, c_type):
+    import struct
+    fmt = 'd' if c_type == 'double' else 'f'
+    pkstr = struct.pack('!'+fmt, flt)
+    hexstr = '0x' + ''.join(['%02x' % ord(b) for b in pkstr])
+    return int(hexstr, 16)
+
+
+def itohstr(i, c_type):
+    import struct
+    fmt_dic = {
+        'int8_t': 'b',
+        'uint8_t': 'B',
+        'int16_t': 'h',
+        'uint16_t': 'H',
+        'int32_t': 'i',
+        'uint32_t': 'I',
+        'int': 'i',
+        'int64_t': 'q',
+        'uint64_t': 'Q'
+    }
+    fmt = fmt_dic[c_type]
+    try:
+        i_str = '0x' + ''.join(['%02x' % ord(b) for b in struct.pack('!' + fmt, i)])
+    except Exception:
+        fmt = fmt.upper() if fmt.islower() else fmt.lower()
+        i_str = '0x' + ''.join(['%02x' % ord(b) for b in struct.pack('!' + fmt, i)])
+    return i_str
+
 
 def lst2arr(c_elm_t, lst):
     sz = len(lst)

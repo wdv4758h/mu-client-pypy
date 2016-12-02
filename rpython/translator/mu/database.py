@@ -22,6 +22,7 @@ class MuDatabase:
         self.gbltypes = {}      # type -> set(Mutype)
         self.gblcnsts = set()
         self.externfncs = set()
+        self.fncrefcnsts = set()
         self.dylibs = None
         self.objtracer = HeapObjectTracer()
         self.graphs = graphs
@@ -46,6 +47,7 @@ class MuDatabase:
                         assert getattr(v.value, 'graph', False)
                         v.mu_name = v.value.graph.mu_name
                         assert v.mu_name
+                    self.fncrefcnsts.add(v)
                 else:
                     v.__init__(v.value)     # rehash
                     self.gblcnsts.add(v)

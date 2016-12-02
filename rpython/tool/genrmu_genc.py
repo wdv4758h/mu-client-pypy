@@ -293,10 +293,14 @@ def _oogen_method(opts, sttname, mtd, fp):
             fp.write(cur_idt +
                      '%(name)s_bool = \'true\' if %(name)s else \'false\'\n' % prm)
             c2rpy_param_map[prm['name']] = prm['name'] + '_bool'
+        elif prm['rpy_type'] == 'int':
+            fp.write(cur_idt +
+                     '%(name)s_int = CIntConst(%(name)s, \'%(type)s\')\n' % prm)
+            c2rpy_param_map[prm['name']] = prm['name'] + '_int'
         elif prm['rpy_type'] == 'float':    # float needs to be preserved over string
             fp.write(cur_idt +
-                     '%(name)s_fltstr = \'%%.20f\' %% %(name)s\n' % prm)
-            c2rpy_param_map[prm['name']] = prm['name'] + '_fltstr'
+                     '%(name)s_cflt = CFloatConst(%(name)s, \'%(type)s\')\n' % prm)
+            c2rpy_param_map[prm['name']] = prm['name'] + '_cflt'
 
     if mtd['ret_rpy_type'] != 'None':
         basename = _ctype2basename.get(mtd['ret_rpy_type'], 'var')
@@ -389,12 +393,46 @@ def gen_oowrapper(opts, db, fp):
 
 # ------------------------------------------------------------
 def gen_extras(db, fp):
+    pkfmt = {
+        ''
+    }
     fp.write(
 """\
 # -------------------------------------------------------------------------------------------------------
 # Helpers
 def null(rmu_t):
     return NULL
+
+
+def ftohstr(flt, c_type):
+    import struct
+    fmt = 'd' if c_type == 'double' else 'f'
+    pkstr = struct.pack('!'+fmt, flt)
+    hexstr = '0x' + ''.join(['%02x' % ord(b) for b in pkstr])
+    return int(hexstr, 16)
+
+
+def itohstr(i, c_type):
+    import struct
+    fmt_dic = {
+        'int8_t': 'b',
+        'uint8_t': 'B',
+        'int16_t': 'h',
+        'uint16_t': 'H',
+        'int32_t': 'i',
+        'uint32_t': 'I',
+        'int': 'i',
+        'int64_t': 'q',
+        'uint64_t': 'Q'
+    }
+    fmt = fmt_dic[c_type]
+    try:
+        i_str = '0x' + ''.join(['%02x' % ord(b) for b in struct.pack('!' + fmt, i)])
+    except Exception:
+        fmt = fmt.upper() if fmt.islower() else fmt.lower()
+        i_str = '0x' + ''.join(['%02x' % ord(b) for b in struct.pack('!' + fmt, i)])
+    return i_str
+
 
 def lst2arr(c_elm_t, lst):
     sz = len(lst)
@@ -475,6 +513,25 @@ class CArrayConst(object):
 
     __repr__ = __str__
 
+class CFloatConst(object):
+    def __init__(self, flt, ctype_str):
+        self.flt = flt
+        self.c_type = ctype_str
+
+    def __str__(self):
+        c_flt_t = self.c_type
+        c_int_t = 'uint64_t' if c_flt_t == 'double' else 'uint32_t'
+        repr_str = ftohstr(self.flt, self.c_type)
+        return '*(%(c_flt_t)s*)(%(c_int_t)s [1]){%(repr_str)s}' % locals()
+
+class CIntConst(object):
+    def __init__(self, i, ctype_str):
+        self.i = i
+        self.c_type = ctype_str
+
+    def __str__(self):
+        return itohstr(self.i, self.c_type)
+
 class CVar(object):
     __slots__ = ('type', 'name')
     _name_dic = {}
@@ -529,6 +586,7 @@ class APILogger:
                  '#include <stdio.h>\\n'
                  '#include <stdlib.h>\\n'
                  '#include <stdbool.h>\\n'
+                 '#include <stdint.h>\\n'
                  '#include "muapi.h"\\n'
                  '#include "refimpl2-start.h"\\n')
         fp.write('''
