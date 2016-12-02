@@ -409,7 +409,7 @@ def ftohstr(flt, c_type):
     fmt = 'd' if c_type == 'double' else 'f'
     pkstr = struct.pack('!'+fmt, flt)
     hexstr = '0x' + ''.join(['%02x' % ord(b) for b in pkstr])
-    return hexstr
+    return hexstr + 'ull'
 
 def itohstr(i, c_type):
     import struct
@@ -430,7 +430,7 @@ def itohstr(i, c_type):
     except Exception:
         fmt = fmt.upper() if fmt.islower() else fmt.lower()
         i_str = '0x' + ''.join(['%02x' % ord(b) for b in struct.pack('!' + fmt, i)])
-    return i_str
+    return i_str + 'ull'
 
 
 def lst2arr(c_elm_t, lst):
@@ -581,7 +581,6 @@ class APILogger:
 
     def genc(self, fp, exitcode=0):
         fp.write('\\n'
-                 '// Compile with flag -std=c99\\n'
                  '#include <stdio.h>\\n'
                  '#include <stdlib.h>\\n'
                  '#include <stdbool.h>\\n'
