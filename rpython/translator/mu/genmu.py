@@ -418,6 +418,9 @@ class MuAPIBundleGenerator(MuBundleGenerator):
             bdr.new_func(_id, idmap[g.mu_type.Sig])
             idmap[g] = _id
 
+        for fncref_cnst in self.db.fncrefcnsts:
+            idmap[fncref_cnst] = idmap[fncref_cnst.value.graph]
+
         for g in self.db.graphs:
             self.gen_graph(g)
 
