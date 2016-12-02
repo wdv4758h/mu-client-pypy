@@ -1472,8 +1472,7 @@ def ftohstr(flt, c_type):
     fmt = 'd' if c_type == 'double' else 'f'
     pkstr = struct.pack('!'+fmt, flt)
     hexstr = '0x' + ''.join(['%02x' % ord(b) for b in pkstr])
-    return int(hexstr, 16)
-
+    return hexstr
 
 def itohstr(i, c_type):
     import struct
