@@ -19,9 +19,6 @@ class IgnoredLLVal(NotImplementedError):
 
 class IgnoredLLOp(NotImplementedError):
     _llops = (
-        "cast_int_to_uint",
-        "cast_uint_to_int",
-        "cast_int_to_unichar",
         "hint",
         "likely",
         "debug_flush",
@@ -525,6 +522,18 @@ class LL2MuMapper:
         """ Exception clause is a tuple """
         return dst_nor, dst_exc
 
+    def _same_as_false(self, llop):
+        llop.__init__('same_as', [self.mapped_const(False)], llop.result)
+        return [llop]
+
+    def _same_as_true(self, llop):
+        llop.__init__('same_as', [self.mapped_const(True)], llop.result)
+        return [llop]
+
+    def _rename_to_same_as(self, llop):
+        llop.opname = 'same_as'
+        return llop
+
     # ----------------
     # call ops
     def map_op_direct_call(self, llop):
@@ -662,6 +671,10 @@ class LL2MuMapper:
     def _map_convop(self, llop):
         return [self.gen_mu_convop(_prim_castop_map[llop.opname],
                                     llop.result.concretetype, llop.args[0], llop.result)]
+
+    map_op_cast_int_to_uint = _rename_to_same_as
+    map_op_cast_uint_to_int = _rename_to_same_as
+    map_op_cast_int_to_unichar = _rename_to_same_as
 
     # ----------------
     # memory and pointer ops
@@ -895,14 +908,6 @@ class LL2MuMapper:
         llop.__init__('ptr_eq', [llop.args[0], NULL_c], llop.result)
         return self.map_op(llop)
 
-    def _same_as_false(self, llop):
-        llop.__init__('same_as', [self.mapped_const(False)], llop.result)
-        return [llop]
-
-    def _same_as_true(self, llop):
-        llop.__init__('same_as', [self.mapped_const(True)], llop.result)
-        return [llop]
-
     map_op_shrink_array = _same_as_false
 
     # TODO: reconsider direct_ptradd and direct_arrayitems, based on the semantic in lltype
@@ -1006,10 +1011,8 @@ class LL2MuMapper:
         assert isinstance(llop.result.concretetype, mutype.MuUPtr)
         return [self.gen_mu_convop('PTRCAST', llop.result.concretetype, llop.args[0], llop.result)]
 
-    def map_op_cast_adr_to_int(self, llop):
-        llop.opname = 'same_as'
-        return [llop]
-    map_op_cast_int_to_adr = map_op_cast_adr_to_int
+    map_op_cast_adr_to_int = _rename_to_same_as
+    map_op_cast_int_to_adr = _rename_to_same_as
 
     map_op_gc_can_move = _same_as_true
     map_op_gc_pin = _same_as_true

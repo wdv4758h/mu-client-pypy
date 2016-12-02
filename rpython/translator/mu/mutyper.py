@@ -136,6 +136,13 @@ class MuTyper:
         return arg
 
     def specialise_operation(self, llop):
+        def _keep_op_for_muinterp(llop):
+            """ Keep some operations to be informative for mu graph interpreter """
+            return llop.opname.startswith('debug_')     # keep all the debug ops
+
+        if _keep_op_for_muinterp(llop):
+            return [llop]
+
         llop.args = [self.specialise_arg(arg) for arg in llop.args]
         llop.result = self.specialise_arg(llop.result)
 
