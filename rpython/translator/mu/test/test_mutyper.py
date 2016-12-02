@@ -197,3 +197,48 @@ def test_specialise_block():
 
     assert blk.operations[-1].opname == 'mu_switch'
 
+
+def test_duplicate_const():
+    def f(x):
+        return abs(-x)
+
+    t = Translation(f, [lltype.Signed])
+    t.rtype()
+    t.backendopt()
+
+    mutyper = MuTyper(t.context)
+
+    graph_f = graph_of(f, t)
+    blk = graph_f.startblock
+
+    mutyper.specialise_graph(graph_f)
+
+    c_0_1 = blk.operations[0].args[1]
+    c_0_2 = blk.operations[1].args[1]
+    c_0_3 = blk.operations[2].args[2]
+
+    # doesn't gurantee same object, but does gurantee equality and hash
+    assert c_0_1 == c_0_2 == c_0_3
+    assert hash(c_0_1) == hash(c_0_2) == hash(c_0_3)
+
+
+def test_duplicate_heap_const():
+    lst = list(range(100))
+    def g(idx):
+        if idx > 42:
+            return lst[idx]
+        else:
+            return lst[idx + 42]
+    t = Translation(g, [lltype.Signed])
+    t.rtype()
+    t.backendopt(remove_asserts=True, really_remove_asserts=True)
+    mutyper = MuTyper(t.context)
+    graph_g = graph_of(g, t)
+    mutyper.specialise_graph(graph_g)
+
+    gcl_1 = graph_g.startblock.exits[1].target.operations[0].args[0]
+    gcl_2 = graph_g.startblock.exits[0].target.exits[0].target.operations[0].args[0]
+
+    assert gcl_1 == gcl_2
+    assert hash(gcl_1) == hash(gcl_2)
+    assert gcl_1.value is gcl_2.value   # gurantee the global cells are the same

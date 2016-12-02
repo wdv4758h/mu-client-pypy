@@ -14,6 +14,7 @@ class MuTyper:
         self._graphname_cntr_dict = {}
         self.tlc = tlc
         self.ll2mu = LL2MuMapper(tlc.rtyper)
+        self._objrefid2gcl_dic = {}
 
     def init_threadlocal_struct_type(self):
         # determine thread local struct type
@@ -123,7 +124,12 @@ class MuTyper:
 
                     if isinstance(muv, mutype._muobject_reference):
                         GCl_T = mutype.MuGlobalCell(MuT)
-                        arg.__init__(mutype._muglobalcell(GCl_T, mutype._muref(MuT, muv), []), GCl_T)
+                        if id(muv) in self._objrefid2gcl_dic:
+                            gcl = self._objrefid2gcl_dic[id(muv)]
+                        else:
+                            gcl = mutype._muglobalcell(GCl_T, mutype._muref(MuT, muv), [])
+                            self._objrefid2gcl_dic[id(muv)] = gcl
+                        arg.__init__(gcl, GCl_T)
                     else:
                         arg.__init__(muv, MuT)
 
