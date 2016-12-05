@@ -270,7 +270,10 @@ def _oogen_method(opts, sttname, mtd, fp):
     arrs = []
     for prm in rpy_params:
         if prm['rpy_type'] == 'str':
-            fp.write(cur_idt + '%(name)s_cstr = CStr(%(name)s) if %(name)s else NULL\n' % prm)
+            if mtd['name'] == 'compile_to_sharedlib':
+                fp.write(cur_idt + '%(name)s_cstr = CLibNameConst(CStr(%(name)s))\n' % prm)
+            else:
+                fp.write(cur_idt + '%(name)s_cstr = CStr(%(name)s) if %(name)s else NULL\n' % prm)
             c2rpy_param_map[prm['name']] = prm['name'] + '_cstr'
             sz_param_name = prm.get('array_sz_param', None)
             if sz_param_name:
@@ -531,6 +534,13 @@ class CIntConst(object):
     def __str__(self):
         return itohstr(self.i, self.c_type)
 
+class CLibNameConst(object):
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return "LIB_FILE_NAME(%s)" % self.name
+
 class CVar(object):
     __slots__ = ('type', 'name')
     _name_dic = {}
@@ -634,13 +644,20 @@ class APILogger:
             self.decl_vars.append(rtn_var)
     def genc(self, fp, exitcode=0):
         fp.write('\\n'
-                 '// Compile with flag -std=c99\\n'
                  '#include <stdio.h>\\n'
                  '#include <stdlib.h>\\n'
                  '#include <stdbool.h>\\n'
                  '#include <dlfcn.h>\\n'
                  '#include "muapi.h"\\n'
-                 '#include "mu-fastimpl.h"\\n')
+                 '#include "mu-fastimpl.h"\\n'
+                 '#ifdef __APPLE__\\n'
+                 '    #define LIB_EXT ".dylib"\\n'
+                 '#elif __linux__\\n'
+                 '    #define LIB_EXT ".so"\\n'
+                 '#elif _WIN32\\n'
+                 '    #define LIB_EXT ".dll"\\n'
+                 '#endif\\n'
+                 '#define LIB_FILE_NAME(name) "lib" name LIB_EXT\\n')
 
         fp.write('int main(int argc, char** argv) {\\n')
         idt = ' ' * 4

@@ -80,6 +80,13 @@ class CIntConst(object):
     def __str__(self):
         return itohstr(self.i, self.c_type)
 
+class CLibNameConst(object):
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return "LIB_FILE_NAME(%s)" % self.name
+
 class CVar(object):
     __slots__ = ('type', 'name')
     _name_dic = {}
@@ -134,13 +141,20 @@ class APILogger:
             self.decl_vars.append(rtn_var)
     def genc(self, fp, exitcode=0):
         fp.write('\n'
-                 '// Compile with flag -std=c99\n'
                  '#include <stdio.h>\n'
                  '#include <stdlib.h>\n'
                  '#include <stdbool.h>\n'
                  '#include <dlfcn.h>\n'
                  '#include "muapi.h"\n'
-                 '#include "mu-fastimpl.h"\n')
+                 '#include "mu-fastimpl.h"\n'
+                 '#ifdef __APPLE__\n'
+                 '    #define LIB_EXT ".dylib"\n'
+                 '#elif __linux__\n'
+                 '    #define LIB_EXT ".so"\n'
+                 '#elif _WIN32\n'
+                 '    #define LIB_EXT ".dll"\n'
+                 '#endif\n'
+                 '#define LIB_FILE_NAME(name) "lib" name LIB_EXT\n')
 
         fp.write('int main(int argc, char** argv) {\n')
         idt = ' ' * 4
@@ -517,7 +531,7 @@ class MuVM:
 
     def compile_to_sharedlib(self, lib_name, extra_srcs):
         # type: (str, [MuCString]) -> None
-        lib_name_cstr = CStr(lib_name) if lib_name else NULL
+        lib_name_cstr = CLibNameConst(CStr(lib_name))
         extra_srcs_arr, extra_srcs_sz = lst2arr('MuCString', extra_srcs)
         _apilog.logcall('compile_to_sharedlib', [self._mu, lib_name_cstr, extra_srcs_arr, extra_srcs_sz], None, self._mu)
 

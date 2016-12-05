@@ -95,7 +95,10 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
             libext = '.dylib'
         else:
             libext = '.dll'
-        lib_path = opts.output[:-2] + libext
+        if opts.run:
+            lib_path = 'lib' + opts.output[:-2] + libext
+        else:
+            lib_path = opts.output[:-2]     # delay lib extension to C script
         mu.compile_to_sharedlib(lib_path, extra_srcs)
         symbol = "test_fnc"
         if opts.run:
@@ -116,7 +119,7 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
             # log.logcall("dlclose", [lib], None, context=None)
 
             # just print out the compiled library name
-            log.logcall("printf", [rmu.CStr("%s\\n"), rmu.CStr(lib_path)], None, context=None)
+            # log.logcall("printf", [rmu.CStr("%s\\n"), rmu.CStr(lib_path)], None, context=None)
             with open(opts.output, 'w') as fp:
                 log.genc(fp)
 

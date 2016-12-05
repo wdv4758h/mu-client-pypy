@@ -80,6 +80,13 @@ class CIntConst(object):
     def __str__(self):
         return itohstr(self.i, self.c_type)
 
+class CLibNameConst(object):
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return "LIB_FILE_NAME(%s)" % self.name
+
 class CVar(object):
     __slots__ = ('type', 'name')
     _name_dic = {}
