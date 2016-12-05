@@ -415,3 +415,198 @@ def test_extern_func(cmdopt):
             "result_type": i64
         }
     impl_jit_test(cmdopt, build_test_bundle)
+
+
+def test_throw(cmdopt):
+    def build_test_bundle(bldr, rmu):
+        """
+        Builds the following test bundle.
+            .typedef @i64 = int<64>
+            .typedef @void = void
+            .typedef @refi64 = ref<@i64>
+            .typedef @refvoid = ref<@void>
+            .const @c_10 <@i64> = 10
+            .const @c_20 <@i64> = 20
+            .const @c_42 <@i64> = 42
+            .funcsig @sig_i64_i64 = (@i64) -> (@i64)
+            .funcdef @throw_fnc VERSION @throw_fnc.v1 <@sig_i64_i64> {
+                %blk0(<@i64> %num):
+                    %cmpres = SLT <@i64> %num @c_42
+                    BRANCH2 %cmpres %blk1() %blk2()
+                %blk1():
+                    %excobj = NEW <@i64>
+                    %iref_obj = GETIREF <@i64> %excobj
+                    STORE <@i64> %iref_obj @c_20
+                    THROW %excobj
+                %blk2():
+                    RET (@c_10)
+            }
+            .funcdef @test_fnc VERSION @test_fnc.v1 <@sig_i64_i64> {
+                %blk0(<@i64> %num):
+                    %res = CALL <@sig_i64_i64> @throw_fnc (%num) EXC(%blk1(%res) %blk2())
+                %blk1(<@i64> %rtn):
+                    RET %rtn
+                %blk2()[%excobj]:
+                    %ri64 = REFCAST <@refvoid @refi64> %excobj
+                    %iri64 = GETIREF <@i64> %excobj
+                    %obj = LOAD <@i64> %iri64
+                    BRANCH %blk1(%obj)
+            }
+        :type bldr: rpython.rlib.rmu.MuIRBuilder
+        :type rmu: rpython.rlib.rmu
+        :return: (rmu.MuVM(), rmu.MuCtx, rmu.MuIRBuilder, MuID, MuID)
+        """
+        void = bldr.gen_sym("@void"); bldr.new_type_void(void)
+        i64 = bldr.gen_sym("@i64"); bldr.new_type_int(i64, 64)
+        refi64 = bldr.gen_sym("@refi64"); bldr.new_type_ref(refi64, i64)
+        refvoid = bldr.gen_sym("@refvoid"); bldr.new_type_ref(refvoid, void)
+
+        c_10 = bldr.gen_sym("@c_10"); bldr.new_const_int(c_10, i64, 10)
+        c_20 = bldr.gen_sym("@c_20"); bldr.new_const_int(c_20, i64, 20)
+        c_42 = bldr.gen_sym("@c_42"); bldr.new_const_int(c_42, i64, 42)
+
+        sig_i64_i64 = bldr.gen_sym("@sig_i64_i64"); bldr.new_funcsig(sig_i64_i64, [i64], [i64])
+
+        test_fnc = bldr.gen_sym("@test_fnc"); bldr.new_func(test_fnc, sig_i64_i64)
+        throw_fnc = bldr.gen_sym("@throw_fnc"); bldr.new_func(throw_fnc, sig_i64_i64)
+
+        throw_fnc_v1 = bldr.gen_sym("@throw_fnc.v1")
+        blk0 = bldr.gen_sym("@throw_fnc.v1.blk0")
+        blk1 = bldr.gen_sym("@throw_fnc.v1.blk1")
+        blk2 = bldr.gen_sym("@throw_fnc.v1.blk2")
+
+        # blk0
+        num = bldr.gen_sym("@throw_fnc.v1.blk0.num")
+        cmpres = bldr.gen_sym("@throw_fnc.v1.blk0.cmpres")
+        op_slt = bldr.gen_sym(); bldr.new_cmp(op_slt, cmpres, rmu.MuCmpOptr.SLT, i64, num, c_42)
+        dst_t = bldr.gen_sym(); bldr.new_dest_clause(dst_t, blk1, [])
+        dst_f = bldr.gen_sym(); bldr.new_dest_clause(dst_f, blk2, [])
+        op_br2 = bldr.gen_sym(); bldr.new_branch2(op_br2, cmpres, dst_t, dst_f)
+        bldr.new_bb(blk0, [num], [i64], rmu.MU_NO_ID, [op_slt, op_br2])
+
+        # blk1
+        excobj = bldr.gen_sym("@throw_fnc.v1.blk1.excobj")
+        iref_obj = bldr.gen_sym("@throw_fnc.v1.blk1.iref_obj")
+        op_new = bldr.gen_sym(); bldr.new_new(op_new, excobj, i64)
+        op_getiref = bldr.gen_sym(); bldr.new_getiref(op_getiref, iref_obj, i64, excobj)
+        op_store = bldr.gen_sym(); bldr.new_store(op_store, False, rmu.MuMemOrd.NOT_ATOMIC, i64, iref_obj, c_20)
+        op_throw = bldr.gen_sym(); bldr.new_throw(op_throw, excobj)
+        bldr.new_bb(blk1, [], [], rmu.MU_NO_ID, [op_new, op_getiref, op_store, op_throw])
+
+        # blk2
+        op_ret = bldr.gen_sym(); bldr.new_ret(op_ret, [c_10])
+        bldr.new_bb(blk2, [], [], rmu.MU_NO_ID, [op_ret])
+
+        bldr.new_func_ver(throw_fnc_v1, throw_fnc, [blk0, blk1, blk2])
+
+        test_fnc_v1 = bldr.gen_sym("@test_fnc.v1")
+        blk0 = bldr.gen_sym("@test_fnc.v1.blk0")
+        blk1 = bldr.gen_sym("@test_fnc.v1.blk1")
+        blk2 = bldr.gen_sym("@test_fnc.v1.blk2")
+
+        # blk0
+        num = bldr.gen_sym("@test_fnc.v1.blk0.num")
+        res = bldr.gen_sym("@test_fnc.v1.blk0.res")
+        dst_nor = bldr.gen_sym(); bldr.new_dest_clause(dst_nor, blk1, [res])
+        dst_exc = bldr.gen_sym(); bldr.new_dest_clause(dst_exc, blk2, [])
+        exc = bldr.gen_sym(); bldr.new_exc_clause(exc, dst_nor, dst_exc)
+        op_call = bldr.gen_sym(); bldr.new_call(op_call, [res], sig_i64_i64, throw_fnc, [num], exc)
+        bldr.new_bb(blk0, [num], [i64], rmu.MU_NO_ID, [op_call])
+
+        # blk1
+        rtn = bldr.gen_sym("@test_fnc.v1.blk1.rtn")
+        op_ret = bldr.gen_sym(); bldr.new_ret(op_ret, [rtn])
+        bldr.new_bb(blk1, [rtn], [i64], rmu.MU_NO_ID, [op_ret])
+
+        # blk2
+        excobj = bldr.gen_sym("@test_fnc.v1.blk2.excobj")
+        ri64 = bldr.gen_sym("@test_fnc.v1.blk2.ri64")
+        iri64 = bldr.gen_sym("@test_fnc.v1.blk2.iri64")
+        obj = bldr.gen_sym("@test_fnc.v1.blk2.obj")
+        op_refcast = bldr.gen_sym(); bldr.new_conv(op_refcast, ri64, rmu.MuConvOptr.REFCAST, refvoid, refi64, excobj)
+        op_getiref = bldr.gen_sym(); bldr.new_getiref(op_getiref, iri64, i64, ri64)
+        op_load = bldr.gen_sym(); bldr.new_load(op_load, obj, False, rmu.MuMemOrd.NOT_ATOMIC, i64, iri64)
+        dst = bldr.gen_sym(); bldr.new_dest_clause(dst, blk1, [obj])
+        op_br = bldr.gen_sym(); bldr.new_branch(op_br, dst)
+        bldr.new_bb(blk2, [], [], excobj, [op_refcast, op_getiref, op_load, op_br])
+
+        bldr.new_func_ver(test_fnc_v1, test_fnc, [blk0, blk1, blk2])
+
+        return {
+            "test_fnc": test_fnc,
+            "test_fnc_sig": sig_i64_i64,
+            "result_type": i64,
+            "@i64": i64,
+            "@refi64": refi64
+        }
+
+    def extend_with_entrypoint(bldr, id_dict, rmu):
+        """
+            Extend the bundle with:
+                .typedef @i32 = int<32>
+                .const @c_0 <@i64> = 0
+                .typedef @i8 = int<8>
+                .typedef @pi8 = uptr<@i8>
+                .typedef @ppi8 = uptr<@pi8>
+                .global @result <@i8>
+                .funcsig @sig_i8ppi8_ = (@i8 @ppi8) -> ()
+                .funcdef @entry VERSION @entry_v1 <@sig_i8ppi8_> {
+                    .blk0 (<@i8> argc <@ppi8> argv):
+                        %res = CALL @test_fnc (@0x8d9f9c1d58324b55_i64)
+                        STORE <i8> @result %res
+                        COMMINST @uvm.thread_exit
+                }
+            """
+        if '@i8' in id_dict:
+            i8 = id_dict['@i8']
+        else:
+            i8 = bldr.gen_sym('@i8')
+            bldr.new_type_int(i8, 8)
+
+        test_fnc_sig = id_dict['test_fnc_sig']
+        test_fnc = id_dict['test_fnc']
+        result_type = id_dict['result_type']
+
+        if '@i32' in id_dict:
+            i32 = id_dict['@i32']
+        else:
+            i32 = bldr.gen_sym('@i32')
+            bldr.new_type_int(i32, 32)
+        pi8 = bldr.gen_sym("@pi8")
+        bldr.new_type_uptr(pi8, i8)
+        ppi8 = bldr.gen_sym("@ppi8")
+        bldr.new_type_uptr(ppi8, pi8)
+        i64 = id_dict['@i64']
+        c_0 = bldr.gen_sym("@c_0")
+        bldr.new_const_int(c_0, i64, 0)
+        result = bldr.gen_sym("@result")
+        bldr.new_global_cell(result, result_type)
+        sig_i32ppi8_ = bldr.gen_sym("@sig_i32ppi8_")
+        bldr.new_funcsig(sig_i32ppi8_, [i32, ppi8], [])
+        entry = bldr.gen_sym("@entry")
+        bldr.new_func(entry, sig_i32ppi8_)
+        # function body
+        v1 = bldr.gen_sym("@entry_v1")
+        blk0 = bldr.gen_sym()
+        argc = bldr.gen_sym()
+        argv = bldr.gen_sym()
+        res = bldr.gen_sym()
+        op_call = bldr.gen_sym()
+        bldr.new_call(op_call, [res], test_fnc_sig, test_fnc, [c_0])
+        op_store = bldr.gen_sym()
+        bldr.new_store(op_store, False, rmu.MuMemOrd.NOT_ATOMIC, result_type, result, res)
+        op_exit = bldr.gen_sym()
+        bldr.new_comminst(op_exit, [], rmu.MuCommInst.THREAD_EXIT, [], [], [], [])
+        bldr.new_bb(blk0, [argc, argv], [i32, ppi8], rmu.MU_NO_ID, [op_call, op_store, op_exit])
+        bldr.new_func_ver(v1, entry, [blk0])
+
+        id_dict.update({
+            '@entry': entry,
+            '@i32': i32,
+            '@ppi8': ppi8,
+            '@result': result
+        })
+
+    res = impl_jit_test(cmdopt, build_test_bundle, extend_with_entrypoint)
+    if cmdopt.run:
+        assert res == 20

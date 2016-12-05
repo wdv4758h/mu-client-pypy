@@ -78,7 +78,7 @@ def impl_jit_test(opts, test_bundle_building_fn, extend_fnc=extend_with_entrypoi
         rmu.get_global_apilogger().clear()
 
     if opts.impl == 'ref':
-        vmargs = 'vmLog=ERROR'
+        vmargs = 'vmLog=DEBUG'
     else:
         vmargs = '--log-level=none --aot-emit-dir=emit'
     mu = rmu.MuVM(vmargs)
