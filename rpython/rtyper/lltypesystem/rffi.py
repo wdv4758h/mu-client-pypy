@@ -97,6 +97,13 @@ def llexternal(name, args, result, _callable=None,
                 don't bother releasing the GIL.  An explicit True or False
                 overrides this logic.
     """
+    #################################
+    # Mu backend temporary decision
+    # ----
+    # ignore GIL for now.
+    releasegil = False
+    #################################
+
     if _callable is not None:
         assert callable(_callable)
     ext_type = lltype.FuncType(args, result)
