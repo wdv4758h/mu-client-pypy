@@ -532,7 +532,7 @@ class LL2MuMapper:
 
     def _rename_to_same_as(self, llop):
         llop.opname = 'same_as'
-        return llop
+        return [llop]
 
     # ----------------
     # call ops
@@ -999,7 +999,7 @@ class LL2MuMapper:
             assert isinstance(llop.args[0].concretetype, mutype.MuUPtr)
             ptr = llop.args[0]
 
-        ops.append(self.gen_mu_convop('PTRCAST', llop.result.concretetype, ptr), llop.result)
+        ops.append(self.gen_mu_convop('PTRCAST', llop.result.concretetype, ptr, llop.result))
         return ops
 
     def map_op_cast_ptr_to_int(self, llop):
@@ -1013,6 +1013,55 @@ class LL2MuMapper:
 
     map_op_cast_adr_to_int = _rename_to_same_as
     map_op_cast_int_to_adr = _rename_to_same_as
+
+    def map_op_force_cast(self, llop):
+        SRC = llop.args[0].concretetype
+        RES = llop.result.concretetype
+
+        if isinstance(SRC, mutype.MuObjectRef) and isinstance(RES, mutype.MuObjectRef):
+            llop.__init__('cast_pointer', [Constant(RES, mutype.MU_VOID), llop.args[0]], llop.result)
+            return self.map_op(llop)    # does the reference class check in actual mapping function
+
+        elif isinstance(SRC, mutype.MuObjectRef) and isinstance(RES, mutype.MuIntType):
+            llop.opname = 'cast_ptr_to_adr'
+            return self.map_op(llop)
+
+        elif isinstance(SRC, mutype.MuIntType) and isinstance(RES, mutype.MuObjectRef):
+            llop.opname = 'cast_adr_to_ptr'
+            return self.map_op(llop)
+
+        elif isinstance(SRC, mutype.MuIntType) and isinstance(RES, mutype.MuIntType):
+            if SRC.BITS < RES.BITS:
+                optr = 'ZEXT' if llop.args[0].annotation.unsigned else 'SEXT'
+            else:
+                optr = 'TRUNC'
+            return [self.gen_mu_convop(optr, RES, llop.args[0], llop.result)]
+
+        elif isinstance(SRC, mutype.MuFloatType) and isinstance(RES, mutype.MuIntType):
+            if not ((SRC == mutype.MU_DOUBLE and RES == mutype.MU_INT64) or
+                        (SRC == mutype.MU_FLOAT and RES == mutype.MU_INT32)):
+                raise TypeError("wrong length when casting floating point bytes to integer: %s -> %s" % (SRC, RES))
+            return [self.gen_mu_convop('BITCAST', RES, llop.args[0], llop.result)]
+
+        elif isinstance(SRC, mutype.MuIntType) and isinstance(RES, mutype.MuFloatType):
+            if not ((RES == mutype.MU_DOUBLE and SRC == mutype.MU_INT64) or
+                        (RES == mutype.MU_FLOAT and SRC == mutype.MU_INT32)):
+                raise TypeError("wrong length when casting integer bytes to floating point: %s -> %s" % (SRC, RES))
+            return [self.gen_mu_convop('BITCAST', RES, llop.args[0], llop.result)]
+
+        elif isinstance(SRC, mutype.MuFloatType) and isinstance(RES, mutype.MuFloatType):
+            if SRC == mutype.MU_FLOAT and RES == mutype.MU_DOUBLE:
+                optr = 'FPEXT'
+            else:
+                optr = 'FPTRUNC'
+            return [self.gen_mu_convop(optr, RES, llop.args[0], llop.result)]
+
+        elif SRC == RES:
+            return self._rename_to_same_as(llop)
+        else:
+            raise NotImplementedError("forcecast: %s -> %s" % (SRC, RES))
+
+    map_op_cast_primitive = map_op_force_cast
 
     map_op_gc_can_move = _same_as_true
     map_op_gc_pin = _same_as_true

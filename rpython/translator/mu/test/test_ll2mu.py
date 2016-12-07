@@ -1,5 +1,6 @@
 from rpython.translator.mu.ll2mu import *
 from rpython.translator.mu.ll2mu import _init_binop_map, varof
+import pytest
 
 
 def test_map_type_prim():
@@ -469,4 +470,22 @@ def test_gc_identityhash():
     assert 'mu_getgcidhash' in [op.opname for _, op in callee.graph.iterblockops()]
     assert 'mu_setgcidhash' in [op.opname for _, op in callee.graph.iterblockops()]
 
-    # TODO: might need another test to overcome the duplication of rtyper specialisation
+
+def test_force_cast():
+    Stt = mutype.MuStruct('point', ('x', mutype.MU_INT64), ('y', mutype.MU_INT64))
+
+    ll2mu = LL2MuMapper()
+    muops = ll2mu.map_op(SpaceOperation('force_cast', [varof(mutype.MuRef(Stt))], varof(mutype.MU_INT64)))
+    assert [op.opname for op in muops] == ['mu_comminst', 'mu_convop']    # pin, then PTRCAST
+
+    with pytest.raises(AssertionError):
+        ll2mu.map_op(SpaceOperation('force_cast', [varof(mutype.MU_INT64)], varof(mutype.MuRef(Stt))))
+    muops = ll2mu.map_op(SpaceOperation('force_cast', [varof(mutype.MU_INT64)], varof(mutype.MuUPtr(Stt))))
+    assert [op.opname for op in muops] == ['mu_convop']
+
+    with pytest.raises(AssertionError):
+        ll2mu.map_op(SpaceOperation('force_cast', [varof(mutype.MuRef(Stt))], varof(mutype.MuUPtr(mutype.MU_INT64))))
+    muops = ll2mu.map_op(SpaceOperation('force_cast', [varof(mutype.MuRef(Stt))], varof(mutype.MuRef(mutype.MU_INT64))))
+    assert [op.opname for op in muops] == ['mu_convop']
+
+    # TODO: test more cases for force_cast? Maybe it will be easier with a graph interpreter
