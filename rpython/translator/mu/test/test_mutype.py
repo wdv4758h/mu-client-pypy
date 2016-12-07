@@ -356,3 +356,11 @@ def test_val_type():
     assert FncRef._val_type  is mutype._mufuncref
     assert FncUPtr._val_type is mutype._muufuncptr
     assert OpqRef._val_type is mutype._muopqref
+
+
+def test_constant_hash():
+    from rpython.flowspace.model import Constant
+    c1 = Constant(mu_int8(0), MU_INT8)
+    c2 = Constant(mu_int64(0), MU_INT64)
+    assert c1 != c2
+    assert hash(c1) != hash(c2)
