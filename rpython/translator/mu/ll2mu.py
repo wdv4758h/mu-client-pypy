@@ -117,8 +117,11 @@ class LL2MuMapper:
             if isinstance(LLT, lltype.Number) and \
                             LLT._type in rarithmetic._inttypes.values():
                 b = LLT._type.BITS
-                return mutype.MuIntType("MU_INT%d" % b,
-                                        rarithmetic.build_int('r_uint%d', False, b))    # unsigned
+                if hasattr(mutype, "MU_INT%d" % b):
+                    return getattr(mutype, "MU_INT%d" % b)
+                else:
+                    return mutype.MuIntType("MU_INT%d" % b,
+                                            rarithmetic.build_int('r_uint%d' % b, False, b))    # unsigned
             raise NotImplementedError("Don't know how to specialise %s using MuTS." % LLT)
 
     def map_type_arrfix(self, LLT):
@@ -697,7 +700,16 @@ class LL2MuMapper:
             ops.append(self.gen_mu_newhybrid(MuT, n_c, llop.result))
         else:
             assert isinstance(llop.result.concretetype, mutype.MuUPtr)
-            raise NotImplementedError
+            from rpython.translator.mu import layout
+            fix = layout.mu_hybsizeOf(MuT, 0)
+            itm = layout.mu_hybsizeOf(MuT, 1) - fix
+
+            # sz = fix + itm * n
+            v = varof(mutype.MU_INT64)
+            ops.extend(self.map_op(SpaceOperation('int_mul', [Constant(itm, mutype.MU_INT64), n_c], v)))
+            sz = varof(mutype.MU_INT64, 'sz')
+            ops.extend(self.map_op(SpaceOperation('int_add', [Constant(fix, mutype.MU_INT64), v], sz)))
+            ops.extend(self.map_op(SpaceOperation('raw_malloc', [sz], llop.result)))
 
         if 'length' in MuT._names:
             ops.extend(self.map_op(SpaceOperation('setfield', [
@@ -933,7 +945,7 @@ class LL2MuMapper:
     def map_op_keepalive(self, llop):
         ref = llop.args[0]
         if isinstance(ref.concretetype, mutype.MuRef):
-            return [self.gen_mu_comminst('NATIVE_UNPIN', ref, llop.result)]
+            return [self.gen_mu_comminst('NATIVE_UNPIN', [ref], llop.result)]
         else:
             return []
 
@@ -966,7 +978,15 @@ class LL2MuMapper:
         # correct memcpy and memmove argument order
         if mufnp._name in ('memcpy', 'memmove'):
             args = [args[1], args[0], args[2]]
-        muops.append(self.gen_mu_ccall(callee, args, llop.result))
+
+        if Sig.RESULTS[0] != llop.result.concretetype:
+            malloc_res = varof(Sig.RESULTS[0])
+            muops.append(self.gen_mu_ccall(callee, args, malloc_res))
+            llop_fc = SpaceOperation('force_cast', [malloc_res], llop.result)
+            muops += self.map_op(llop_fc)
+        else:
+            muops.append(self.gen_mu_ccall(callee, args, llop.result))
+
         return muops
 
     map_op_raw_malloc = _map_rawmemop
@@ -1416,8 +1436,6 @@ class LL2MuMapper:
         assert len(args) == len(Sig.ARGS)
         for i, arg in enumerate(args):
             assert arg.concretetype == Sig.ARGS[i]
-        if res:
-            assert res.concretetype == Sig.RESULTS[0]
 
         metainfo = {}
         if keepalive:

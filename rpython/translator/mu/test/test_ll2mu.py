@@ -384,6 +384,19 @@ def test_malloc_varsize():
     assert [op.opname for op in muops] == ['mu_newhybrid', 'mu_getiref', 'mu_getfieldiref', 'mu_store']
     assert muops[0].result is rs    # the result is of the first instruction rather than the last
 
+
+def test_malloc_varsize_raw():
+    ll2mu = LL2MuMapper()
+    Hyb = mutype.MuHybrid('string', ('hash', mutype.MU_INT64), ('length', mutype.MU_INT64), ('chars', mutype.MU_INT8))
+    rs = varof(mutype.MuUPtr(Hyb), "rs")
+    llop = SpaceOperation('malloc_varsize', [ll2mu.mapped_const(Hyb),
+                                             ll2mu.mapped_const({'flavor': 'raw'}),
+                                             ll2mu.mapped_const(10)],
+                          rs)
+    muops = ll2mu.map_op(llop)
+    assert [op.opname for op in muops] == ['mu_binop', 'mu_binop', 'mu_ccall', 'mu_convop', 'mu_getfieldiref', 'mu_store']
+
+
 def test_setarrayitem():
     ll2mu = LL2MuMapper()
     Hyb = mutype.MuHybrid('string', ('hash', mutype.MU_INT64), ('length', mutype.MU_INT64), ('chars', mutype.MU_INT8))
