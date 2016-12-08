@@ -16,7 +16,6 @@ class MuType(object):
         '__eq__',
         '__ne__',
         '_is_compatible',
-        '__hash__',
         '__hash_is_not_constant__',
         '__repr__',
         '__str__',
@@ -25,7 +24,7 @@ class MuType(object):
         '_freeze_',
         '_is_varsize',
     ))
-    __slots__ = ('__dict__', '__cached_hash')
+    __slots__ = ['__dict__', '__cached_hash']
 
     def __setattr__(self, attr, nvalue):
         try:
@@ -54,6 +53,31 @@ class MuType(object):
 
     def _allocate(self, parent=None, parentindex=None):
         raise NotImplementedError
+
+    def __hash__(self, TLS=lltype.TLS):     # NOTE: copied from lltype
+        # cannot use saferecursive() -- see test_lltype.test_hash().
+        # NB. the __cached_hash should neither be used nor updated
+        # if we enter with hash_level > 0, because the computed
+        # __hash__ can be different in this situation.
+        hash_level = 0
+        try:
+            hash_level = TLS.nested_hash_level
+            if hash_level == 0:
+                return self.__cached_hash
+        except AttributeError:
+            pass
+        if hash_level >= 3:
+            return 0
+        items = self.__dict__.items()
+        items.sort()
+        TLS.nested_hash_level = hash_level + 1
+        try:
+            result = hash((self.__class__,) + tuple(items))
+        finally:
+            TLS.nested_hash_level = hash_level
+        if hash_level == 0:
+            self.__cached_hash = result
+        return result
 _setup_consistent_methods(MuType)
 
 

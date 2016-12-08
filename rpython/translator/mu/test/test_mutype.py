@@ -364,3 +364,11 @@ def test_constant_hash():
     c2 = Constant(mu_int64(0), MU_INT64)
     assert c1 != c2
     assert hash(c1) != hash(c2)
+
+def test_eq_not_affected_by_hash():
+    String = MuHybrid("String", ("length", MU_INT64), ("chars", MU_INT8))
+    T1 = mutype.MuRef(String)
+    hash(T1)
+    T2 = mutype.MuRef(mutype.MuForwardReference())
+    T2.TO.become(String)
+    assert T1 == T2
