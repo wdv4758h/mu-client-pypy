@@ -427,15 +427,19 @@ def test_ptr_nonzero():
 def test_raw_memcopy():
     ll2mu = LL2MuMapper()
     VOIDP = ll2mu.map_type(rffi.VOIDP)
-    src = varof(VOIDP, 'src')
-    dst = varof(VOIDP, 'dst')
+    src = varof(mutype.MU_INT64, 'src')
+    dst = varof(mutype.MU_INT64, 'dst')
     sz = varof(mutype.MU_INT64, 'sz')
     llop = SpaceOperation('raw_memcopy', [src, dst, sz], varof(mutype.MU_VOID))
     muops = ll2mu.map_op(llop)
-    assert [op.opname for op in muops] == ['mu_ccall']
-    ccall = muops[0]
+    assert [op.opname for op in muops] == ['mu_convop', 'mu_convop', 'mu_ccall']
+    ccall = muops[-1]
     assert ccall.args[0].value._name == 'memcpy'
-    assert ccall.args[1] is dst and ccall.args[2] is src
+    assert muops[0].args[-1] is src
+    src_cast = muops[0].result
+    assert muops[1].args[-1] is dst
+    dst_cast = muops[1].result
+    assert ccall.args[1] is dst_cast and ccall.args[2] is src_cast
 
 def test_gc_identityhash():
     from rpython.translator.interactive import Translation

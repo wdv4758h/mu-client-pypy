@@ -938,17 +938,37 @@ class LL2MuMapper:
             return []
 
     def _map_rawmemop(self, llop):
+        muops = []
         llfnp = _llrawop_c_externfncs[llop.opname[4:]]
         mufnp = self.map_value(llfnp)
         self.resolve_ptr_types()
         self.resolve_ptr_values()
         callee = Constant(mufnp, mutype.mutypeOf(mufnp))
 
+        # out of respect for typing rigour, cast integer address to pointer
         args = llop.args
+        Sig = mutype.mutypeOf(mufnp).Sig
+
+        for i, ARG in enumerate(Sig.ARGS):
+            arg = args[i]
+            if arg.concretetype != ARG:
+                try:
+                    cast_res = varof(ARG)
+                    llop_fc = SpaceOperation('force_cast', [arg], cast_res)
+                    muops += self.map_op(llop_fc)
+                    args[i] = cast_res
+                except NotImplementedError:
+                    raise TypeError("calling %(sig)s with wrong argument types (%(arg_ts)s)." % {
+                        'sig': Sig,
+                        'arg_ts': ', '.join(map(lambda a: a.concretetype, args))
+                    })
+
         # correct memcpy and memmove argument order
         if mufnp._name in ('memcpy', 'memmove'):
             args = [args[1], args[0], args[2]]
-        return [self.gen_mu_ccall(callee, args, llop.result)]
+        muops.append(self.gen_mu_ccall(callee, args, llop.result))
+        return muops
+
     map_op_raw_malloc = _map_rawmemop
     map_op_raw_free = _map_rawmemop
     map_op_raw_memset = _map_rawmemop
