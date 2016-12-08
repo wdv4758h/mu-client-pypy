@@ -776,10 +776,7 @@ class LL2MuMapper:
         else:
             assert isinstance(MuT.TO, mutype.MuArray)
             iref_itm0 = varof(cls(MuT.TO.OF), 'ira%s' % var.name)
-            ops.extend(self.map_op(SpaceOperation('cast_pointer', [
-                Constant(iref_itm0.concretetype, mutype.MU_VOID), iref
-            ],
-                                                  iref_itm0)))
+            ops.extend(self.map_op(SpaceOperation('cast_pointer', [iref], iref_itm0)))
 
         iref_itm = varof(cls(iref_itm0.concretetype.TO), 'ir%s_itm' % var.name)
         ops.append(self.gen_mu_shiftiref(iref_itm0, idx_vc, iref_itm))
@@ -879,21 +876,27 @@ class LL2MuMapper:
         return ops
 
     def map_op_cast_pointer(self, llop):
-        MuT_DST_c, var = llop.args
-        assert MuT_DST_c.value == llop.result.concretetype, \
-            'cast destination type %s does not match result type %s' % (MuT_DST_c.value, llop.result.concretetype)
+        if isinstance(llop.args[0], Constant) and isinstance(llop.args[0].value, mutype.MuType):
+            DST = llop.args[0].value
+            assert DST == llop.result.concretetype, \
+                'cast destination type %s does not match result type %s' % (DST, llop.result.concretetype)
+            var = llop.args[1]
+        else:
+            var = llop.args[0]
+            DST = llop.result.concretetype
+
         assert var.concretetype.__class__ == llop.result.concretetype.__class__, \
             'cannot cast from %s to %s' % (var.concretetype, llop.result.concretetype)
 
-        if isinstance(MuT_DST_c.value, (mutype.MuUPtr, mutype.MuUFuncPtr)):
+        if isinstance(DST, (mutype.MuUPtr, mutype.MuUFuncPtr)):
             optr = 'PTRCAST'
         else:
             optr = 'REFCAST'
 
-        return [self.gen_mu_convop(optr, MuT_DST_c.value, var, llop.result)]
+        return [self.gen_mu_convop(optr, DST, var, llop.result)]
 
     def map_op_cast_opaque_ptr(self, llop):
-        llop.__init__('cast_pointer', [Constant(llop.result.concretetype, mutype.MU_VOID), llop.args[0]], llop.result)
+        llop.__init__('cast_pointer', [llop.args[0]], llop.result)
         return self.map_op_cast_pointer(llop)
 
     def map_op_ptr_nonzero(self, llop):
@@ -922,7 +925,7 @@ class LL2MuMapper:
             llop.__init__('getfield', [llop.args[0], Constant('items', mutype.MU_VOID)], llop.result)
             return self.map_op(llop)
         # otherwise cast to the correct type
-        llop.__init__('cast_pointer', [Constant(llop.result.concretetype, mutype.MU_VOID), llop.args[0]], llop.result)
+        llop.__init__('cast_pointer', [llop.args[0]], llop.result)
         return self.map_op_cast_pointer(llop)
 
     # ----------------
@@ -1019,7 +1022,7 @@ class LL2MuMapper:
         RES = llop.result.concretetype
 
         if isinstance(SRC, mutype.MuObjectRef) and isinstance(RES, mutype.MuObjectRef):
-            llop.__init__('cast_pointer', [Constant(RES, mutype.MU_VOID), llop.args[0]], llop.result)
+            llop.__init__('cast_pointer', [llop.args[0]], llop.result)
             return self.map_op(llop)    # does the reference class check in actual mapping function
 
         elif isinstance(SRC, mutype.MuObjectRef) and isinstance(RES, mutype.MuIntType):
@@ -1127,7 +1130,7 @@ class LL2MuMapper:
         MuT = self.map_type(lltype.Ptr(lltype.GcArray(lltype.Signed)))
         self.resolve_ptr_types()
         ref = varof(MuT)
-        ops.extend(self.map_op_cast_pointer(SpaceOperation('cast_pointer', [Constant(MuT, mutype.MU_VOID), llop.args[0]], ref)))
+        ops.extend(self.map_op_cast_pointer(SpaceOperation('cast_pointer', [llop.args[0]], ref)))
         ops.extend(self.map_op_getarraysize(SpaceOperation('getarraysize', [ref], llop.result)))
         return ops
 
@@ -1141,7 +1144,7 @@ class LL2MuMapper:
         ops.append(self.gen_mu_comminst('GET_THREADLOCAL', [], tlref_void))
         RefStt = mutype.MuRef(self.TLStt)
         tlref_stt = varof(RefStt)
-        ops.extend(self.map_op(SpaceOperation('cast_pointer', [Constant(RefStt, mutype.MU_VOID), tlref_void], tlref_stt)))
+        ops.extend(self.map_op(SpaceOperation('cast_pointer', [tlref_void], tlref_stt)))
         fld = llop.args[0].value.expr[10:]
         ops.extend(self.map_op(SpaceOperation('getfield', [tlref_stt, Constant(fld, mutype.MU_VOID)], llop.result)))
         return ops
@@ -1153,7 +1156,7 @@ class LL2MuMapper:
         ops.append(self.gen_mu_comminst('GET_THREADLOCAL', [], tlref_void))
         RefStt = mutype.MuRef(self.TLStt)
         tlref_stt = varof(RefStt)
-        ops.extend(self.map_op(SpaceOperation('cast_pointer', [Constant(RefStt, mutype.MU_VOID), tlref_void], tlref_stt)))
+        ops.extend(self.map_op(SpaceOperation('cast_pointer', [tlref_void], tlref_stt)))
         fld = llop.args[0].value.expr[10:]
         ops.extend(self.map_op(SpaceOperation('setfield', [tlref_stt, Constant(fld, mutype.MU_VOID), llop.args[1]], llop.result)))
         return ops

@@ -308,10 +308,6 @@ def prepare(graphs, entry_graph):
             for op in blk.operations:
                 op.args = [arg for arg in op.args if _keep_arg(arg, op.opname)]
 
-                if op.opname == 'cast_pointer':  # explicit CAST_TYPE when it's implicit
-                    if not isinstance(op.args[0], Constant) and isinstance(op.args[0].value, lltype.LowLevelType):
-                        op.args.insert(0, Constant(op.result.concretetype, lltype.Void))
-
             # replace constants with dummy variables in inputargs --> they shouldn't appear there
             idx_cnsts = filter(lambda _i: isinstance(blk.inputargs[_i], Constant), range(len(blk.inputargs)))
             if len(idx_cnsts) > 0:
