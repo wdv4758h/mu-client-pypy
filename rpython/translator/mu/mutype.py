@@ -468,7 +468,6 @@ class _muhybrid(lltype._parentable):
     _template = (lltype._struct, (
         '__repr__',
         '_str_fields',
-        '__str__',
         '_getattr',
     ))
 
@@ -503,6 +502,9 @@ class _muhybrid(lltype._parentable):
 
         if parent is not None:
             self._setparentstructure(parent, parentindex)
+
+    def __str__(self):
+        return 'hybrid %s { %s }' % (self._TYPE._name, self._str_fields())
 _setup_consistent_methods(_muhybrid)
 
 
