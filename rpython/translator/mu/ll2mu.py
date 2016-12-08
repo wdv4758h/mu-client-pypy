@@ -424,7 +424,7 @@ class LL2MuMapper:
             Sig = MuT.Sig
             MuT = mutype.MuUFuncPtr(Sig)
             c_name = fnc._name
-            return mutype._muufuncptr(MuT, _name=c_name, eci=fnc.compilation_info)
+            return mutype._muufuncptr(MuT, _name=c_name, eci=fnc.compilation_info, _llfnctype=LLT.TO)
 
     def map_value_adrofs(self, llv):
         def rec(llv):

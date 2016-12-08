@@ -1,16 +1,98 @@
-"""
-Tasks to be done at database stage:
-- lower the debug operations to mu_ccalls
-- collect all global definitions
-    - types
-    - constants
-    - external functions
-    - global cells
-    - graphs & function references
-- assign a Mu name to each global entity and local variable
-- process external C functions
-    - create a C function source file that redirects macro calls to function calls
-    - find corresponding functions in libraries suggested
-    - rename some functions based on platforms
-- trace heap objects
-"""
+from rpython.flowspace.model import Constant
+from rpython.translator.mu import mutype
+import ctypes, ctypes.util
+import os, sys
+
+from rpython.tool.ansi_mandelbrot import Driver
+from rpython.tool.ansi_print import AnsiLogger
+mdb = Driver()
+
+
+class MuDatabase:
+    def __init__(self, tlc):
+        # type: (rpython.translator.translator.TranslationContext) -> None
+        self.tlc = tlc
+        self.types = set()
+        self.consts = set()
+        self.funcref_consts = set()
+        self.gcells = set()
+        self.extern_fncs = set()
+        self.objtracer = None
+
+    def build_database(self):
+        """
+        Tasks to be done at database stage:
+        - lower the debug operations to mu_ccalls
+        - collect all global definitions
+            - types
+            - constants
+            - external functions
+            - global cells
+            - graphs & function references
+        - assign a Mu name to each global entity and local variable
+        - process external C functions
+            - create a C function source file that redirects macro calls to function calls
+            - find corresponding functions in libraries suggested
+            - rename some functions based on platforms
+        - trace heap objects
+        """
+        self.collect_global_defs()
+
+    def collect_global_defs(self):
+        for graph in self.tlc.graphs:
+            self._add_type(mutype.MuFuncSig(map(lambda v: v.concretetype, graph.getargs()),
+                                            [graph.getreturnvar().concretetype]))
+
+            for blk in graph.iterblocks():
+                for a in blk.inputargs:
+                    self._add_type(a.concretetype)
+                for op in blk.operations:
+                    for a in op.args:
+                        self._add_type(a.concretetype)
+                        if isinstance(a, Constant):
+                            self._collect_constant(a)
+                    self._add_type(op.result.concretetype)
+                for lnk in blk.exits:
+                    for a in lnk.args:
+                        self._add_type(a.concretetype)
+                        if isinstance(a, Constant):
+                            self._collect_constant(a)
+                    if isinstance(lnk.exitcase, Constant):
+                        self._collect_constant(lnk.exitcase)
+
+    def _collect_constant(self, c):
+        if isinstance(c.concretetype, mutype.MuNumber):
+            self.consts.add(c)
+        elif isinstance(c.concretetype, mutype.MuGlobalCell):
+            self.gcells.add(c)
+        elif isinstance(c.concretetype, mutype.MuUFuncPtr):
+            self.extern_fncs.add(c)
+        elif isinstance(c.concretetype, mutype.MuFuncRef):
+            self.funcref_consts.add(c)
+
+    def _add_type(self, T):
+        assert isinstance(T, mutype.MuType)
+
+        if isinstance(T, mutype.MuGlobalCell):
+            T = T.TO
+
+        if T not in self.types:
+            self.types.add(T)
+
+        if isinstance(T, mutype.MuStruct):
+            for FLD in tuple(getattr(T, fld) for fld in T._names):
+                self._add_type(FLD)
+        elif isinstance(T, mutype.MuHybrid):
+            for FLD in tuple(getattr(T, fld) for fld in T._names[:-1]):
+                self._add_type(FLD)
+            self._add_type(T._vartype.OF)
+        elif isinstance(T, mutype.MuArray):
+            self._add_type(T.OF)
+        elif isinstance(T, mutype.MuObjectRef):
+            self._add_type(T.TO)
+        elif isinstance(T, mutype.MuGeneralFunctionReference):
+            self._add_type(T.Sig)
+        elif isinstance(T, mutype.MuFuncSig):
+            ts = T.ARGS + T.RESULTS
+            for t in ts:
+                self._add_type(t)
