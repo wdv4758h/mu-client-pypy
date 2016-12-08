@@ -168,13 +168,14 @@ class MuTyper:
 
 # -----------------------------------------------------------------------------
 # preparation before mutyper
-def prune(g_entry):
+def graph_closure(g_entry):
     """
-    Remove all the graphs in the list (after inlining)
-    that cannot be reached from the entry point.
+    Find closure of graphs from g_entry, including graphs in:
+    - direct/indirect calls
+    - function references in heap objects
 
     :param g_entry: the graph in the list that is the entry point
-    :return: a chopped down list of graphs
+    :return: a set of FunctionGraphs as closure
     """
 
     graph_closure = set()
@@ -293,7 +294,7 @@ def prepare(graphs, entry_graph):
 
     # Task 1: prune and remove inlined graphs
     n0 = len(graphs)
-    graphs = prune(entry_graph)
+    graphs = graph_closure(entry_graph)
     log.prune("%d -> %d graphs" % (n0, len(graphs)))
 
     for g in graphs:
