@@ -978,15 +978,17 @@ class LL2MuMapper:
         # correct memcpy and memmove argument order
         if mufnp._name in ('memcpy', 'memmove'):
             args = [args[1], args[0], args[2]]
-
-        if Sig.RESULTS[0] != llop.result.concretetype:
-            malloc_res = varof(Sig.RESULTS[0])
-            muops.append(self.gen_mu_ccall(callee, args, malloc_res))
-            llop_fc = SpaceOperation('force_cast', [malloc_res], llop.result)
-            muops += self.map_op(llop_fc)
-        else:
-            muops.append(self.gen_mu_ccall(callee, args, llop.result))
-
+        # NOTE: assume implicit casting to avoid
+        # adding extra operations at the end of a block
+        # which messes with block exit analysis
+        # if Sig.RESULTS[0] != llop.result.concretetype:
+        #     malloc_res = varof(Sig.RESULTS[0])
+        #     muops.append(self.gen_mu_ccall(callee, args, malloc_res))
+        #     llop_fc = SpaceOperation('force_cast', [malloc_res], llop.result)
+        #     muops += self.map_op(llop_fc)
+        # else:
+        #     muops.append(self.gen_mu_ccall(callee, args, llop.result))
+        muops.append(self.gen_mu_ccall(callee, args, llop.result))
         return muops
 
     map_op_raw_malloc = _map_rawmemop

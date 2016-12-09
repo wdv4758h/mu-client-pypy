@@ -127,7 +127,8 @@ class MuTyper:
                         if id(muv) in self._objrefid2gcl_dic:
                             gcl = self._objrefid2gcl_dic[id(muv)]
                         else:
-                            gcl = mutype._muglobalcell(GCl_T, mutype._muref(MuT, muv), [])
+                            gcl = mutype.new(GCl_T)
+                            gcl._store(muv)
                             self._objrefid2gcl_dic[id(muv)] = gcl
                         arg.__init__(gcl, GCl_T)
                     else:
@@ -136,11 +137,11 @@ class MuTyper:
         return arg
 
     def specialise_operation(self, llop):
-        def _keep_op_for_muinterp(llop):
+        def skip(llop):
             """ Keep some operations to be informative for mu graph interpreter """
-            return llop.opname.startswith('debug_')     # keep all the debug ops
+            return llop.opname.startswith('debug_') or llop.opname.startswith('mu_')   # keep all the debug ops
 
-        if _keep_op_for_muinterp(llop):
+        if skip(llop):
             return [llop]
 
         llop.args = [self.specialise_arg(arg) for arg in llop.args]

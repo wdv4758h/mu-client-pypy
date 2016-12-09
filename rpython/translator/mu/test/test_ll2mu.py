@@ -394,7 +394,7 @@ def test_malloc_varsize_raw():
                                              ll2mu.mapped_const(10)],
                           rs)
     muops = ll2mu.map_op(llop)
-    assert [op.opname for op in muops] == ['mu_binop', 'mu_binop', 'mu_ccall', 'mu_convop', 'mu_getfieldiref', 'mu_store']
+    assert [op.opname for op in muops] == ['mu_binop', 'mu_binop', 'mu_ccall', 'mu_getfieldiref', 'mu_store']
 
 
 def test_setarrayitem():

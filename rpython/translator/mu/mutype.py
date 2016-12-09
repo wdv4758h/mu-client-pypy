@@ -621,20 +621,6 @@ class MuReferenceType(MuType):
     _symbol = None     # child class must specify
     _val_type = property(lambda self: _mugeneral_reference)
 
-    _cache = lltype.WeakValueDictionary()
-
-    def __new__(cls, TO, use_cache=True):
-        if not use_cache:
-            obj = MuType.__new__(cls)
-        else:
-            try:
-                return MuReferenceType._cache[(cls, TO)]
-            except KeyError:
-                obj = MuReferenceType._cache[(cls, TO)] = MuType.__new__(cls)
-            except TypeError:
-                obj = MuType.__new__(cls)
-        return obj
-
     def __str__(self):
         raise NotImplementedError
 
