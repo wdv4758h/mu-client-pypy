@@ -35,14 +35,17 @@ class MuDatabase:
             - graphs & function references
         - assign a Mu name to each global entity and local variable
         - process external C functions
-            - create a C function source file that redirects macro calls to function calls
-            - find corresponding functions in libraries suggested
-            - rename some functions based on platforms
+            - compiling C function macros,
+                        C function declared in post_include_bits,
+                        and C functions defined in PyPy C backend into one shared library
+            - update the ecis, and rename function names
         - trace heap objects
         """
         self.collect_global_defs()
+        self.compile_pypy_c_extern_funcs()
 
     def collect_global_defs(self):
+        # collect global definitions in graphs
         for graph in self.tlc.graphs:
             try:
                 ret_t = graph.getreturnvar().concretetype
@@ -67,6 +70,16 @@ class MuDatabase:
                             self._collect_constant(a)
                     if isinstance(lnk.exitcase, Constant):
                         self._collect_constant(lnk.exitcase)
+
+        # trace heap objects
+        self.objtracer = HeapObjectTracer()
+
+        for gcl in self.gcells:
+            self.objtracer.trace(gcl.value._load())
+
+        # add types in heap to global type definitions
+        for t in self.objtracer.types_in_heap():
+            self._add_type(t)
 
     def _collect_constant(self, c):
         if isinstance(c.concretetype, mutype.MuNumber):
@@ -168,3 +181,45 @@ class MuDatabase:
 
         self.libsupport_path = py.path.local(eci.libraries[-1])
         return eci
+
+
+class HeapObjectTracer:
+    def __init__(self):
+        self.objs = set()
+        self.uptrs = set()  # objects pointed to by uptr, needs relocation support
+        self.nullref_ts = set()
+        self.types = set()
+
+    def trace(self, obj):
+        MuT = mutype.mutypeOf(obj)
+        if not isinstance(MuT, mutype._MuMemArray):
+            self.types.add(MuT)
+
+        if isinstance(obj, mutype._muobject_reference):
+            if obj._is_null():
+                self.nullref_ts.add(mutype.mutypeOf(obj))
+                return
+
+            refnt = obj._obj
+            if isinstance(refnt, mutype._mustruct):
+                refnt = refnt._normalizedcontainer()
+
+            if refnt not in self.objs:
+                self.objs.add(refnt)
+                self.trace(refnt)
+
+            if isinstance(obj, mutype._muuptr):
+                self.uptrs.add(refnt)
+
+        elif isinstance(obj, (mutype._mustruct, mutype._muhybrid)):
+            for fld in mutype.mutypeOf(obj)._flds:
+                self.trace(getattr(obj, fld))
+
+        elif isinstance(obj, (mutype._mumemarray, mutype._muarray)):
+            if isinstance(mutype.mutypeOf(obj).OF, (mutype.MuContainerType, mutype.MuObjectRef)):
+                for i in range(len(obj.items)):
+                    itm = obj[i]
+                    self.trace(itm)
+
+    def types_in_heap(self):
+        return self.types
