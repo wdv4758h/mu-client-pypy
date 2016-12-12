@@ -5,6 +5,8 @@ from rpython.rlib import rposix
 from rpython.translator.mu import mutype
 from rpython.translator.mu.database import MuDatabase
 
+from rpython.translator.mu.test.test_mutyper import graph_of
+
 
 def test_collect_global_defs():
     lst = [1, 5, -23]
@@ -24,3 +26,75 @@ def test_collect_global_defs():
 
     assert len(db.types) == 9   # void, i1, i8, i64, ref<i64>, hyb, ref<hyb>, iref<hyb>, (i64) -> (i64)
     assert len(db.gcells) == 1
+
+
+def exported_symbol_in_dylib(sym_name, libpath):
+    # use nm program to get a list of symbols in shared library,
+    # then check if the symbol name is in the list with 'T' (exported symbol)
+    import subprocess
+    from rpython.translator.platform import platform
+    output = str(subprocess.check_output('nm %(flag)s %(libpath)s' % {
+        'flag': '-D' if platform.name.startswith('linux') else '',
+        'libpath': libpath
+    }, shell=True))
+    return 'T _%(sym_name)s' % locals() in output  # exported symbol
+
+
+def test_extern_funcs_macro_wrapper():
+    t = Translation(rposix.makedev, [int, int], backend='mu')
+    t.rtype()
+    t.mutype()
+
+    db = MuDatabase(t.context)
+    db.collect_global_defs()
+    eci = db.compile_pypy_c_extern_funcs()
+
+    graph = graph_of(rposix.makedev, t)
+
+    ccall = graph.startblock.operations[2]
+    fnp = ccall.args[0].value
+    assert fnp.eci == eci
+
+    assert exported_symbol_in_dylib(fnp._name, eci.libraries[-1])
+
+
+def test_extern_funcs_support_func():
+    from rpython.rlib.rdtoa import dtoa
+    def f(x):
+        return dtoa(x)
+
+    t = Translation(f, [float], backend='mu')
+    t.mutype()
+
+    db = MuDatabase(t.context)
+    db.collect_global_defs()
+    eci = db.compile_pypy_c_extern_funcs()
+
+    graph = graph_of(dtoa, t)
+    ccall = graph.startblock.exits[0].target.exits[0].target.operations[0].args[0].value.graph.startblock.operations[2]
+    assert ccall.opname == 'mu_ccall'
+    fnp = ccall.args[0].value
+    assert fnp.eci == eci
+
+    assert exported_symbol_in_dylib(fnp._name, eci.libraries[-1])
+
+
+def test_extern_funcs_post_include_bits():
+    from rpython.rlib.rmd5 import _rotateLeft
+    def f(n, k):
+        return _rotateLeft(n, k)
+    t = Translation(f, [lltype.Unsigned, lltype.Signed], backend='mu')
+    t.mutype()
+
+    db = MuDatabase(t.context)
+    db.collect_global_defs()
+    eci = db.compile_pypy_c_extern_funcs()
+
+    graph_f = graph_of(f, t)
+    ccall = graph_f.startblock.operations[0]
+    assert ccall.opname == 'mu_ccall'
+    fnp = ccall.args[0].value
+    assert fnp.eci == eci
+
+    assert fnp._name.startswith('pypy_macro_wrapper')   # rotateLeft should be wrapped as a 'macro' (rely on inlining)
+    assert exported_symbol_in_dylib(fnp._name, eci.libraries[-1])
