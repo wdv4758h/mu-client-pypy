@@ -158,7 +158,7 @@ class MuDatabase:
         eci = eci.merge(rffi.ExternalCompilationInfo(includes=[header_file_name], include_dirs=[header_file_dir_path]))
 
         # step 3: compile these files into shared library
-        eci = eci.compile_shared_lib('libpypy_mu_support',
+        eci = eci.compile_shared_lib('pypy_mu_support',
                                      debug_mode=False,      # no '-g -O0'
                                      defines=['RPY_EXTERN=RPY_EXPORTED'])
 
