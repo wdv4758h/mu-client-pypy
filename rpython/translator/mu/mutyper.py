@@ -141,11 +141,11 @@ class MuTyper:
             """ Keep some operations to be informative for mu graph interpreter """
             return llop.opname.startswith('debug_') or llop.opname.startswith('mu_')   # keep all the debug ops
 
-        if skip(llop):
-            return [llop]
-
         llop.args = [self.specialise_arg(arg) for arg in llop.args]
         llop.result = self.specialise_arg(llop.result)
+
+        if skip(llop):      # translate the concretetype regardless
+            return [llop]
 
         muops = []
         muops.extend(self.extract_load_gcell(llop))
