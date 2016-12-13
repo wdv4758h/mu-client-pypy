@@ -76,6 +76,8 @@ def test_mutypeOf():
     x = mu_int64(10)
     assert mutypeOf(x) is MU_INT64
 
+    assert mutypeOf(mu_float(1.0)) is MU_FLOAT
+
     with pytest.raises(TypeError):
         mutypeOf(10)
 
@@ -372,3 +374,10 @@ def test_eq_not_affected_by_hash():
     T2 = mutype.MuRef(mutype.MuForwardReference())
     T2.TO.become(String)
     assert T1 == T2
+
+
+def test_hex_repr():
+    assert hex_repr(mu_int8(10)) == '0xa'
+    with pytest.raises(TypeError):
+        hex_repr(10)   # value must be mu value type
+    assert hex_repr(mu_float(float('nan'))) == '0x7fc00000'

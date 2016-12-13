@@ -140,6 +140,19 @@ class MuFloatType(MuNumber):
         self._val_t = value_type_cls
 
 
+def hex_repr(val):
+    MuT = mutypeOf(val)
+    assert isinstance(MuT, MuNumber)
+    if isinstance(MuT, MuIntType):
+        return hex(val)[:-1]
+    if isinstance(MuT, MuFloatType):
+        import struct
+        fmt = 'd' if MuT.BITS == 64 else 'f'
+        pkstr = struct.pack('!' + fmt, float(val))
+        hexstr = '0x' + ''.join(['%02x' % ord(b) for b in pkstr])
+        return hexstr
+
+
 mu_int1 = rarithmetic.build_int('r_int1', False, 1, True)
 mu_int8 = rffi.r_uchar
 mu_int16 = rffi.r_ushort
@@ -151,10 +164,12 @@ MU_INT16 = MuIntType("MU_INT16", mu_int16)
 MU_INT32 = MuIntType("MU_INT32", mu_int32)
 MU_INT64 = MuIntType("MU_INT64", mu_int64)
 
-mu_float = rffi.r_singlefloat
-mu_double = rarithmetic.r_longfloat
+class mu_float(rffi.r_singlefloat): pass
+class mu_double(rarithmetic.r_longfloat): pass
 MU_FLOAT = MuFloatType("MU_FLOAT", mu_float, 32)
+mu_float._TYPE = MU_FLOAT
 MU_DOUBLE = MuFloatType("MU_DOUBLE", mu_double, 64)
+mu_double._TYPE = MU_DOUBLE
 
 MU_VOID = MuPrimitive("MU_VOID", None)
 
