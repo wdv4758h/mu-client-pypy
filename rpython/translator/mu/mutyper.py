@@ -2,7 +2,7 @@ from rpython.flowspace.model import Variable, Constant, c_last_exception
 from rpython.rtyper.lltypesystem import lltype, llmemory
 from rpython.translator.mu import mutype
 from rpython.translator.mu.ll2mu import LL2MuMapper, IgnoredLLOp, IgnoredLLVal, varof
-from rpython.rlib import rmu
+from rpython.rlib.rmu import holstein as rmu
 from rpython.tool.ansi_mandelbrot import Driver
 from rpython.tool.ansi_print import AnsiLogger
 log = AnsiLogger("MuTyper")
@@ -15,6 +15,7 @@ class MuTyper:
         self.tlc = tlc
         self.ll2mu = LL2MuMapper(tlc.rtyper)
         self._objrefid2gcl_dic = {}
+        self.init_threadlocal_struct_type()
 
     def init_threadlocal_struct_type(self):
         # determine thread local struct type
@@ -112,27 +113,30 @@ class MuTyper:
                     else:   # for other non-translation constants, just keep the value
                         arg.__init__(arg.value, mutype.MU_VOID)
                 else:
-                    MuT = self.ll2mu.map_type(arg.concretetype)
-                    muv = self.ll2mu.map_value(arg.value)
-                    self.ll2mu.resolve_ptr_types()
-                    self.ll2mu.resolve_ptr_values()
+                    try:
+                        MuT = self.ll2mu.map_type(arg.concretetype)
+                        muv = self.ll2mu.map_value(arg.value)
+                        self.ll2mu.resolve_ptr_types()
+                        self.ll2mu.resolve_ptr_values()
 
-                    if isinstance(muv, mutype._muufuncptr):
-                        MuT = mutype.mutypeOf(muv)
+                        if isinstance(muv, mutype._muufuncptr):
+                            MuT = mutype.mutypeOf(muv)
 
-                    assert mutype.mutypeOf(muv) == MuT
+                        assert mutype.mutypeOf(muv) == MuT
 
-                    if isinstance(muv, mutype._muobject_reference):
-                        GCl_T = mutype.MuGlobalCell(MuT)
-                        if id(muv) in self._objrefid2gcl_dic:
-                            gcl = self._objrefid2gcl_dic[id(muv)]
+                        if isinstance(muv, mutype._muobject_reference):
+                            GCl_T = mutype.MuGlobalCell(MuT)
+                            if id(muv) in self._objrefid2gcl_dic:
+                                gcl = self._objrefid2gcl_dic[id(muv)]
+                            else:
+                                gcl = mutype.new(GCl_T)
+                                gcl._store(muv)
+                                self._objrefid2gcl_dic[id(muv)] = gcl
+                            arg.__init__(gcl, GCl_T)
                         else:
-                            gcl = mutype.new(GCl_T)
-                            gcl._store(muv)
-                            self._objrefid2gcl_dic[id(muv)] = gcl
-                        arg.__init__(gcl, GCl_T)
-                    else:
-                        arg.__init__(muv, MuT)
+                            arg.__init__(muv, MuT)
+                    except IgnoredLLVal:
+                        pass
 
         return arg
 

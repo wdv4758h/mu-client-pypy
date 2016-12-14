@@ -284,7 +284,19 @@ translation_optiondescription = OptionDescription(
                  suggests={"arm": [("translation.gcrootfinder", "shadowstack"),
                                    ("translation.jit_backend", "arm")]}),
 
+    OptionDescription("mu", "Mu backend options", [
+        ChoiceOption("codegen", "Code generator to use for Mu backend",
+                     ["api", "c"], default="api", cmdline="--mu-codegen"),
+        ChoiceOption("impl", "Mu implementation to target",
+                     ["holstein", "zebu"], default="holstein", cmdline="--mu-impl"),
+        BoolOption("testjit", "Generate code suitable for testing Mu JIT",
+                   requires=[('translation.muimpl', 'zebu')],
+                   default=False, cmdline="--mu-zebu-testjit"),
+        StrOption("vmargs", "MuVM option string",
+                  default='', cmdline="--mu-vmargs"),
+    ]),
 ])
+
 
 def get_combined_translation_config(other_optdescr=None,
                                     existing_config=None,

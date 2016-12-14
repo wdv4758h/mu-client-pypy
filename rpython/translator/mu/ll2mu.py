@@ -3,7 +3,8 @@ from rpython.translator.mu import mutype, layout
 from rpython.rtyper.normalizecalls import TotalOrderSymbolic
 from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
-from rpython.rlib import rarithmetic, rmu
+from rpython.rlib import rarithmetic
+from rpython.rlib.rmu import holstein as rmu
 from rpython.flowspace.model import Variable, Constant, SpaceOperation, Link
 from rpython.translator.c.node import needs_gcheader
 from random import randint
@@ -706,9 +707,9 @@ class LL2MuMapper:
 
             # sz = fix + itm * n
             v = varof(mutype.MU_INT64)
-            ops.extend(self.map_op(SpaceOperation('int_mul', [Constant(itm, mutype.MU_INT64), n_c], v)))
+            ops.extend(self.map_op(SpaceOperation('int_mul', [Constant(mutype.mu_int64(itm), mutype.MU_INT64), n_c], v)))
             sz = varof(mutype.MU_INT64, 'sz')
-            ops.extend(self.map_op(SpaceOperation('int_add', [Constant(fix, mutype.MU_INT64), v], sz)))
+            ops.extend(self.map_op(SpaceOperation('int_add', [Constant(mutype.mu_int64(fix), mutype.MU_INT64), v], sz)))
             ops.extend(self.map_op(SpaceOperation('raw_malloc', [sz], llop.result)))
 
         if 'length' in MuT._names:
@@ -1179,7 +1180,7 @@ class LL2MuMapper:
     def set_threadlocal_struct_type(self, TYPE):
         self.TLStt = TYPE
 
-    def map_op_threadlocalref_get(self, llop):
+    def map_op_threadlocalref_load(self, llop):
         ops = []
 
         tlref_void = varof(mutype.MuRef(mutype.MU_VOID))
@@ -1191,7 +1192,7 @@ class LL2MuMapper:
         ops.extend(self.map_op(SpaceOperation('getfield', [tlref_stt, Constant(fld, mutype.MU_VOID)], llop.result)))
         return ops
 
-    def map_op_threadlocalref_set(self, llop):
+    def map_op_threadlocalref_store(self, llop):
         ops = []
 
         tlref_void = varof(mutype.MuRef(mutype.MU_VOID))
@@ -1202,6 +1203,9 @@ class LL2MuMapper:
         fld = llop.args[0].value.expr[10:]
         ops.extend(self.map_op(SpaceOperation('setfield', [tlref_stt, Constant(fld, mutype.MU_VOID), llop.args[1]], llop.result)))
         return ops
+
+    map_op_threadlocalref_get = map_op_threadlocalref_load
+    map_op_threadlocalref_set = map_op_threadlocalref_store
 
     def map_op_mu_threadlocalref_init(self, llop):
         ops = []

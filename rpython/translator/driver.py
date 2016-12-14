@@ -552,15 +552,23 @@ class TranslationDriver(SimpleTaskEngine):
 
     @taskdef(["mutype_mu"], "Mu backend optimisations.")
     def task_optimise_mu(self):
-        raise NotImplementedError
+        pass
 
     @taskdef(["optimise_mu"], "Collect global defs into a database.")
     def task_database_mu(self):
-        raise NotImplementedError
+        from rpython.translator.mu.database import MuDatabase
+        self.mu_db = MuDatabase(self.translator)
+        self.mu_db.build_database()
 
     @taskdef(["database_mu"], "MuIR Code Generation")
     def task_compile_mu(self):
-        raise NotImplementedError
+        from rpython.translator.mu.genmu import MuBundleGen
+        self.mu_bdlgen = MuBundleGen(self.mu_db)
+        if self.standalone:
+            target_name = self.compute_exe_name()
+            return self.mu_bdlgen.gen_boot_image(target_name)
+        else:
+            return self.mu_bdlgen.build_and_load_bundle()
 
     def proceed(self, goals):
         if not goals:
