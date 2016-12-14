@@ -3,7 +3,7 @@ from rpython.rtyper.lltypesystem import rffi, lltype
 from rpython.translator.interactive import Translation
 from rpython.rlib import rposix
 from rpython.translator.mu import mutype
-from rpython.translator.mu.database import MuDatabase
+from rpython.translator.mu.database import MuDatabase, MuNameManager
 
 from rpython.translator.mu.test.test_mutyper import graph_of
 
@@ -143,3 +143,41 @@ def test_extern_funcs_post_include_bits():
 
     assert fnp._name.startswith('pypy_macro_wrapper')   # rotateLeft should be wrapped as a 'macro' (rely on inlining)
     assert exported_symbol_in_dylib(fnp._name, eci.libraries[-1])
+
+
+def test_get_type_name():
+    man = MuNameManager()
+    assert man.get_type_name(mutype.MU_INT64) == '@i64'
+    assert man.get_type_name(mutype.MU_VOID) == '@void'
+    assert man.get_type_name(mutype.MuFuncSig(
+        [mutype.MU_INT64, mutype.MuArray(mutype.MU_INT8, 10)], [])) == '@sig_i64arr0_'
+    Point = mutype.MuStruct('Point', ('x', mutype.MU_INT64), ('y', mutype.MU_INT64))
+    assert man.get_type_name(mutype.MuUPtr(Point)) == '@ptrstt0'
+
+
+def test_get_const_name():
+    man = MuNameManager()
+    assert man.get_const_name(Constant(mutype.mu_int64(10), mutype.MU_INT64)) == '@0xa_i64'
+    assert man.get_const_name(Constant(mutype.mu_double(float('nan')), mutype.MU_DOUBLE)) == '@0x7ff8000000000000_dbl'
+
+
+def test_assign_mu_name():
+    def fac(n):
+        if n <= 1:
+            return 1
+        return n * fac(n - 1)
+    t = Translation(fac, [int], backend='mu')
+    t.mutype()
+
+    db = MuDatabase(t.context)
+    db.collect_global_defs()
+    db.assign_mu_name()
+
+    names = db.mu_name_map.values()
+    assert '@0x1_i64' in names
+    assert '@i64' in names
+    assert '@sig_i64_i64' in names
+    assert '@fnrsig_i64_i64' in names
+    assert '@fac_0' in names
+    assert '@fac_0.blk0' in names
+    assert '@fac_0.blk0.n_0' in names

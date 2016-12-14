@@ -22,6 +22,7 @@ class MuDatabase:
         self.extern_fncs = set()
         self.objtracer = None
         self.libsupport_path = None
+        self.mu_name_map = {}
 
     def build_database(self):
         """
@@ -43,6 +44,7 @@ class MuDatabase:
         """
         self.collect_global_defs()
         self.compile_pypy_c_extern_funcs()
+        self.assign_mu_name()
 
     def collect_global_defs(self):
         # collect global definitions in graphs
@@ -86,6 +88,8 @@ class MuDatabase:
             self.consts.add(c)
         elif isinstance(c.concretetype, mutype.MuGlobalCell):
             self.gcells.add(c)
+        elif isinstance(c.concretetype, mutype.MuReferenceType) and c.value._is_null():
+            self.consts.add(c)
         elif isinstance(c.concretetype, mutype.MuUFuncPtr):
             self.extern_fncs.add(c)
         elif isinstance(c.concretetype, mutype.MuFuncRef):
@@ -182,6 +186,37 @@ class MuDatabase:
         self.libsupport_path = py.path.local(eci.libraries[-1])
         return eci
 
+    def assign_mu_name(self):
+        man = MuNameManager()
+        # types
+        for T in self.types:
+            self.mu_name_map[T] = man.assign(T)
+
+        # constants
+        for c in self.consts:
+            self.mu_name_map[c] = man.assign(c)
+
+        for c in self.extern_fncs:
+            self.mu_name_map[c] = '@extfnc_' + c.value._name
+
+        # global cells
+        for c in self.gcells:
+            self.mu_name_map[c] = man.assign(c)
+
+        # graphs
+        for g in self.tlc.graphs:
+            graph_name = '@' + g.name
+            self.mu_name_map[g] = graph_name
+            for i, blk in enumerate(g.iterblocks()):
+                blk_name = '%(graph_name)s.blk%(i)d' % locals()
+                self.mu_name_map[blk] = blk_name
+
+                for v in blk.inputargs:
+                    self.mu_name_map[v] = '%(blk_name)s.%(v)s' % locals()
+                for op in blk.operations:
+                    res = op.result
+                    self.mu_name_map[res] = '%(blk_name)s.%(res)s' % locals()
+
 
 class HeapObjectTracer:
     def __init__(self):
@@ -223,3 +258,84 @@ class HeapObjectTracer:
 
     def types_in_heap(self):
         return self.types
+
+
+class MuNameManager:
+    def __init__(self):
+        self.name_map = {
+            mutype.MU_FLOAT: '@flt',
+            mutype.MU_DOUBLE: '@dbl',
+            mutype.MU_VOID: '@void',
+        }
+        self._counter = {
+            'stt': 0,
+            'hyb': 0,
+            'arr': 0,
+            'gcl': 0,
+        }
+
+    def assign(self, obj):
+        if isinstance(obj, mutype.MuType):
+            return self.get_type_name(obj)
+        if isinstance(obj, Constant):
+            return self.get_const_name(obj)
+
+    def get_type_name(self, MuT):
+        if MuT in self.name_map:
+            return self.name_map[MuT]
+
+        if isinstance(MuT, mutype.MuIntType):
+            name = 'i%d' % MuT.BITS
+
+        if isinstance(MuT, mutype.MuStruct):
+            name = 'stt%d' % self._counter['stt']
+            self._counter['stt'] += 1
+
+        if isinstance(MuT, mutype.MuHybrid):
+            name = 'hyb%d' % self._counter['hyb']
+            self._counter['hyb'] += 1
+
+        if isinstance(MuT, mutype.MuArray):
+            name = 'arr%d' % self._counter['arr']
+            self._counter['arr'] += 1
+
+        if isinstance(MuT, mutype.MuReferenceType):
+            prefix_map = {
+                mutype.MuRef: 'ref',
+                mutype.MuIRef: 'irf',
+                mutype.MuUPtr: 'ptr',
+                mutype.MuWeakRef: 'wrf',
+                mutype.MuFuncRef: 'fnr',
+                mutype.MuUFuncPtr: 'fnp',
+                mutype.MuOpaqueRef: 'opqr'
+            }
+            prefix = prefix_map[type(MuT)]
+            if isinstance(MuT, mutype.MuObjectRef):
+                refnt = self.get_type_name(MuT.TO)[1:]
+                name = prefix + refnt
+            elif isinstance(MuT, mutype.MuGeneralFunctionReference):
+                sig = self.get_type_name(MuT.Sig)[1:]
+                name = prefix + sig
+            elif isinstance(MuT, mutype.MuOpaqueRef):
+                name = prefix + MuT.obj_name
+
+        if isinstance(MuT, mutype.MuFuncSig):
+            name = 'sig_%(args)s_%(rets)s' % {
+                'args': ''.join([self.get_type_name(T)[1:] for T in MuT.ARGS]),
+                'rets': ''.join([self.get_type_name(T)[1:] for T in MuT.RESULTS])
+            }
+
+        name = '@' + name
+        self.name_map[MuT] = name
+        return name
+
+    def get_const_name(self, const):
+        if isinstance(const.concretetype, mutype.MuGlobalCell):
+            name = 'gcl%d' % self._counter['gcl']
+            self._counter['gcl'] += 1
+        elif isinstance(const.concretetype, mutype.MuReferenceType) and const.value._is_null():
+            name = 'NULL_%s' % self.get_type_name(const.concretetype)
+        elif isinstance(const.concretetype, mutype.MuNumber):
+            name = '%(hex)s_%(type)s' % {'hex': mutype.hex_repr(const.value),
+                                         'type': self.get_type_name(const.concretetype)[1:]}
+        return '@' + name
