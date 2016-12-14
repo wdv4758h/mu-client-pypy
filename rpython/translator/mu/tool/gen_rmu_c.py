@@ -270,7 +270,10 @@ def _oogen_method(opts, sttname, mtd, fp):
     arrs = []
     for prm in rpy_params:
         if prm['rpy_type'] == 'str':
-            fp.write(cur_idt + '%(name)s_cstr = CStr(%(name)s) if %(name)s else NULL\n' % prm)
+            if mtd['name'] == 'compile_to_sharedlib':
+                fp.write(cur_idt + '%(name)s_cstr = CLibNameConst(CStr(%(name)s))\n' % prm)
+            else:
+                fp.write(cur_idt + '%(name)s_cstr = CStr(%(name)s) if %(name)s else NULL\n' % prm)
             c2rpy_param_map[prm['name']] = prm['name'] + '_cstr'
             sz_param_name = prm.get('array_sz_param', None)
             if sz_param_name:
@@ -293,10 +296,14 @@ def _oogen_method(opts, sttname, mtd, fp):
             fp.write(cur_idt +
                      '%(name)s_bool = \'true\' if %(name)s else \'false\'\n' % prm)
             c2rpy_param_map[prm['name']] = prm['name'] + '_bool'
+        elif prm['rpy_type'] == 'int':
+            fp.write(cur_idt +
+                     '%(name)s_int = CIntConst(%(name)s, \'%(type)s\')\n' % prm)
+            c2rpy_param_map[prm['name']] = prm['name'] + '_int'
         elif prm['rpy_type'] == 'float':    # float needs to be preserved over string
             fp.write(cur_idt +
-                     '%(name)s_fltstr = \'%%.20f\' %% %(name)s\n' % prm)
-            c2rpy_param_map[prm['name']] = prm['name'] + '_fltstr'
+                     '%(name)s_cflt = CFloatConst(%(name)s, \'%(type)s\')\n' % prm)
+            c2rpy_param_map[prm['name']] = prm['name'] + '_cflt'
 
     if mtd['ret_rpy_type'] != 'None':
         basename = _ctype2basename.get(mtd['ret_rpy_type'], 'var')
@@ -364,9 +371,9 @@ def gen_oowrapper(opts, db, fp):
     else:
         init_funcs = {
             'MuVM':
-                ("    def __init__(self):\n"
+                ("    def __init__(self, config_str=\"\"):\n"
                  "        self._mu = CVar('MuVM*', 'mu')\n"
-                 "        _apilog.logcall('mu_fastimpl_new', [], self._mu)\n"
+                 "        _apilog.logcall('mu_fastimpl_new_with_opts', [CStr('init_mu ' + config_str)], self._mu)\n"
                  "\n"),
             'MuCtx':
                 ("    def __init__(self, ctx_var):\n"
@@ -389,12 +396,45 @@ def gen_oowrapper(opts, db, fp):
 
 # ------------------------------------------------------------
 def gen_extras(db, fp):
+    pkfmt = {
+        ''
+    }
     fp.write(
 """\
 # -------------------------------------------------------------------------------------------------------
 # Helpers
 def null(rmu_t):
     return NULL
+
+
+def ftohstr(flt, c_type):
+    import struct
+    fmt = 'd' if c_type == 'double' else 'f'
+    pkstr = struct.pack('!'+fmt, flt)
+    hexstr = '0x' + ''.join(['%02x' % ord(b) for b in pkstr])
+    return hexstr + 'ull'
+
+def itohstr(i, c_type):
+    import struct
+    fmt_dic = {
+        'int8_t': 'b',
+        'uint8_t': 'B',
+        'int16_t': 'h',
+        'uint16_t': 'H',
+        'int32_t': 'i',
+        'uint32_t': 'I',
+        'int': 'i',
+        'int64_t': 'q',
+        'uint64_t': 'Q'
+    }
+    fmt = fmt_dic[c_type]
+    try:
+        i_str = '0x' + ''.join(['%02x' % ord(b) for b in struct.pack('!' + fmt, i)])
+    except Exception:
+        fmt = fmt.upper() if fmt.islower() else fmt.lower()
+        i_str = '0x' + ''.join(['%02x' % ord(b) for b in struct.pack('!' + fmt, i)])
+    return i_str + 'ull'
+
 
 def lst2arr(c_elm_t, lst):
     sz = len(lst)
@@ -466,10 +506,40 @@ class CArrayConst(object):
         self.lst = lst
 
     def __str__(self):
-        return '({type}){value}'.format(type='%s [%d]' % (self.c_elm_t, len(self.lst)),
-                                        value='{%s}' % ', '.join(map(str, self.lst)))
+        if self.c_elm_t == 'MuCString':
+            return '({type}){value}'.format(type='char*[]',
+                                            value='{%s}' % ', '.join(map(lambda s: "&%s" % CStr(s), self.lst)))
+        else:
+            return '({type}){value}'.format(type='%s [%d]' % (self.c_elm_t, len(self.lst)),
+                                            value='{%s}' % ', '.join(map(str, self.lst)))
 
     __repr__ = __str__
+
+class CFloatConst(object):
+    def __init__(self, flt, ctype_str):
+        self.flt = flt
+        self.c_type = ctype_str
+
+    def __str__(self):
+        c_flt_t = self.c_type
+        c_int_t = 'uint64_t' if c_flt_t == 'double' else 'uint32_t'
+        repr_str = ftohstr(self.flt, self.c_type)
+        return '*(%(c_flt_t)s*)(%(c_int_t)s [1]){%(repr_str)s}' % locals()
+
+class CIntConst(object):
+    def __init__(self, i, ctype_str):
+        self.i = i
+        self.c_type = ctype_str
+
+    def __str__(self):
+        return itohstr(self.i, self.c_type)
+
+class CLibNameConst(object):
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return "LIB_FILE_NAME(%s)" % self.name
 
 class CVar(object):
     __slots__ = ('type', 'name')
@@ -497,6 +567,9 @@ class CVar(object):
     def __str__(self):
         return self.name
 
+    def decl(self):
+        return '%s %s;' % (self.type, self.name)
+
     __repr__ = __str__
 """
     )
@@ -512,12 +585,16 @@ class APILogger:
         self.ccalls.append(CCall(fnc_name, args, rtn_var, context, check_err))
         if rtn_var:
             self.decl_vars.append(rtn_var)
+
+    def clear(self):
+        APILogger.__init__(self)
+
     def genc(self, fp, exitcode=0):
         fp.write('\\n'
-                 '// Compile with flag -std=c99\\n'
                  '#include <stdio.h>\\n'
                  '#include <stdlib.h>\\n'
                  '#include <stdbool.h>\\n'
+                 '#include <stdint.h>\\n'
                  '#include "muapi.h"\\n'
                  '#include "refimpl2-start.h"\\n')
         fp.write('''
@@ -532,7 +609,7 @@ class APILogger:
         fp.write('int main(int argc, char** argv) {\\n')
         idt = ' ' * 4
         for var in self.decl_vars:
-            fp.write(idt + '%s %s;\\n' % (var.type, var.name))
+            fp.write(idt + var.decl() + '\\n')
 
         for ccall in self.ccalls:
             fp.write(idt + '%(ccall)s\\n' % locals())
@@ -543,10 +620,23 @@ class APILogger:
     else:
         fp.write(
 """\
+
+class CFuncPtr(CVar):
+    def __init__(self, arg_ts, ret_t, var_name):
+        self.arg_ts = arg_ts
+        self.ret_t = ret_t
+        self.name = var_name
+
+    def decl(self):
+        return '%s (*%s) (%s);' % (self.ret_t, self.name, ', '.join(self.arg_ts))
+
 class APILogger:
     def __init__(self):
         self.ccalls = []
         self.decl_vars = []
+
+    def clear(self):
+        APILogger.__init__(self)
 
     def logcall(self, fnc_name, args, rtn_var, context=None):
         self.ccalls.append(CCall(fnc_name, args, rtn_var, context, False))
@@ -554,17 +644,25 @@ class APILogger:
             self.decl_vars.append(rtn_var)
     def genc(self, fp, exitcode=0):
         fp.write('\\n'
-                 '// Compile with flag -std=c99\\n'
                  '#include <stdio.h>\\n'
                  '#include <stdlib.h>\\n'
                  '#include <stdbool.h>\\n'
+                 '#include <dlfcn.h>\\n'
                  '#include "muapi.h"\\n'
-                 '#include "mu-fastimpl.h"\\n')
+                 '#include "mu-fastimpl.h"\\n'
+                 '#ifdef __APPLE__\\n'
+                 '    #define LIB_EXT ".dylib"\\n'
+                 '#elif __linux__\\n'
+                 '    #define LIB_EXT ".so"\\n'
+                 '#elif _WIN32\\n'
+                 '    #define LIB_EXT ".dll"\\n'
+                 '#endif\\n'
+                 '#define LIB_FILE_NAME(name) "lib" name LIB_EXT\\n')
 
         fp.write('int main(int argc, char** argv) {\\n')
         idt = ' ' * 4
         for var in self.decl_vars:
-            fp.write(idt + '%s %s;\\n' % (var.type, var.name))
+                fp.write(idt + var.decl() + '\\n')
 
         for ccall in self.ccalls:
             fp.write(idt + '%(ccall)s\\n' % locals())
