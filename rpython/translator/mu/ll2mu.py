@@ -132,14 +132,6 @@ class LL2MuMapper:
         if LLT._is_varsize():
             return self.map_type_varstt(LLT)
 
-        if __name__ == '__main__':
-            if len(LLT._names) == 0:    # empty struct
-                # Mu does not support empty struct
-                # From the spec:
-                #   In Mu, if it is desired to allocate an empty unit in the heap,
-                #   the appropriate type is `void`
-                return mutype.MU_VOID
-
         flds = []
         if needs_gcheader(LLT):
             flds.append(LL2MuMapper.GC_IDHASH_FIELD)
@@ -148,6 +140,13 @@ class LL2MuMapper:
             MuT = self.map_type(LLT._flds[n])
             if MuT is not mutype.MU_VOID:
                 flds.append((n, MuT))
+
+        if len(flds) == 0:  # empty struct
+            # Mu does not support empty struct
+            # From the spec:
+            #   In Mu, if it is desired to allocate an empty unit in the heap,
+            #   the appropriate type is `void`
+            return mutype.MU_VOID
 
         name = self._new_typename(LLT._name)
         return mutype.MuStruct(name, *flds)
@@ -373,7 +372,7 @@ class LL2MuMapper:
         LLT = lltype.typeOf(llv)
         MuT = self.map_type(LLT)
 
-        if llv._TYPE.OF is lltype.Void:
+        if llv._TYPE.OF == lltype.Void:
             stt = mutype._mustruct(MuT)
             stt.length = self.map_value(llv.getlength())
             return stt
@@ -396,7 +395,7 @@ class LL2MuMapper:
         if isinstance(LLT.TO, lltype.FuncType):
             return self.map_value_funcptr(llv)
 
-        if MuT.TO is mutype.MU_VOID:
+        if MuT.TO == mutype.MU_VOID:
             muv = MuT._null()
             log.warning("Translating LL value '%(llv)r' to '%(muv)r'" % locals())
             return muv
@@ -459,7 +458,7 @@ class LL2MuMapper:
         return MuT._val_type(rec(llv))
 
     def map_value_opq(self, llv):
-        if llv._TYPE is lltype.RuntimeTypeInfo:
+        if llv._TYPE == lltype.RuntimeTypeInfo:
             # Since rtti is of char type in C, we use mu_int8 here as well, with an initialised 0 value
             return mutype.mu_int8(randint(0, 0xff))
 
@@ -550,9 +549,9 @@ class LL2MuMapper:
     def map_op_indirect_call(self, llop):
         last = llop.args[-1]
         if isinstance(last, Constant) and isinstance(last.value, list):
-            args = llop.args[:-1]
+            args = llop.args[1:-1]
         else:
-            args = llop.args
+            args = llop.args[1:]
         return [self.gen_mu_call(llop.args[0], args, llop.result)]
 
     # ----------------
@@ -1143,7 +1142,7 @@ class LL2MuMapper:
                 addr = llmemory.cast_ptr_to_adr(obj)
                 addr_int = llmemory.cast_adr_to_int(addr)
                 h = addr_int
-                llop.mu_setgcidhash(lltype.Void, obj)
+                llop.mu_setgcidhash(lltype.Void, obj, h)
                 keepalive_until_here(obj)
             return h
 

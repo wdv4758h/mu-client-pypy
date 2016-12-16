@@ -232,6 +232,24 @@ class MuForwardReference(MuContainerType):
 _setup_consistent_methods(MuForwardReference)
 
 
+class _muparentable(lltype._parentable):
+    def _normalizedcontainer(self, check=True):
+        # if we are the first inlined substructure of a structure,
+        # return the whole (larger) structure instead
+        container = self
+        while True:
+            parent = container._parentstructure(check=check)
+            if parent is None:
+                break
+            index = container._parent_index
+            T = mutypeOf(parent)
+            if (not isinstance(T, MuStruct) or T._first_struct()[0] != index
+                or isinstance(T, MuArray)):
+                break
+            container = parent
+        return container
+
+
 class MuStruct(MuContainerType):
     _template = (lltype.Struct, (
         '_nofield',
@@ -265,6 +283,9 @@ class MuStruct(MuContainerType):
         self._names = tuple(names)
 
         self._install_extras(**kwds)
+
+    def _field_types(self):
+        return tuple(self._flds[name] for name in self._names)
 
     def _is_varsize(self):
         return False    # struct in Mu is always fixed size
@@ -302,7 +323,7 @@ class MuStruct(MuContainerType):
 _setup_consistent_methods(MuStruct)
 
 
-class _mustruct(lltype._parentable):
+class _mustruct(_muparentable):
     _kind = "structure"
     _template = (lltype._struct, (
         '__repr__',
@@ -332,7 +353,7 @@ class _mustruct(lltype._parentable):
         return object.__new__(variety)
 
     def __init__(self, TYPE, parent=None, parentindex=None):
-        lltype._parentable.__init__(self, TYPE)
+        _muparentable.__init__(self, TYPE)
         for fld, typ in TYPE._flds.items():
             value = typ._allocate(parent=self, parentindex=fld)
             setattr(self, fld, value)
@@ -384,7 +405,7 @@ class _MuMemArray(MuContainerType):
 _setup_consistent_methods(_MuMemArray)
 
 
-class _mumemarray(lltype._parentable):
+class _mumemarray(_muparentable):
     __slots__ = ('items',)
 
     _template = (lltype._array, (
@@ -402,7 +423,7 @@ class _mumemarray(lltype._parentable):
             raise TypeError("array length must be an int")
         if n < 0:
             raise ValueError("negative array length")
-        lltype._parentable.__init__(self, TYPE)
+        _muparentable.__init__(self, TYPE)
         myrange = self._check_range(n)
         self.items = [TYPE.OF._allocate(parent=self, parentindex=j)
                       for j in myrange]
@@ -481,6 +502,12 @@ class MuHybrid(MuContainerType):
 
         self._install_extras(**kwds)
 
+    def _fixed_field_types(self):
+        return tuple(self._flds[name] for name in self._names[:-1])
+
+    def _var_field_type(self):
+        return self._vartype.OF
+
     def _is_varsize(self):
         return True  # hybrid in Mu is always fixed size
 
@@ -502,7 +529,7 @@ class MuHybrid(MuContainerType):
 _setup_consistent_methods(MuHybrid)
 
 
-class _muhybrid(lltype._parentable):
+class _muhybrid(_muparentable):
     _kind = "hybrid"
     _template = (lltype._struct, (
         '__repr__',
@@ -531,7 +558,7 @@ class _muhybrid(lltype._parentable):
         return object.__new__(variety)
 
     def __init__(self, TYPE, n, parent=None, parentindex=None):
-        lltype._parentable.__init__(self, TYPE)
+        _muparentable.__init__(self, TYPE)
         for fld, typ in TYPE._flds.items():
             if fld == TYPE._varfld:
                 value = _mumemarray(typ, n, parent=self, parentindex=fld)
@@ -572,7 +599,7 @@ class MuArray(MuContainerType):
 _setup_consistent_methods(MuArray)
 
 
-class _muarray(lltype._parentable):
+class _muarray(_muparentable):
     _template = (lltype._fixedsizearray, (
         'getlength',
         'getbounds',
@@ -581,7 +608,7 @@ class _muarray(lltype._parentable):
     ))
 
     def __init__(self, TYPE, parent=None, parentindex=None):
-        lltype._parentable.__init__(self, TYPE)
+        _muparentable.__init__(self, TYPE)
 
         typ = TYPE.OF
         storage = []

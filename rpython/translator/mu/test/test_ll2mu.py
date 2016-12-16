@@ -506,3 +506,17 @@ def test_force_cast():
     assert [op.opname for op in muops] == ['mu_convop']
 
     # TODO: test more cases for force_cast? Maybe it will be easier with a graph interpreter
+
+
+def test_empty_struct():
+    EMPTY = lltype.Struct("pbc", hints={'immutable': True})
+    ptr_empty = lltype.malloc(EMPTY, immortal=True)
+
+    ll2mu = LL2MuMapper()
+    MuT = ll2mu.map_type(lltype.typeOf(ptr_empty))
+    ll2mu.resolve_ptr_types()
+    assert MuT == mutype.MuUPtr(mutype.MU_VOID)
+
+    muv = ll2mu.map_value(ptr_empty)
+    assert muv._is_null()
+    assert len(ll2mu._pending_ptr_values) == 0

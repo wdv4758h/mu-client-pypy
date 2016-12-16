@@ -72,6 +72,15 @@ def test_containers():
     assert a[0].x == mu_int64(0)
 
 
+def test_normalizedcontainer():
+    A = MuStruct("A", ('x', MU_INT64))
+    B = MuStruct("B", ('super', A), ('y', MU_INT64))
+    b = new(B)._obj
+    a = b.super
+    assert a._parentstructure() is b
+    assert a._normalizedcontainer() is b
+
+
 def test_mutypeOf():
     x = mu_int64(10)
     assert mutypeOf(x) is MU_INT64

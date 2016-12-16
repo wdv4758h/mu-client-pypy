@@ -15,7 +15,6 @@ class MuTyper:
         self.tlc = tlc
         self.ll2mu = LL2MuMapper(tlc.rtyper)
         self._objrefid2gcl_dic = {}
-        self.init_threadlocal_struct_type()
 
     def init_threadlocal_struct_type(self):
         # determine thread local struct type
