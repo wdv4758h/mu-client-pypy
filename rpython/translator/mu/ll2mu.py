@@ -300,6 +300,7 @@ class LL2MuMapper:
         topstt = llv._normalizedcontainer()
         if building:
             MuT = self.map_type(LLT)
+            self.resolve_ptr_types()
             stt = mutype._mustruct(MuT)
             self._val_cache[(LLT, llv)] = stt
 
@@ -662,7 +663,15 @@ class LL2MuMapper:
         return [self.gen_mu_binop('MUL', llop.args[0], llop.args[1], llop.result, flag, [flag_v])]
 
     def _map_binop(self, llop):
-        return [self.gen_mu_binop(_binop_map[llop.opname], llop.args[0], llop.args[1], llop.result)]
+        optr = _binop_map[llop.opname]
+        if optr in ('SHL', 'LSHR', 'ASHR') and llop.args[1].concretetype != llop.args[0].concretetype:
+            # type mismatch, force_cast the second one
+            res = varof(llop.args[0].concretetype)
+            ops = self.map_op(SpaceOperation('force_cast', [llop.args[1]], res))
+            ops.append(self.gen_mu_binop(optr, llop.args[0], res, llop.result))
+        else:
+            ops = [self.gen_mu_binop(optr, llop.args[0], llop.args[1], llop.result)]
+        return ops
 
     def _map_cmpop(self, llop):
         muops = []
@@ -1077,7 +1086,14 @@ class LL2MuMapper:
 
         elif isinstance(SRC, mutype.MuIntType) and isinstance(RES, mutype.MuIntType):
             if SRC.BITS < RES.BITS:
-                optr = 'ZEXT' if llop.args[0].annotation.unsigned else 'SEXT'
+                if hasattr(llop, '_src_llt'):
+                    SRC_LLT = llop._src_llt
+                    is_signed = SRC_LLT == lltype.Signed or SRC_LLT._type.SIGNED
+                else:
+                    # this means llop did not come from mutyper => generated from ll2mu
+                    # of all the cases, we are casting unsigned integers in this module.
+                    is_signed = False
+                optr = 'SEXT' if is_signed else 'ZEXT'
             else:
                 optr = 'TRUNC'
             return [self.gen_mu_convop(optr, RES, llop.args[0], llop.result)]

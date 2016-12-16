@@ -242,3 +242,26 @@ def test_duplicate_heap_const():
     assert gcl_1 == gcl_2
     assert hash(gcl_1) == hash(gcl_2)
     assert gcl_1.value is gcl_2.value   # gurantee the global cells are the same
+
+
+def test_force_cast_constant_signedness_problem():
+    from rpython.rlib.rbigint import _widen_digit
+    def f():
+        return _widen_digit(0)
+
+    t = Translation(f, [], backend='mu')
+    t.rtype()
+    t.backendopt(remove_asserts=True, really_remove_asserts=True)
+    mutyper = MuTyper(t.context)
+    graph_f = graph_of(f, t)
+
+    graph_f.view()
+
+    llop = graph_f.startblock.operations[0]
+    assert llop.args[0].concretetype == lltype.Signed
+    assert llop.result.concretetype == lltype.SignedLongLongLong
+    muop = mutyper.specialise_operation(llop)[0]
+    # the problem here is that when translating Constants, I throw out the original lltype
+    # thus loosing signedness information.
+    # Current walk-around is annotating the force_cast operation with original types.
+    assert muop.args[0].value == 'SEXT'

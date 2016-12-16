@@ -144,6 +144,11 @@ class MuTyper:
             """ Keep some operations to be informative for mu graph interpreter """
             return llop.opname.startswith('debug_') or llop.opname.startswith('mu_')   # keep all the debug ops
 
+        if llop.opname == 'force_cast':
+            # HACK: save original arg and result types to discern signedness.
+            llop._src_llt = llop.args[0].concretetype
+            llop._res_llt = llop.result.concretetype
+
         llop.args = [self.specialise_arg(arg) for arg in llop.args]
         llop.result = self.specialise_arg(llop.result)
 

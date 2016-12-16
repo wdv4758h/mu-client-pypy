@@ -520,3 +520,10 @@ def test_empty_struct():
     muv = ll2mu.map_value(ptr_empty)
     assert muv._is_null()
     assert len(ll2mu._pending_ptr_values) == 0
+
+
+def test_shl_type_mismatch():
+    ll2mu = LL2MuMapper()
+    muops = ll2mu.map_op(SpaceOperation('lllong_lshift', [varof(mutype.MU_INT128), varof(mutype.MU_INT64)], varof(mutype.MU_INT128)))
+    # not raising assertion error from type checking
+    assert [op.opname for op in muops] == ['mu_convop', 'mu_binop']     # cast first
