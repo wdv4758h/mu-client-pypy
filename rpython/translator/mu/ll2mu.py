@@ -1049,7 +1049,7 @@ class LL2MuMapper:
         llop.opname = 'raw_free'
         return self.map_op_raw_free(llop)
 
-    def map_op_memclear(self, llop):
+    def map_op_raw_memclear(self, llop):
         llop.__init__('raw_memset', [llop.args[0], Constant(mutype.mu_int8(0), mutype.MU_INT8), llop.args[1]], llop.result)
         return self._map_rawmemop(llop)
 

@@ -45,6 +45,7 @@ class MuTyper:
         self.tlc.graphs = self.graphs = processed
 
     def specialise_graph(self, g):
+        g.sig = mutype.MuFuncSig([self.ll2mu.map_type(arg_t) for arg_t in g.sig[0]], [self.ll2mu.map_type(g.sig[1])])
         for blk in g.iterblocks():
             self.specialise_block(blk)
 
@@ -309,7 +310,7 @@ def prepare(graphs, entry_graph):
     for g in graphs:
         rename(g)
 
-        for blk in g.iterblocks():
+        for blk in list(g.iterblocks()) + [g.returnblock]:  # force include return block, in case always throwing exceptions
             # Task 2: Remove Void args and parameters in inputargs, operations and links
             blk.inputargs = [arg for arg in blk.inputargs if arg.concretetype != lltype.Void]
             for lnk in blk.exits:
@@ -324,5 +325,9 @@ def prepare(graphs, entry_graph):
                     _v = Variable('dummy')
                     _v.concretetype = blk.inputargs[i].concretetype
                     blk.inputargs[i] = _v
+
+        ret_t = g.returnblock.inputargs[0].concretetype if len(g.returnblock.inputargs) == 1 else lltype.Void
+        arg_ts = map(lambda arg: arg.concretetype, g.startblock.inputargs)
+        g.sig = (arg_ts, ret_t)
 
     return graphs
