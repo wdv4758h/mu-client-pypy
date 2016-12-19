@@ -15,31 +15,6 @@ from rpython.tool.ansi_mandelbrot import Driver
 log = AnsiLogger("ll2mu")
 mdb = Driver()
 
-class IgnoredLLVal(NotImplementedError):
-    pass
-
-class IgnoredLLOp(NotImplementedError):
-    _llops = (
-        "hint",
-        "likely",
-        "debug_flush",
-        "debug_forked",
-        "debug_offset",
-        "debug_print",
-        "debug_start",
-        "debug_stop",
-        "gc_add_memory_pressure",
-        "gc_set_max_heap_size",
-        "gc_thread_after_fork",
-        "gc_writebarrier",
-        "gc_writebarrier_before_copy",
-        "gc_unpin",
-        "jit_conditional_call",
-        "jit_force_quasi_immutable",
-        "jit_force_virtual",
-        "jit_is_virtual",
-        "jit_marker",
-    )
 
 class LL2MuMapper:
     GC_IDHASH_FIELD = ('gc_idhash', mutype.MU_INT64)
@@ -273,8 +248,6 @@ class LL2MuMapper:
         if isinstance(llv, TotalOrderSymbolic):
             llv = llv.compute_fn()
         elif isinstance(llv, CDefinedIntSymbolic):
-            if llv.default == '?':
-                raise IgnoredLLVal
             llv = llv.default
         elif isinstance(llv, (str, unicode)):
             assert len(llv) == 1  # char
@@ -503,9 +476,6 @@ class LL2MuMapper:
         """
         if hasattr(self, 'map_op_' + llop.opname):
             return getattr(self, 'map_op_' + llop.opname)(llop)
-
-        elif llop.opname in IgnoredLLOp._llops:  # Making ignoring explicit
-            raise IgnoredLLOp(llop.opname)
 
         elif llop.opname in _binop_map:   # a binop
             if any(cmpop in llop.opname for cmpop in 'lt le eq ne ge gt'.split(' ')):
@@ -789,8 +759,8 @@ class LL2MuMapper:
         try:
             iref_fld, ops = self._getfieldiref(var, fldname_c)
         except AttributeError:
-            log.error("Field '%s' not found in type '%s'." % (fldname_c.value, var.concretetype.TO))
-            raise IgnoredLLOp
+            log.error("Field '%s' not found in type '%s'; ignoring %s." % (fldname_c.value, var.concretetype.TO, llop))
+            return []
 
         ops.append(self.gen_mu_load(iref_fld, llop.result))
         return ops
@@ -800,8 +770,9 @@ class LL2MuMapper:
         try:
             iref_fld, ops = self._getfieldiref(var, fldname_c)
         except AttributeError:
-            log.error("Field '%s' not found in type '%s'." % (fldname_c.value, var.concretetype.TO))
-            raise IgnoredLLOp
+            log.error("Field '%s' not found in type '%s'; ignoring %s." % (fldname_c.value, var.concretetype.TO, llop))
+            return []
+
         assert iref_fld.concretetype.TO == val_c.concretetype, \
             "cannot store value %s of type %s to %s" % (val_c.value, val_c.concretetype, iref_fld.concretetype)
 
@@ -813,8 +784,8 @@ class LL2MuMapper:
         try:
             iref_fld, ops = self._getfieldiref(var, fldname_c)
         except AttributeError:
-            log.error("Field '%s' not found in type '%s'." % (fldname_c.value, var.concretetype.TO))
-            raise IgnoredLLOp
+            log.error("Field '%s' not found in type '%s'; ignoring %s." % (fldname_c.value, var.concretetype.TO, llop))
+            return []
 
         if isinstance(iref_fld.concretetype.TO, (mutype.MuRef, mutype.MuUPtr)):
             ops.append(self.gen_mu_load(iref_fld, llop.result))
@@ -907,8 +878,9 @@ class LL2MuMapper:
         offsets = llop.args[1:]
         try:
             iref, ops = self._getinterioriref(var, offsets)
-        except AttributeError:
-            raise IgnoredLLOp
+        except AttributeError as e:
+            log.error("%s; ignoring %s." % (e.message, llop))
+            return []
 
         ops.append(self.gen_mu_load(iref, llop.result))
         return ops
@@ -919,8 +891,9 @@ class LL2MuMapper:
         val_vc = llop.args[-1]
         try:
             iref, ops = self._getinterioriref(var, offsets)
-        except AttributeError:
-            raise IgnoredLLOp
+        except AttributeError as e:
+            log.error("%s; ignoring %s." % (e.message, llop))
+            return []
 
         ops.append(self.gen_mu_store(iref, val_vc, llop.result))
         return ops

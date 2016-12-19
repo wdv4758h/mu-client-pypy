@@ -1,8 +1,8 @@
 from rpython.flowspace.model import Variable, Constant, c_last_exception
 from rpython.rtyper.lltypesystem import lltype, llmemory
 from rpython.translator.mu import mutype
-from rpython.translator.mu.ll2mu import LL2MuMapper, IgnoredLLOp, IgnoredLLVal, varof
-from rpython.rlib.rmu import holstein as rmu
+from rpython.translator.mu.ll2mu import LL2MuMapper, varof
+from rpython.rlib.objectmodel import CDefinedIntSymbolic
 from rpython.tool.ansi_mandelbrot import Driver
 from rpython.tool.ansi_print import AnsiLogger
 log = AnsiLogger("MuTyper")
@@ -45,7 +45,9 @@ class MuTyper:
         self.tlc.graphs = self.graphs = processed
 
     def specialise_graph(self, g):
-        g.sig = mutype.MuFuncSig([self.ll2mu.map_type(arg_t) for arg_t in g.sig[0]], [self.ll2mu.map_type(g.sig[1])])
+        ret_llt = g.returnblock.inputargs[0].concretetype if len(g.returnblock.inputargs) == 1 else lltype.Void
+        arg_llts = map(lambda arg: arg.concretetype, g.startblock.inputargs)
+        g.sig = mutype.MuFuncSig([self.ll2mu.map_type(arg_t) for arg_t in arg_llts], [self.ll2mu.map_type(ret_llt)])
         for blk in g.iterblocks():
             self.specialise_block(blk)
 
@@ -102,48 +104,68 @@ class MuTyper:
 
     def specialise_arg(self, arg):
         if isinstance(arg.concretetype, lltype.LowLevelType):   # has not been processed
+            LLT = arg.concretetype
             if isinstance(arg, Variable):
-                arg.concretetype = self.ll2mu.map_type(arg.concretetype)
+                arg.concretetype = self.ll2mu.map_type(LLT)
                 self.ll2mu.resolve_ptr_types()
             elif isinstance(arg, Constant):
-                if arg.concretetype is lltype.Void:
+                llv = arg.value
+                if LLT is lltype.Void:
                     if isinstance(arg.value, lltype.LowLevelType):  # a type constant
-                        arg.__init__(self.ll2mu.map_type(arg.value), mutype.MU_VOID)
+                        arg.__init__(self.ll2mu.map_type(llv), mutype.MU_VOID)
                         self.ll2mu.resolve_ptr_types()
                     else:   # for other non-translation constants, just keep the value
-                        arg.__init__(arg.value, mutype.MU_VOID)
+                        arg.__init__(llv, mutype.MU_VOID)
                 else:
-                    try:
-                        MuT = self.ll2mu.map_type(arg.concretetype)
-                        muv = self.ll2mu.map_value(arg.value)
-                        self.ll2mu.resolve_ptr_types()
-                        self.ll2mu.resolve_ptr_values()
+                    if isinstance(llv, CDefinedIntSymbolic) and llv.default == '?':
+                        return arg  # ignore it; it should be dealt with when translating ops
 
-                        if isinstance(muv, mutype._muufuncptr):
-                            MuT = mutype.mutypeOf(muv)
+                    MuT = self.ll2mu.map_type(LLT)
+                    muv = self.ll2mu.map_value(llv)
+                    self.ll2mu.resolve_ptr_types()
+                    self.ll2mu.resolve_ptr_values()
 
-                        assert mutype.mutypeOf(muv) == MuT
+                    if isinstance(muv, mutype._muufuncptr):
+                        MuT = mutype.mutypeOf(muv)
 
-                        if isinstance(muv, mutype._muobject_reference):
-                            GCl_T = mutype.MuGlobalCell(MuT)
-                            if id(muv) in self._objrefid2gcl_dic:
-                                gcl = self._objrefid2gcl_dic[id(muv)]
-                            else:
-                                gcl = mutype.new(GCl_T)
-                                gcl._store(muv)
-                                self._objrefid2gcl_dic[id(muv)] = gcl
-                            arg.__init__(gcl, GCl_T)
+                    assert mutype.mutypeOf(muv) == MuT
+
+                    if isinstance(muv, mutype._muobject_reference):
+                        GCl_T = mutype.MuGlobalCell(MuT)
+                        if id(muv) in self._objrefid2gcl_dic:
+                            gcl = self._objrefid2gcl_dic[id(muv)]
                         else:
-                            arg.__init__(muv, MuT)
-                    except IgnoredLLVal:
-                        pass
-
+                            gcl = mutype.new(GCl_T)
+                            gcl._store(muv)
+                            self._objrefid2gcl_dic[id(muv)] = gcl
+                        arg.__init__(gcl, GCl_T)
+                    else:
+                        arg.__init__(muv, MuT)
         return arg
 
     def specialise_operation(self, llop):
         def skip(llop):
-            """ Keep some operations to be informative for mu graph interpreter """
-            return llop.opname.startswith('debug_') or llop.opname.startswith('mu_')   # keep all the debug ops
+            return llop.opname in (
+                "hint",
+                "likely",
+                "debug_flush",
+                "debug_forked",
+                "debug_offset",
+                "debug_print",
+                "debug_start",
+                "debug_stop",
+                "gc_add_memory_pressure",
+                "gc_set_max_heap_size",
+                "gc_thread_after_fork",
+                "gc_writebarrier",
+                "gc_writebarrier_before_copy",
+                "gc_unpin",
+                "jit_conditional_call",
+                "jit_force_quasi_immutable",
+                "jit_force_virtual",
+                "jit_is_virtual",
+                "jit_marker",
+            ) or llop.opname.startswith('mu_')
 
         if llop.opname == 'force_cast':
             # HACK: save original arg and result types to discern signedness.
@@ -158,11 +180,7 @@ class MuTyper:
 
         muops = []
         muops.extend(self.extract_load_gcell(llop))
-        try:
-            muops.extend(self.ll2mu.map_op(llop))
-        except IgnoredLLOp:
-            log.specialise_operation('ignored operation %s' % llop)
-            return []
+        muops.extend(self.ll2mu.map_op(llop))
         return muops
 
     def extract_load_gcell(self, llop):
@@ -325,9 +343,5 @@ def prepare(graphs, entry_graph):
                     _v = Variable('dummy')
                     _v.concretetype = blk.inputargs[i].concretetype
                     blk.inputargs[i] = _v
-
-        ret_t = g.returnblock.inputargs[0].concretetype if len(g.returnblock.inputargs) == 1 else lltype.Void
-        arg_ts = map(lambda arg: arg.concretetype, g.startblock.inputargs)
-        g.sig = (arg_ts, ret_t)
 
     return graphs
