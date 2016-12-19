@@ -26,7 +26,7 @@ def test_collect_global_defs():
 
     assert len(db.types) == 9   # void, i1, i8, i64, ref<i64>, hyb, ref<hyb>, iref<hyb>, (i64) -> (i64)
     assert len(db.gcells) == 1
-    assert len(db.objtracer.objs) == 1
+    assert len(db.objtracer.heap_objs) == 1
 
 
 def test_object_tracer():
@@ -55,12 +55,13 @@ def test_object_tracer():
     db = MuDatabase(t.context)
     db.collect_global_defs()
 
-    assert len(db.objtracer.objs) == 6
+    assert len(db.objtracer.heap_objs) == 4
 
     # @ MuStruct rpython.translator.mu.test.test_database.Node { super, inst_nxt, inst_x }
     # MuStruct rpython.translator.mu.test.test_database.Node { super, inst_nxt, inst_x }
     # * MuStruct object_vtable { subclassrange_min, subclassrange_max, rtti, name, hash, instantiate }
     # MuStruct object_vtable { subclassrange_min, subclassrange_max, rtti, name, hash, instantiate }
+    # MuStruct rpython.translator.mu.test.test_database.Node_vtable { super }
     # MU_INT64
     # * MU_INT8
     # MU_INT8
@@ -68,9 +69,9 @@ def test_object_tracer():
     # MuHybrid rpy_string { gc_idhash, hash, length, chars }
     # FncRef(  ) -> ( @ MuStruct object { gc_idhash, typeptr } )
     # MuStruct object { gc_idhash, typeptr }
-    assert len(db.objtracer.types_in_heap()) == 11
+    assert len(db.objtracer.types_in_heap()) == 12
 
-    assert len(db.objtracer.uptrs) == 2    # object_vtable, rtti (MU_INT8)
+    assert len(db.objtracer.fixed_objs) == 2    # object_vtable, rtti (MU_INT8)
 
 
 def exported_symbol_in_dylib(sym_name, libpath):

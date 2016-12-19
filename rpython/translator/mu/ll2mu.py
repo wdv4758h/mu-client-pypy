@@ -191,7 +191,7 @@ class LL2MuMapper:
     def map_type_funcptr(self, LLT):
         LLFnc = LLT.TO
         ARG_TS = tuple(self.map_type(ARG) for ARG in LLFnc.ARGS if ARG != lltype.Void)
-        RTN_TS = (self.map_type(LLFnc.RESULT),)
+        RTN_TS = (self.map_type(LLFnc.RESULT),) if LLFnc.RESULT != lltype.Void else tuple()
         sig = mutype.MuFuncSig(ARG_TS, RTN_TS)
         return mutype.MuFuncRef(sig)
 
@@ -1360,7 +1360,10 @@ class LL2MuMapper:
         for i, arg in enumerate(args):
             assert arg.concretetype == Sig.ARGS[i]
         if res:
-            assert res.concretetype == Sig.RESULTS[0]
+            if res.concretetype == mutype.MU_VOID:
+                assert len(Sig.RESULTS) == 0
+            else:
+                assert res.concretetype == Sig.RESULTS[0]
 
         metainfo = {}
         if keepalive:

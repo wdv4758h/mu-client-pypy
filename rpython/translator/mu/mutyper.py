@@ -47,7 +47,8 @@ class MuTyper:
     def specialise_graph(self, g):
         ret_llt = g.returnblock.inputargs[0].concretetype if len(g.returnblock.inputargs) == 1 else lltype.Void
         arg_llts = map(lambda arg: arg.concretetype, g.startblock.inputargs)
-        g.sig = mutype.MuFuncSig([self.ll2mu.map_type(arg_t) for arg_t in arg_llts], [self.ll2mu.map_type(ret_llt)])
+        g.sig = mutype.MuFuncSig([self.ll2mu.map_type(arg_t) for arg_t in arg_llts],
+                                 [self.ll2mu.map_type(ret_llt)] if ret_llt != lltype.Void else [])
         for blk in g.iterblocks():
             self.specialise_block(blk)
 
@@ -73,9 +74,11 @@ class MuTyper:
 
             elif len(blk.exits) == 2:
                 blk.exitswitch = self.specialise_arg(blk.exitswitch)
-                if blk.exitswitch.concretetype is mutype.MU_INT8:
+                if not (blk.exitswitch.concretetype is mutype.MU_INT1):
+                    MuT = blk.exitswitch.concretetype
                     flag = varof(mutype.MU_INT1)
-                    muops.append(self.ll2mu.gen_mu_cmpop('EQ', blk.exitswitch, self.ll2mu.mapped_const(True), flag))
+                    muops.append(self.ll2mu.gen_mu_cmpop('EQ', blk.exitswitch,
+                                                         Constant(MuT._val_type(1), MuT), flag))
                     blk.exitswitch = flag
                 muops.append(self.ll2mu.gen_mu_branch2(blk.exitswitch, blk.exits[1], blk.exits[0]))
 

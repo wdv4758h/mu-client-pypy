@@ -539,6 +539,35 @@ class TranslationDriver(SimpleTaskEngine):
 
         log.llinterpret("result -> %s" % v)
 
+    @taskdef([RTYPE], "Create entry point function for Mu backend")
+    def task_entrypoint_mu(self):
+        if self.standalone:
+            self.log.info("Task entrypoint_mu")
+
+            from rpython.rtyper.lltypesystem import rffi, lltype
+            from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
+            from rpython.rtyper.llannotation import lltype_to_annotation as l2a
+            from rpython.rtyper.lltypesystem.lloperation import llop
+            from rpython.flowspace.model import Constant
+            def pypy_mu_main(argc, argv):
+                args = []
+                for i in range(argc):
+                    s = rffi.charp2str(argv[i])
+                    args.append(s)
+                llop.mu_comminst(lltype.Void, Constant('THREAD_EXIT', lltype.Void), Constant({}, lltype.Void))
+                try:
+                    exitcode = self.entry_point(args)
+                except Exception as e:
+                    os.write(2, "Caught exception: %s\n" % str(e))
+                    return 1
+                # What do I do with the exitcode?
+                return exitcode
+
+            mlha = MixLevelHelperAnnotator(self.translator.rtyper)
+            g = mlha.getgraph(pypy_mu_main, [l2a(rffi.INT), l2a(rffi.CCHARPP)], l2a(lltype.Signed))
+            mlha.finish()
+            self.translator.entry_point_graph = g
+
     @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
     def task_mutype_mu(self):
         from rpython.translator.mu.exctran import MuExceptionTransformer
@@ -547,6 +576,7 @@ class TranslationDriver(SimpleTaskEngine):
         exctran.transform_all()
 
         self.mutyper = MuTyper(self.translator)
+        self.mutyper.init_threadlocal_struct_type()
         self.mutyper.prepare_all()
         self.mutyper.specialise_all()
 
@@ -566,7 +596,7 @@ class TranslationDriver(SimpleTaskEngine):
         self.mu_bdlgen = MuBundleGen(self.mu_db)
         if self.standalone:
             target_name = self.compute_exe_name()
-            return self.mu_bdlgen.gen_boot_image(target_name)
+            return self.mu_bdlgen.gen_boot_image(target_name.basename)
         else:
             return self.mu_bdlgen.build_and_load_bundle()
 

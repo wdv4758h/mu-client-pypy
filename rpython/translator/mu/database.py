@@ -15,6 +15,7 @@ class MuDatabase:
     def __init__(self, tlc):
         # type: (rpython.translator.translator.TranslationContext) -> None
         self.tlc = tlc
+        self.graphs = tlc.graphs
         self.types = set()
         self.consts = set()
         self.funcref_consts = set()
@@ -48,17 +49,15 @@ class MuDatabase:
 
     def collect_global_defs(self):
         # collect global definitions in graphs
-        for graph in self.tlc.graphs:
-            try:
-                ret_t = graph.getreturnvar().concretetype
-            except IndexError:
-                ret_t = mutype.MU_VOID
-
-            self._add_type(mutype.MuFuncSig(map(lambda v: v.concretetype, graph.getargs()), [ret_t]))
+        for graph in self.graphs:
+            self._add_type(graph.sig)
 
             for blk in graph.iterblocks():
                 for a in blk.inputargs:
                     self._add_type(a.concretetype)
+                if blk.mu_excparam:
+                    self._add_type(blk.mu_excparam.concretetype)
+
                 for op in blk.operations:
                     for a in op.args:
                         self._add_type(a.concretetype)
@@ -82,6 +81,8 @@ class MuDatabase:
         # add types in heap to global type definitions
         for t in self.objtracer.types_in_heap():
             self._add_type(t)
+
+        # TODO: add additional global cells for pointer relocation
 
     def _collect_constant(self, c):
         if isinstance(c.concretetype, mutype.MuNumber):
@@ -183,7 +184,9 @@ class MuDatabase:
         for fnp in replace_ecis:
             fnp.eci = eci
 
-        self.libsupport_path = py.path.local(eci.libraries[-1])
+        if eci.libraries:
+            self.libsupport_path = py.path.local(eci.libraries[-1])
+
         return eci
 
     def assign_mu_name(self):
@@ -213,15 +216,23 @@ class MuDatabase:
 
                 for v in blk.inputargs:
                     self.mu_name_map[v] = '%(blk_name)s.%(v)s' % locals()
+                if blk.mu_excparam:
+                    ep = blk.mu_excparam
+                    self.mu_name_map[ep] = '%(blk_name)s.%(ep)s' % locals()
                 for op in blk.operations:
                     res = op.result
                     self.mu_name_map[res] = '%(blk_name)s.%(res)s' % locals()
+                    if op.opname == 'mu_binop':
+                        metainfo = op.args[-1].value
+                        if hasattr(metainfo, 'status'):
+                            for v in metainfo['status'][1]:
+                                self.mu_name_map[v] = '%(blk_name)s.%(v)s' % locals()
 
 
 class HeapObjectTracer:
     def __init__(self):
-        self.objs = set()
-        self.uptrs = set()  # objects pointed to by uptr, needs relocation support
+        self.heap_objs = set()
+        self.fixed_objs = set()  # objects pointed to by uptr, needs relocation support
         self.nullref_ts = set()
         self.types = set()
 
@@ -235,16 +246,18 @@ class HeapObjectTracer:
                 self.nullref_ts.add(mutype.mutypeOf(obj))
                 return
 
+            self.check_reference_assumptions(obj)
+
             refnt = obj._obj
             if isinstance(refnt, mutype._mustruct):
                 refnt = refnt._normalizedcontainer()
 
-            if refnt not in self.objs:
-                self.objs.add(refnt)
-                self.trace(refnt)
-
             if isinstance(obj, mutype._muuptr):
-                self.uptrs.add(refnt)
+                self.fixed_objs.add(refnt)
+            else:
+                self.heap_objs.add(refnt)
+
+            self.trace(refnt)
 
         elif isinstance(obj, (mutype._mustruct, mutype._muhybrid)):
             for fld in mutype.mutypeOf(obj)._flds:
@@ -255,6 +268,23 @@ class HeapObjectTracer:
                 for i in range(len(obj.items)):
                     itm = obj[i]
                     self.trace(itm)
+
+    def check_reference_assumptions(self, ref):
+        obj = ref._obj
+        norm_obj = obj
+        if isinstance(obj, mutype._mustruct):
+            norm_obj = obj._normalizedcontainer()
+
+        # assumption 1: all references should be to the beginning
+        # of containers, not in the guts
+        if isinstance(norm_obj, mutype._muparentable):
+            assert norm_obj._parentstructure() is None
+
+        # assumption 2: if ref is uptr,
+        # then the outer container must not be pointed by a ref
+        if isinstance(ref, mutype._muuptr):
+            # TODO: how to check this?
+            pass
 
     def types_in_heap(self):
         return self.types
@@ -334,7 +364,7 @@ class MuNameManager:
             name = 'gcl%d' % self._counter['gcl']
             self._counter['gcl'] += 1
         elif isinstance(const.concretetype, mutype.MuReferenceType) and const.value._is_null():
-            name = 'NULL_%s' % self.get_type_name(const.concretetype)
+            name = 'NULL_%s' % self.get_type_name(const.concretetype)[1:]
         elif isinstance(const.concretetype, mutype.MuNumber):
             name = '%(hex)s_%(type)s' % {'hex': mutype.hex_repr(const.value),
                                          'type': self.get_type_name(const.concretetype)[1:]}
