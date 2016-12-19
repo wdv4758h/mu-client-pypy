@@ -522,6 +522,19 @@ def test_empty_struct():
     assert len(ll2mu._pending_ptr_values) == 0
 
 
+def test_malloc_array_of_void():
+    T = mutype.MuStruct('Void', ('length', mutype.MU_INT64))
+    llop = SpaceOperation('malloc_varsize', [Constant(T, mutype.MU_VOID),
+                                             Constant({'flavor': 'raw'}, mutype.MU_VOID),
+                                             Constant(mutype.mu_int64(0), mutype.MU_INT64)], varof(mutype.MuUPtr(T)))
+    ll2mu = LL2MuMapper()
+    muops = ll2mu.map_op(llop)
+    assert len(muops) == 1
+    assert muops[0].opname == 'mu_ccall'
+    assert muops[0].args[0].value._name == 'malloc'
+    assert muops[0].args[1].value == 8
+
+
 def test_shl_type_mismatch():
     ll2mu = LL2MuMapper()
     muops = ll2mu.map_op(SpaceOperation('lllong_lshift', [varof(mutype.MU_INT128), varof(mutype.MU_INT64)], varof(mutype.MU_INT128)))

@@ -222,6 +222,8 @@ class MuExceptionTransformer:
                     lnk.args = _localise_args(lnk.args, lvmap)
                 # pickout things specific to this comparison
                 vexc_t, vexc_v = inargs_cmpblk[:2]
+                assert vexc_t.name.startswith('exc_t')
+                assert vexc_v.name.startswith('exc_v')
                 case = cases.pop(0)
                 exclnk = exclnks.pop(0)
 
@@ -235,7 +237,7 @@ class MuExceptionTransformer:
 
                 # recursively call on rest of the links
                 norm_args = _collect_normal_args(exclnks)
-                lnk_rest = _process_exception(exclnks, cases, norm_args)
+                lnk_rest = _process_exception(exclnks, cases, [vexc_t, vexc_v] + norm_args)
                 lnk_rest.prevblock = cmpblk
                 cmpblk.exits = (lnk_rest, exclnk)
 

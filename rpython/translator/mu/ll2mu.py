@@ -617,6 +617,7 @@ class LL2MuMapper:
         neg_x = varof(x.concretetype, 'neg_x')
         op_neg = SpaceOperation('int_neg', [x], neg_x)
         ops.extend(self.map_op(op_neg))
+        return ops
 
     map_op_uint_invert = map_op_int_invert
     map_op_llong_invert = map_op_int_invert
@@ -662,6 +663,36 @@ class LL2MuMapper:
         flag = 'V'
         return [self.gen_mu_binop('MUL', llop.args[0], llop.args[1], llop.result, flag, [flag_v])]
 
+    def map_op_float_is_true(self, llop):
+        # x != 0
+        MuT = llop.args[0].concretetype
+        llop.__init__('float_ne', [llop.args[0], Constant(MuT._val_type(0.0), MuT)], llop.result)
+        return self.map_op(llop)
+
+    def map_op_float_neg(self, llop):
+        MuT = llop.args[0].concretetype
+        llop.__init__('float_sub', [
+            Constant(MuT._val_type(0.0), MuT),
+            llop.args[0],
+        ],
+                      llop.result)
+        return self.map_op(llop)
+
+    def map_op_float_abs(self, llop):
+        ops = []
+        x = llop.args[0]
+        MuT = x.concretetype
+        # -x = 0 - x
+        neg_x = varof(x.concretetype, 'neg_x')
+        op_neg = SpaceOperation('float_neg', [x], neg_x)
+        ops.extend(self.map_op(op_neg))
+        # x > 0 ?
+        cmp_res = varof(mutype.MU_INT1, 'cmp_res')
+        ops.append(self.gen_mu_cmpop('FOGT', x, Constant(MuT._val_type(0.0), MuT), cmp_res))
+        # True -> x, False -> -x
+        ops.append(self.gen_mu_select(cmp_res, x, neg_x, llop.result))
+        return ops
+
     def _map_binop(self, llop):
         optr = _binop_map[llop.opname]
         if optr in ('SHL', 'LSHR', 'ASHR') and llop.args[1].concretetype != llop.args[0].concretetype:
@@ -697,19 +728,27 @@ class LL2MuMapper:
             return [self.gen_mu_new(llop.args[0].value, llop.result)]
         else:
             assert isinstance(llop.result.concretetype, mutype.MuUPtr)
-            raise NotImplementedError
+            sz = layout.mu_sizeOf(llop.args[0].value)
+            llop.__init__('raw_malloc', [Constant(mutype.mu_int64(sz), mutype.MU_INT64)], llop.result)
+            return self.map_op(llop)
 
     def map_op_malloc_varsize(self, llop):
         ops = []
         MuT_c, hints_c, n_c = llop.args
         MuT = MuT_c.value
         flavor = hints_c.value['flavor']
+
+        if isinstance(MuT, mutype.MuStruct):
+            if isinstance(n_c, Constant):
+                assert n_c.value == 0
+            llop.__init__('malloc', [MuT_c, hints_c], llop.result)
+            return self.map_op(llop)
+
         if flavor == 'gc':
             assert isinstance(llop.result.concretetype, mutype.MuRef)
             ops.append(self.gen_mu_newhybrid(MuT, n_c, llop.result))
         else:
             assert isinstance(llop.result.concretetype, mutype.MuUPtr)
-            from rpython.translator.mu import layout
             fix = layout.mu_hybsizeOf(MuT, 0)
             itm = layout.mu_hybsizeOf(MuT, 1) - fix
 
@@ -836,10 +875,10 @@ class LL2MuMapper:
             iref = var
 
         for o in offsets:
+            T = iref.concretetype.TO
             if o.concretetype == mutype.MU_VOID:
                 assert isinstance(o, Constant)
                 assert isinstance(o.value, str)
-                T = iref.concretetype.TO
                 if isinstance(T, mutype.MuHybrid) and o.value == T._varfld:
                     iref_var = varof(cls(T._vartype.OF), 'ira%s' % var.name)
                     ops.append(self.gen_mu_getvarpartiref(iref, iref_var))
@@ -853,7 +892,7 @@ class LL2MuMapper:
                     # This case happens when the outer container is array,
                     # and rtyper assumes it can respond to indexing.
                     # For translated hybrid type however, we need to get the variable part reference first.
-                    assert isinstance(iref.concretetype.TO, mutype.MuHybrid)
+                    assert isinstance(T, mutype.MuHybrid)
                     iref_var = varof(cls(T._vartype.OF), 'ira%s' % var.name)
                     ops.append(self.gen_mu_getvarpartiref(iref, iref_var))
                     iref = iref_var
