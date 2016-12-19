@@ -124,4 +124,7 @@ class Translation(object):
         return self.driver.c_entryp
 
     def mutype(self):
-        self.driver.mutype()
+        return self.driver.mutype()
+
+    def compile_mu(self):
+        return self.driver.compile_mu()
