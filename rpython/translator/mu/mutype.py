@@ -880,6 +880,9 @@ class _muobject_reference(_mugeneral_reference):
                                (CURTYPE, PARENTTYPE, REFTYPE.TO))
         return cls(REFTYPE, struc)
 
+    def __hash__(self):
+        return hash((self.__class__, self._obj))
+
 
 class MuRef(MuObjectRef):
     _suffix = 'Ref'

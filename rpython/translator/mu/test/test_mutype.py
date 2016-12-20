@@ -376,6 +376,28 @@ def test_constant_hash():
     assert c1 != c2
     assert hash(c1) != hash(c2)
 
+
+def test_objref_hash():
+    # the hash of object reference types should base on the referent object
+    Point = MuStruct("Point", ("x", MU_INT64), ("y", MU_INT64))
+    RP = MuRef(Point)
+    PP = MuUPtr(Point)
+
+    NULL_RP = RP._null()
+    NULL_RP2 = RP._null()
+    assert not (NULL_RP is NULL_RP2)
+    assert hash(NULL_RP) == hash(NULL_RP2)
+
+    NULL_PP = PP._null()
+    assert hash(NULL_RP) != hash(NULL_PP)
+
+    rp = new(Point)
+    assert hash(NULL_RP) != hash(rp)
+
+    rp2 = mutype._muref(RP, rp._obj)
+    assert hash(rp2) == hash(rp)
+
+
 def test_eq_not_affected_by_hash():
     String = MuHybrid("String", ("length", MU_INT64), ("chars", MU_INT8))
     T1 = mutype.MuRef(String)
