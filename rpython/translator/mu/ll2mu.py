@@ -587,6 +587,8 @@ class LL2MuMapper:
         neg_x = varof(x.concretetype, 'neg_x')
         op_neg = SpaceOperation('int_neg', [x], neg_x)
         ops.extend(self.map_op(op_neg))
+        op_sub = SpaceOperation('int_sub', [neg_x, Constant(x.concretetype._val_type(1), x.concretetype)], llop.result)
+        ops.extend(self.map_op(op_sub))
         return ops
 
     map_op_uint_invert = map_op_int_invert
