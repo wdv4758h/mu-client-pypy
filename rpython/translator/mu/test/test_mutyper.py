@@ -265,3 +265,19 @@ def test_force_cast_constant_signedness_problem():
     # thus loosing signedness information.
     # Current walk-around is annotating the force_cast operation with original types.
     assert muop.args[0].value == 'SEXT'
+
+
+def test_pass_heap_obj_in_link_arg():
+    def f(x):
+        if len(x) > 0:
+            return x
+        return "NULL"
+
+    t = Translation(f, [str], backend='mu')
+    t.mutype()
+
+    graph_f = graph_of(f, t)
+    blk = graph_f.startblock
+    op = blk.operations[-2]     # load from global cell in second last
+    assert op.opname == 'mu_load'
+    assert isinstance(op.args[0].concretetype, mutype.MuGlobalCell)

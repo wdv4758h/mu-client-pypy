@@ -1,5 +1,7 @@
 from rpython.rtyper.lltypesystem import lltype, rffi
 from rpython.translator.interactive import Translation
+from rpython.translator.mu import mutype
+from rpython.translator.mu.database import MuDatabase, MuNameManager
 from rpython.translator.mu.genmu import MuBundleGen
 
 
@@ -43,3 +45,29 @@ def test_bigintbenchmark(tmpdir):
     from rpython.translator.goal.targetbigintbenchmark import entry_point
     t = Translation(entry_point, [str], backend='mu')
     t.compile_mu()
+
+
+def test_identityhash():
+    from rpython.rlib import objectmodel
+    def f(x):
+        return objectmodel.compute_identity_hash(x)
+
+    t = Translation(f, [lltype.Ptr(lltype.GcStruct('stt', ('x', lltype.Signed)))], backend='mu')
+    t.mutype()
+    graphs = t.context.graphs
+    assert len(graphs) == 2
+
+
+def test_ovf():
+    from rpython.rlib.rarithmetic import ovfcheck
+    from rpython.translator.mu.test.test_mutyper import graph_of
+    def f(a, b):
+        try:
+            return ovfcheck(a + b)
+        except OverflowError:
+            raise MemoryError
+
+    t =Translation(f, [int, int], backend='mu')
+    t.compile_mu()
+    graph_f = graph_of(f, t)
+    graph_f.view()

@@ -22,8 +22,9 @@ class MuBundleGen:
         self.idmap = {}
         self.rmu = get_rmu()
         self.mu_config = get_translation_config().translation.mu
-        # self.mu = self.rmu.MuVM(self.mu_config.vmargs)
-        self.mu = self.rmu.MuVM('dumpBundle=True')
+        self.mu = self.rmu.MuVM(self.mu_config.vmargs + '\n' +
+                                'extraLibs=' + self.db.libsupport_path.strpath + '\n' +
+                                'dumpBundle=True')
         self.ctx = self.mu.new_context()
         self.bdr = self.ctx.new_ir_builder()
         self.objhdlmap = {}     # used in heap initialisation; NOTE: referent -> handle (not reference)
@@ -123,7 +124,10 @@ class MuBundleGen:
                 self.bdr.new_const_double(_id, _id_T, float(v))
             elif isinstance(T, mutype.MuReferenceType):
                 assert v._is_null()
-                self.bdr.new_const_null(_id, _id_T)
+                if isinstance(T, mutype.MuUPtr):
+                    self.bdr.new_const_int(_id, _id_T, 0)   # NULL for uptr is 0
+                else:
+                    self.bdr.new_const_null(_id, _id_T)
 
         for c in self.db.extern_fncs:
             self.bdr.new_const_extern(self._id_of(c), self._id_of(c.concretetype), c.value._name)
@@ -157,7 +161,7 @@ class MuBundleGen:
 
     def _genop_mu_binop(self, op, op_id):
         metainfo = op.args[-1].value
-        if hasattr(metainfo, 'status'):
+        if 'status' in metainfo:
             self.bdr.new_binop_with_status(op_id, self._id_of(op.result),
                                            self._ids_of(metainfo['status'][1]),
                                            getattr(self.rmu.MuBinOptr, op.args[0].value),
@@ -316,7 +320,7 @@ class MuBundleGen:
         types = self._ids_of(metainfo['types']) if 'types' in metainfo else []
         sigs = self._ids_of(metainfo['sigs']) if 'sigs' in metainfo else []
         self.bdr.new_comminst(op_id, [self._id_of(op.result)],
-                              getattr(self.rmu.MuCommInst, self.args[0].value),
+                              getattr(self.rmu.MuCommInst, op.args[0].value),
                               flags, types, sigs,
                               self._ids_of(op.args[1:-1]))
 

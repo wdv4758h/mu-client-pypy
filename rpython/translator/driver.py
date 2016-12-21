@@ -575,10 +575,10 @@ class TranslationDriver(SimpleTaskEngine):
         exctran = MuExceptionTransformer(self.translator)
         exctran.transform_all()
 
-        self.mutyper = MuTyper(self.translator)
-        self.mutyper.init_threadlocal_struct_type()
-        self.mutyper.prepare_all()
-        self.mutyper.specialise_all()
+        self.translator.mutyper = MuTyper(self.translator)
+        self.translator.mutyper.init_threadlocal_struct_type()
+        self.translator.mutyper.prepare_all()
+        self.translator.mutyper.specialise_all()
 
     @taskdef(["mutype_mu"], "Mu backend optimisations.")
     def task_optimise_mu(self):
@@ -587,18 +587,18 @@ class TranslationDriver(SimpleTaskEngine):
     @taskdef(["optimise_mu"], "Collect global defs into a database.")
     def task_database_mu(self):
         from rpython.translator.mu.database import MuDatabase
-        self.mu_db = MuDatabase(self.translator)
-        self.mu_db.build_database()
+        self.translator.mu_db = MuDatabase(self.translator)
+        self.translator.mu_db.build_database()
 
     @taskdef(["database_mu"], "MuIR Code Generation")
     def task_compile_mu(self):
         from rpython.translator.mu.genmu import MuBundleGen
-        self.mu_bdlgen = MuBundleGen(self.mu_db)
+        self.translator.mu_bdlgen = MuBundleGen(self.translator.mu_db)
         if self.standalone:
             target_name = self.compute_exe_name()
-            return self.mu_bdlgen.gen_boot_image(target_name.basename)
+            return self.translator.mu_bdlgen.gen_boot_image(target_name.basename)
         else:
-            return self.mu_bdlgen.build_and_load_bundle()
+            return self.translator.mu_bdlgen.build_and_load_bundle()
 
     def proceed(self, goals):
         if not goals:

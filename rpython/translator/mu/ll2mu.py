@@ -34,6 +34,7 @@ class LL2MuMapper:
             self.mlha = MixLevelHelperAnnotator(rtyper)
         else:
             self.mlha = None
+        self.helper_graphs = []
 
     def _new_typename(self, name):
         if name not in self._name_cache:
@@ -1181,6 +1182,8 @@ class LL2MuMapper:
         self.mlha.backend_optimize()
         callee_c.value = self.map_value(callee_c.value)
         callee_c.concretetype = mutype.mutypeOf(callee_c.value)
+
+        self.helper_graphs.append(callee_c.value.graph)
 
         llop.__init__('direct_call', [callee_c, llop.args[0]], llop.result)
         return self.map_op(llop)

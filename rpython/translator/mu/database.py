@@ -224,7 +224,7 @@ class MuDatabase:
                     self.mu_name_map[res] = '%(blk_name)s.%(res)s' % locals()
                     if op.opname == 'mu_binop':
                         metainfo = op.args[-1].value
-                        if hasattr(metainfo, 'status'):
+                        if 'status' in metainfo:
                             for v in metainfo['status'][1]:
                                 self.mu_name_map[v] = '%(blk_name)s.%(v)s' % locals()
 

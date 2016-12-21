@@ -1,5 +1,6 @@
 from rpython.flowspace.model import Variable, Constant, c_last_exception
 from rpython.rtyper.lltypesystem import lltype, llmemory
+from rpython.translator.backendopt.removenoops import remove_unaryops
 from rpython.translator.mu import mutype
 from rpython.translator.mu.ll2mu import LL2MuMapper, varof
 from rpython.rlib.objectmodel import CDefinedIntSymbolic
@@ -41,6 +42,8 @@ class MuTyper:
             g = self.graphs.pop()
             self.specialise_graph(g)
             processed.append(g)
+            while len(self.ll2mu.helper_graphs) > 0:
+                self.graphs.add(self.ll2mu.helper_graphs.pop())
 
         self.tlc.graphs = self.graphs = processed
 
@@ -52,6 +55,8 @@ class MuTyper:
         for blk in g.iterblocks():
             self.specialise_block(blk)
 
+        remove_unaryops(g, ['same_as', 'likely'])
+
     def specialise_block(self, blk):
         # specialise inputargs
         blk.inputargs = [self.specialise_arg(arg) for arg in blk.inputargs]
@@ -62,8 +67,11 @@ class MuTyper:
             muops.extend(self.specialise_operation(op))
 
         # specialise exits
+        ldgcell_ops = []
         for e in blk.exits:
             e.args = [self.specialise_arg(arg) for arg in e.args]
+            ldgcell_ops.extend(self.extract_load_gcell(e.args))
+
         if blk.exitswitch is not c_last_exception:
             if len(blk.exits) == 0:
                 if len(muops) == 0 or muops[-1].opname not in ("mu_throw", "mu_comminst"):
@@ -99,10 +107,12 @@ class MuTyper:
             metainfo = muops[-1].args[-1].value
             statres_V = metainfo['status'][1][0]     # only V is used at this moment
             blk.exitswitch = statres_V
+            muops.append(self.ll2mu.gen_mu_branch2(blk.exitswitch, blk.exits[1], blk.exits[0]))
         else:   # exceptional branching for mu_call, mu_comminst
             metainfo = muops[-1].args[-1].value
             metainfo['excclause'] = self.ll2mu.exc_clause(blk.exits[0], blk.exits[1])
 
+        muops = muops[:-1] + ldgcell_ops + [muops[-1]]
         blk.operations = muops
 
     def specialise_arg(self, arg):
@@ -168,7 +178,7 @@ class MuTyper:
                 "jit_force_virtual",
                 "jit_is_virtual",
                 "jit_marker",
-            ) or llop.opname.startswith('mu_')
+            ) or (llop.opname.startswith('mu_') and 'gcidhash' not in llop.opname)
 
         if llop.opname == 'force_cast':
             # HACK: save original arg and result types to discern signedness.
@@ -182,18 +192,21 @@ class MuTyper:
             return [llop]
 
         muops = []
-        muops.extend(self.extract_load_gcell(llop))
+        muops.extend(self.extract_load_gcell(llop.args))
         muops.extend(self.ll2mu.map_op(llop))
         return muops
 
-    def extract_load_gcell(self, llop):
+    def extract_load_gcell(self, args):
+        # find global cells in argument list,
+        # replace them with load variables
+        # return a list of load operations
         loadops = []
-        for i, arg in enumerate(llop.args):
+        for i, arg in enumerate(args):
             if isinstance(arg, Constant) and isinstance(arg.concretetype, mutype.MuGlobalCell):
                 ldvar = Variable('ldgcl')
                 ldvar.concretetype = arg.concretetype.TO
                 loadops.append(self.ll2mu.gen_mu_load(arg, ldvar))
-                llop.args[i] = ldvar
+                args[i] = ldvar
         return loadops
 
 
