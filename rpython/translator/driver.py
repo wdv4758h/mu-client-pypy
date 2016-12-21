@@ -378,7 +378,7 @@ class TranslationDriver(SimpleTaskEngine):
         jittest.jittest(self)
 
     BACKENDOPT = 'backendopt_lltype'
-    @taskdef([RTYPE, '??pyjitpl_lltype', '??jittest_lltype'], "lltype back-end optimisations")
+    @taskdef([RTYPE, '??pyjitpl_lltype', '??jittest_lltype', '?entrypoint_mu'], "lltype back-end optimisations")
     def task_backendopt_lltype(self):
         """ Run all backend optimizations - lltype version
         """
@@ -548,28 +548,37 @@ class TranslationDriver(SimpleTaskEngine):
             from rpython.rtyper.annlowlevel import MixLevelHelperAnnotator
             from rpython.rtyper.llannotation import lltype_to_annotation as l2a
             from rpython.rtyper.lltypesystem.lloperation import llop
-            from rpython.flowspace.model import Constant
+            from rpython.rlib.rposix import exit
             def pypy_mu_main(argc, argv):
                 args = []
                 for i in range(argc):
                     s = rffi.charp2str(argv[i])
                     args.append(s)
-                llop.mu_comminst(lltype.Void, Constant('THREAD_EXIT', lltype.Void), Constant({}, lltype.Void))
+                llop.mu_threadlocalref_init(lltype.Void)
                 try:
                     exitcode = self.entry_point(args)
                 except Exception as e:
                     os.write(2, "Caught exception: %s\n" % str(e))
-                    return 1
+                    exitcode = 1
                 # What do I do with the exitcode?
-                return exitcode
+                exit(rffi.cast(rffi.INT, exitcode))
 
             mlha = MixLevelHelperAnnotator(self.translator.rtyper)
-            g = mlha.getgraph(pypy_mu_main, [l2a(rffi.INT), l2a(rffi.CCHARPP)], l2a(lltype.Signed))
+            g = mlha.getgraph(pypy_mu_main, [l2a(rffi.INT), l2a(rffi.CCHARPP)], l2a(lltype.Void))
             mlha.finish()
             self.translator.entry_point_graph = g
 
     @taskdef([BACKENDOPT], "Specialise types and ops for Mu")
     def task_mutype_mu(self):
+        self.log.info("Task mutype_mu.")
+        # if self.standalone:
+        #     # Hack the return block of the entry point to exit thread instead of returning
+        #     from rpython.flowspace.model import Variable, SpaceOperation
+        #     from rpython.rtyper.lltypesystem import lltype
+        #     v = Variable()
+        #     v.concretetype = lltype.Void
+        #     self.translator.entry_point_graph.returnblock.operations = (SpaceOperation('mu_thread_exit', [], v),)
+
         from rpython.translator.mu.exctran import MuExceptionTransformer
         from rpython.translator.mu.mutyper import MuTyper
         exctran = MuExceptionTransformer(self.translator)

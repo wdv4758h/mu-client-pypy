@@ -1,3 +1,4 @@
+from rpython.flowspace.model import Constant
 from rpython.config.translationoption import get_translation_config
 from rpython.tool.ansi_print import AnsiLogger
 from rpython.tool.ansi_mandelbrot import Driver
@@ -29,8 +30,13 @@ class MuBundleGen:
         self.bdr = self.ctx.new_ir_builder()
         self.objhdlmap = {}     # used in heap initialisation; NOTE: referent -> handle (not reference)
         self.log = AnsiLogger('MuBundleGen')
+        self.reloc_obj_map = {}
+        self.obj_hdl_map = {}
+        self._hyb2stt_map = {}
 
     def build_and_load_bundle(self):
+        self.check_reloc_object()
+
         # generate all symbols first
         self.idmap = self.db.mu_name_map.copy()
         for entity in self.idmap:
@@ -43,6 +49,36 @@ class MuBundleGen:
         self.gen_gcells()
         self.gen_graphs()
         self.bdr.load()
+
+    def check_reloc_object(self):
+        """
+        Check heap objects that need uptr relocation.
+        Create new global cells for these objects.
+
+        When an object is hybrid (C array), it is quite a tricky case.
+        Without proper support of relocation,
+        a compromise needs to be made in order to fit it in global cell.
+        So the current strategy is to convert the hybrid into an equivalent struct and make note of that,
+        and add the struct type to the database.
+        """
+        for obj in self.db.objtracer.fixed_objs:
+            MuT = mutype.mutypeOf(obj)
+            if isinstance(MuT, mutype.MuHybrid):
+                stt = hybrid2struct(obj)
+                self._hyb2stt_map[obj] = stt
+                MuT = mutype.mutypeOf(stt)
+                self.db._add_type(MuT)
+                obj = stt
+
+            GCL = mutype.MuGlobalCell(MuT)
+            gcl = mutype.new(GCL)
+            gcl._store(obj)
+            gcl_c = Constant(gcl, GCL)
+            self.db.gcells.add(gcl_c)
+            self.db.assign_mu_name()
+            self.db.mu_name_map[gcl_c] = self.db.nman.assign(gcl_c)
+
+            self.reloc_obj_map[obj] = gcl_c
 
     def gen_boot_image(self, targetname):
         self.build_and_load_bundle()
@@ -68,7 +104,7 @@ class MuBundleGen:
             self.mu.close()
 
         if self.mu_config.codegen == 'api':
-            if self.mu_config.impl == 'ref':
+            if self.mu_config.impl == 'holstein':
                 if self.db.libsupport_path:
                     from mar import mu_meta_set
                     mu_meta_set(str(targetname), extra_libraries=self.db.libsupport_path.strpath)
@@ -238,7 +274,8 @@ class MuBundleGen:
             self.bdr.new_exc_clause(exc, dst_n, dst_e)
         else:
             exc = self.rmu.MU_NO_ID
-        self.bdr.new_call(op_id, [self._id_of(op.result)],
+        results = [self._id_of(op.result)] if op.args[0].concretetype.Sig.RESULTS else []
+        self.bdr.new_call(op_id, results,
                           self._id_of(op.args[0].concretetype.Sig), self._id_of(op.args[0]),
                           self._ids_of(op.args[1:-1]), exc)
 
@@ -304,7 +341,8 @@ class MuBundleGen:
                            self._id_of(op.args[1]))
 
     def _genop_mu_ccall(self, op, op_id):
-        self.bdr.new_ccall(op_id, [self._id_of(op.result)],
+        results = [self._id_of(op.result)] if op.args[0].concretetype.Sig.RESULTS else []
+        self.bdr.new_ccall(op_id, results,
                            getattr(self.rmu.MuCallConv, op.args[-1].value['callconv']),
                            self._id_of(op.args[0].concretetype),
                            self._id_of(op.args[0].concretetype.Sig),
@@ -331,4 +369,141 @@ class MuBundleGen:
         return map(self.idmap.get, lst_entity)
 
     def init_heap(self):
-        pass
+        # allocate memory first
+        for obj in self.db.objtracer.heap_objs:
+            MuT = mutype.mutypeOf(obj)
+            tid = self._id_of(MuT)
+            if isinstance(MuT, mutype.MuHybrid):
+                hlen = self.ctx.handle_from_uint64(obj.length, mutype.mutypeOf(obj.length).BITS)
+                hdl = self.ctx.new_hybrid(tid, hlen)
+            else:
+                hdl = self.ctx.new_fixed(tid)
+            self.obj_hdl_map[obj] = hdl
+
+        for obj in self.db.objtracer.fixed_objs:
+            if isinstance(mutype.mutypeOf(obj), mutype.MuHybrid):
+                obj = self._hyb2stt_map[obj]
+            hdl = self.ctx.handle_from_global(self._id_of(self.reloc_obj_map[obj]))
+            self.obj_hdl_map[obj] = hdl
+
+        for obj in self.db.objtracer.heap_objs:
+            self._init_heap_obj(obj)
+        for obj in self.db.objtracer.fixed_objs:
+            self._init_fixed_obj(obj)
+
+    def _init_heap_obj(self, obj, hiref=None):
+        MuT = mutype.mutypeOf(obj)
+        if isinstance(MuT, mutype.MuNumber):
+            if isinstance(MuT, mutype.MuIntType):
+                if MuT.BITS <= 64:
+                    mtd = getattr(self.ctx, 'handle_from_uint%d' % MuT.BITS)
+                    return mtd(obj, MuT.BITS)
+                else:
+                    return self.ctx.handle_from_uint64s(obj.get_uint64s(), MuT.BITS)
+            elif MuT == mutype.MU_FLOAT:
+                return self.ctx.handle_from_float(float(obj))
+            elif MuT == mutype.MU_DOUBLE:
+                return self.ctx.handle_from_double(float(obj))
+
+        elif isinstance(MuT, mutype.MuStruct):
+            if not hiref:
+                href = self.obj_hdl_map[obj]
+                hiref = self.ctx.get_iref(href)
+            self._init_heap_struct_like(obj, hiref)
+
+            return
+
+        elif isinstance(MuT, mutype.MuHybrid):
+            if not hiref:
+                href = self.obj_hdl_map[obj]
+                hiref = self.ctx.get_iref(href)
+
+            # fixed fields
+            self._init_heap_struct_like(obj, hiref, MuT._names[:-1])
+
+            # var fields
+            memarr = getattr(obj, MuT._varfld)
+            hiref_var = self.ctx.get_var_part_iref(hiref)
+            self._init_heap_array_like(memarr, hiref_var)
+
+            return
+
+        elif isinstance(MuT, mutype.MuArray):
+            if len(obj) > 0:
+                if not hiref:
+                    href = self.obj_hdl_map[obj]
+                    hiref = self.ctx.get_iref(href)
+                helm_0 = self.ctx.get_elem_iref(hiref, self.ctx.handle_from_uint64(0, 64))
+                self._init_heap_array_like(obj, helm_0)
+
+            return
+
+        elif isinstance(MuT, mutype.MuReferenceType):
+            if obj._is_null():
+                const_id = self._id_of(self.db.heap_NULL_constant_map[MuT])
+                return self.ctx.handle_from_const(const_id)
+
+            if isinstance(MuT, mutype.MuRef):
+                refnt = obj._obj._normalizedcontainer() if isinstance(MuT.TO, mutype.MuStruct) else obj._obj
+                return self.obj_hdl_map[refnt]
+
+            elif isinstance(MuT, mutype.MuUPtr):
+                refnt = obj._obj
+                if isinstance(MuT.TO, mutype.MuStruct):
+                    refnt = refnt._normalizedcontainer()
+                elif isinstance(MuT.TO, mutype.MuHybrid):
+                    refnt = self._hyb2stt_map[refnt]
+
+                hgcl = self.ctx.handle_from_global(self._id_of(self.reloc_obj_map[refnt]))
+                addr = self.ctx.get_addr(hgcl)
+                return addr
+
+            elif isinstance(MuT, mutype.MuFuncRef):
+                return self.ctx.handle_from_func(self._id_of(obj.graph))
+
+        raise NotImplementedError("Don't know how to initialise heap object %s of type %s" % (obj, MuT))
+
+    def _init_heap_struct_like(self, obj, hiref, names=None):
+        MuT = mutype.mutypeOf(obj)
+        if names is None:
+            names = MuT._names
+
+        for idx, fld_name in enumerate(names):
+            fld_hiref = self.ctx.get_field_iref(hiref, idx)
+            fld_val_hdl = self._init_heap_obj(getattr(obj, fld_name), fld_hiref)
+            if fld_val_hdl:
+                self.ctx.store(self.rmu.MuMemOrd.NOT_ATOMIC, fld_hiref, fld_val_hdl)
+
+    def _init_heap_array_like(self, arr, hiref):
+        for i in range(len(arr)):
+            elm = arr[i]
+            hidx = self.ctx.handle_from_uint64(i, 64)
+            elm_iref = self.ctx.shift_iref(hiref, hidx)
+            elm_hdl = self._init_heap_obj(elm, elm_iref)
+            if elm_hdl:
+                self.ctx.store(self.rmu.MuMemOrd.NOT_ATOMIC, elm_iref, elm_hdl)
+
+    def _init_fixed_obj(self, obj):
+        if isinstance(mutype.mutypeOf(obj), mutype.MuHybrid):
+            obj = self._hyb2stt_map[obj]
+        self._init_heap_obj(obj, self.obj_hdl_map[obj])
+
+
+def hybrid2struct(hyb):
+    # convert a hybrid with known size to struct
+    Hyb = mutype.mutypeOf(hyb)
+    assert isinstance(Hyb, mutype.MuHybrid)
+    fixed_flds = [(n, Hyb._flds[n]) for n in Hyb._names[:-1]]
+    Arr = mutype.MuArray(Hyb._var_field_type(), len(getattr(hyb, Hyb._varfld)))
+    Stt = mutype.MuStruct(Hyb._name, *(fixed_flds + [(Hyb._varfld, Arr)]))
+
+    stt = mutype._mustruct(Stt)
+    for n in Hyb._names[:-1]:
+        setattr(stt, n, getattr(hyb, n))
+
+    stt_arr = getattr(stt, Hyb._varfld)
+    hyb_arr = getattr(hyb, Hyb._varfld)
+    for i, e in enumerate(hyb_arr):
+        stt_arr[i] = e
+
+    return stt

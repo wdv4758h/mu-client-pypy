@@ -178,7 +178,12 @@ class MuTyper:
                 "jit_force_virtual",
                 "jit_is_virtual",
                 "jit_marker",
-            ) or (llop.opname.startswith('mu_') and 'gcidhash' not in llop.opname)
+            ) or (llop.opname.startswith('mu_') and llop.opname not in (
+                'mu_getgcidhash',
+                'mu_setgcidhash',
+                'mu_thread_exit',
+                'mu_threadlocalref_init',
+            ))
 
         if llop.opname == 'force_cast':
             # HACK: save original arg and result types to discern signedness.

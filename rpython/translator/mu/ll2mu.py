@@ -1245,10 +1245,13 @@ class LL2MuMapper:
     def map_op_mu_threadlocalref_init(self, llop):
         ops = []
 
-        ops.append(self.gen_mu_new(self.TLStt))
-        ref = ops[-1].result
+        ref = varof(mutype.MuRef(self.TLStt))
+        ops.append(self.gen_mu_new(self.TLStt, ref))
         ops.append(self.gen_mu_comminst('SET_THREADLOCAL', [ref], varof(mutype.MU_VOID)))
         return ops
+
+    def map_op_mu_thread_exit(self, llop):
+        return [self.gen_mu_comminst('THREAD_EXIT', [], varof(mutype.MU_VOID))]
 
     def map_op_weakref_create(self, llop):
         ops = []
@@ -1394,7 +1397,7 @@ class LL2MuMapper:
         if res:
             assert res.concretetype == mutype.MuRef(TYPE)
         return SpaceOperation('mu_new', [Constant(TYPE, mutype.MU_VOID)],
-                              res if res else mutype.MuRef(TYPE))
+                              res if res else varof(mutype.MuRef(TYPE)))
 
     def gen_mu_newhybrid(self, TYPE, n_vc, res=None):
         assert isinstance(TYPE, mutype.MuHybrid)
@@ -1402,14 +1405,14 @@ class LL2MuMapper:
         if res:
             assert res.concretetype == mutype.MuRef(TYPE)
         return SpaceOperation('mu_newhybrid', [Constant(TYPE, mutype.MU_VOID), n_vc],
-                              res if res else mutype.MuRef(TYPE))
+                              res if res else varof(mutype.MuRef(TYPE)))
 
     def gen_mu_getiref(self, ref, res=None):
         assert isinstance(ref.concretetype, mutype.MuRef)
         if res:
             assert res.concretetype == mutype.MuIRef(ref.concretetype.TO)
         return SpaceOperation('mu_getiref', [ref],
-                              res if res else mutype.MuIRef(ref.concretetype.TO))
+                              res if res else varof(mutype.MuIRef(ref.concretetype.TO)))
 
     def gen_mu_getfieldiref(self, iref, fldname, res=None):
         assert isinstance(iref.concretetype, (mutype.MuIRef, mutype.MuUPtr))
@@ -1456,7 +1459,7 @@ class LL2MuMapper:
             assert res.concretetype == cls(Hyb._vartype.OF)
 
         return SpaceOperation('mu_getvarpartiref', [irefhyb],
-                              res if res else cls(Hyb._vartype.OF))
+                              res if res else varof(cls(Hyb._vartype.OF)))
 
     def gen_mu_load(self, ref, res=None, memord='NOT_ATOMIC'):
         assert isinstance(ref.concretetype, mutype.MuObjectRef)

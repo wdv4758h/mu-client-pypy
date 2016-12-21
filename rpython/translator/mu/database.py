@@ -24,6 +24,8 @@ class MuDatabase:
         self.objtracer = None
         self.libsupport_path = None
         self.mu_name_map = {}
+        self.nman = None
+        self.heap_NULL_constant_map = {}
 
     def build_database(self):
         """
@@ -82,7 +84,11 @@ class MuDatabase:
         for t in self.objtracer.types_in_heap():
             self._add_type(t)
 
-        # TODO: add additional global cells for pointer relocation
+        # create constants for NULLs found in heap objects
+        for T in self.objtracer.nullref_ts:
+            c = Constant(T._null(), T)
+            self.consts.add(c)
+            self.heap_NULL_constant_map[T] = c
 
     def _collect_constant(self, c):
         if isinstance(c.concretetype, mutype.MuNumber):
@@ -191,6 +197,7 @@ class MuDatabase:
 
     def assign_mu_name(self):
         man = MuNameManager()
+        self.nman = man
         # types
         for T in self.types:
             self.mu_name_map[T] = man.assign(T)
@@ -241,11 +248,11 @@ class HeapObjectTracer:
         if not isinstance(MuT, mutype._MuMemArray):
             self.types.add(MuT)
 
-        if isinstance(obj, mutype._muobject_reference):
-            if obj._is_null():
-                self.nullref_ts.add(mutype.mutypeOf(obj))
-                return
+        if isinstance(obj, mutype._mugeneral_reference) and obj._is_null():
+            self.nullref_ts.add(mutype.mutypeOf(obj))
+            return
 
+        if isinstance(obj, mutype._muobject_reference):
             self.check_reference_assumptions(obj)
 
             refnt = obj._obj
