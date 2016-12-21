@@ -354,6 +354,9 @@ class LL2MuMapper:
 
         hyb = mutype._muhybrid(MuT, self.map_value(llv.getlength()))
 
+        if 'length' in MuT._names:
+            hyb.length = mutype.mu_int64(llv.getlength())
+
         _memarr = getattr(hyb, MuT._varfld)
         for i in range(hyb.length):
             _memarr[i] = self.map_value(llv.getitem(i))
@@ -1167,7 +1170,7 @@ class LL2MuMapper:
             from rpython.rtyper.rclass import OBJECT
             from rpython.rtyper.lltypesystem.lloperation import llop
 
-            # obj = lltype.cast_pointer(lltype.Ptr(OBJECT), obj)
+            obj = lltype.cast_pointer(lltype.Ptr(OBJECT), obj)
             h = llop.mu_getgcidhash(lltype.Signed, obj)
             if h == 0:
                 addr = llmemory.cast_ptr_to_adr(obj)

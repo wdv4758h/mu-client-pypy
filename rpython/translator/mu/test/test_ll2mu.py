@@ -142,6 +142,19 @@ def test_map_value_varstt():
     for i in range(5):
         assert mus.chars[i] == ord(s.chars.getitem(i))
 
+def test_map_value_array():
+    ll2mu = LL2MuMapper()
+
+    Arr = lltype.GcArray(lltype.Char)
+    arr = lltype.malloc(Arr, 5, zero=True)._obj
+    for i, c in enumerate("hello"):
+        arr.setitem(i, c)
+
+    muarr = ll2mu.map_value(arr)
+    assert muarr.length == 5
+    for i in range(5):
+        assert muarr.items[i] == ord(arr.getitem(i))
+
 def test_map_value_ptr():
     ll2mu = LL2MuMapper()
     Point = lltype.GcStruct("Point", ('x', lltype.Signed), ('y', lltype.Signed))
