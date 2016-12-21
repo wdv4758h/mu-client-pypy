@@ -600,6 +600,9 @@ LL_OPERATIONS = {
     # hacks for gc id hash
     'mu_getgcidhash':       LLOp(),
     'mu_setgcidhash':       LLOp(),
+    # entry point hacks
+    'mu_thread_exit':       LLOp(),
+    'mu_threadlocalref_init': LLOp(),
 }
 # ***** Run test_lloperation after changes. *****
 
