@@ -804,6 +804,9 @@ class LL2MuMapper:
 
         if isinstance(iref_fld.concretetype.TO, (mutype.MuRef, mutype.MuUPtr)):
             ops.append(self.gen_mu_load(iref_fld, llop.result))
+        else:
+            assert ops[-1].result.concretetype == llop.result.concretetype
+            ops[-1].result = llop.result
         return ops
 
     def _getarrayitemiref(self, var, idx_vc):

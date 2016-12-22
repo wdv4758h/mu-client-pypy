@@ -171,7 +171,6 @@ class MuTyper:
                 "gc_set_max_heap_size",
                 "gc_thread_after_fork",
                 "gc_writebarrier",
-                "gc_writebarrier_before_copy",
                 "jit_conditional_call",
                 "jit_force_quasi_immutable",
                 "jit_force_virtual",
