@@ -249,7 +249,16 @@ class LL2MuMapper:
         if isinstance(llv, TotalOrderSymbolic):
             llv = llv.compute_fn()
         elif isinstance(llv, CDefinedIntSymbolic):
-            llv = llv.default
+            from rpython.rlib import objectmodel, jit
+            if llv is objectmodel._translated_to_c:
+                llv = 1     # faking it to make it work
+            elif llv is objectmodel.malloc_zero_filled:
+                llv = 1     # Mu NEW zeros memory
+            elif llv is jit._we_are_jitted:
+                llv = 0     # this is AoT, not jitted
+            else:
+                raise NotImplementedError("Unanticipated %s" % llv)
+
         elif isinstance(llv, (str, unicode)):
             assert len(llv) == 1  # char
             llv = ord(llv)
@@ -258,7 +267,7 @@ class LL2MuMapper:
             if llv in (ERR, OK):
                 llv = -1 if llv is ERR else 0
             else:
-                raise NotImplementedError("Don't know how to map primitive value %s" % llv)
+                raise NotImplementedError("Unanticipted %s" % llv)
 
         return MuT._val_type(llv)
 
@@ -1144,7 +1153,19 @@ class LL2MuMapper:
     map_op_cast_primitive = map_op_force_cast
 
     map_op_gc_can_move = _same_as_true
-    map_op_gc_pin = _same_as_true
+
+    def map_op_gc_pin(self, llop):
+        assert isinstance(llop.args[0].concretetype, mutype.MuRef)
+        ops = []
+        ptr = varof(mutype.MuUPtr(llop.args[0].concretetype.TO), 'ptr')
+        ops.append(self.gen_mu_comminst('NATIVE_PIN', [llop.args[0]], ptr, types=[llop.args[0].concretetype]))
+        ops.extend(self._same_as_true(llop))
+        return ops
+
+    def map_op_gc_unpin(self, llop):
+        assert isinstance(llop.args[0].concretetype, mutype.MuRef)
+        return [self.gen_mu_comminst('NATIVE_UNPIN', [llop.args[0]], llop.result, types=[llop.args[0].concretetype])]
+
     map_op_gc_writebarrier_before_copy = _same_as_true
 
     def map_op_gc_load_indexed(self, llop):

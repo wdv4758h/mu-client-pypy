@@ -172,7 +172,6 @@ class MuTyper:
                 "gc_thread_after_fork",
                 "gc_writebarrier",
                 "gc_writebarrier_before_copy",
-                "gc_unpin",
                 "jit_conditional_call",
                 "jit_force_quasi_immutable",
                 "jit_force_virtual",
