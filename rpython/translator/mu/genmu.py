@@ -399,20 +399,30 @@ class MuBundleGen:
             obj = gcl_c.value._obj
             if isinstance(MuT, mutype.MuRef):
                 hgcl = self.ctx.handle_from_global(gcl_id)
-                heap_obj = obj._obj
-                if isinstance(mutype.mutypeOf(heap_obj), mutype.MuStruct):
-                    heap_obj = heap_obj._normalizedcontainer()
-                href = self.obj_hdl_map[heap_obj]
+                if obj._is_null():
+                    NULL_c = self.db.heap_NULL_constant_map[mutype.mutypeOf(obj)]
+                    NULL_c_id = self._id_of(NULL_c)
+                    href = self.ctx.handle_from_const(NULL_c_id)
+                else:
+                    heap_obj = obj._obj
+                    if isinstance(mutype.mutypeOf(heap_obj), mutype.MuStruct):
+                        heap_obj = heap_obj._normalizedcontainer()
+                    href = self.obj_hdl_map[heap_obj]
                 self.ctx.store(self.rmu.MuMemOrd.NOT_ATOMIC, hgcl, href)
             elif isinstance(MuT, mutype.MuUPtr):
-                fixed_obj = obj._obj
                 hgcl = self.ctx.handle_from_global(gcl_id)
-                if isinstance(mutype.mutypeOf(fixed_obj), mutype.MuHybrid):
-                    fixed_obj = self._hyb2stt_map[fixed_obj]
-                if isinstance(mutype.mutypeOf(fixed_obj), mutype.MuStruct):
-                    fixed_obj = fixed_obj._normalizedcontainer()
-                hgcl_obj = self.obj_hdl_map[fixed_obj]
-                huptr = self.ctx.get_addr(hgcl_obj)
+                if obj._is_null():
+                    NULL_c = self.db.heap_NULL_constant_map[mutype.mutypeOf(obj)]
+                    NULL_c_id = self._id_of(NULL_c)
+                    huptr = self.ctx.handle_from_const(NULL_c_id)
+                else:
+                    fixed_obj = obj._obj
+                    if isinstance(mutype.mutypeOf(fixed_obj), mutype.MuHybrid):
+                        fixed_obj = self._hyb2stt_map[fixed_obj]
+                    if isinstance(mutype.mutypeOf(fixed_obj), mutype.MuStruct):
+                        fixed_obj = fixed_obj._normalizedcontainer()
+                    hgcl_obj = self.obj_hdl_map[fixed_obj]
+                    huptr = self.ctx.get_addr(hgcl_obj)
                 self.ctx.store(self.rmu.MuMemOrd.NOT_ATOMIC, hgcl, huptr)
 
     def _init_heap_obj(self, obj, hiref=None):
