@@ -392,6 +392,29 @@ class MuBundleGen:
         for obj in self.db.objtracer.fixed_objs:
             self._init_fixed_obj(obj)
 
+        # store to global cells
+        for gcl_c in self.db.gcells:
+            MuT = gcl_c.concretetype.TO
+            gcl_id = self._id_of(gcl_c)
+            obj = gcl_c.value._obj
+            if isinstance(MuT, mutype.MuRef):
+                hgcl = self.ctx.handle_from_global(gcl_id)
+                heap_obj = obj._obj
+                if isinstance(mutype.mutypeOf(heap_obj), mutype.MuStruct):
+                    heap_obj = heap_obj._normalizedcontainer()
+                href = self.obj_hdl_map[heap_obj]
+                self.ctx.store(self.rmu.MuMemOrd.NOT_ATOMIC, hgcl, href)
+            elif isinstance(MuT, mutype.MuUPtr):
+                fixed_obj = obj._obj
+                hgcl = self.ctx.handle_from_global(gcl_id)
+                if isinstance(mutype.mutypeOf(fixed_obj), mutype.MuHybrid):
+                    fixed_obj = self._hyb2stt_map[fixed_obj]
+                if isinstance(mutype.mutypeOf(fixed_obj), mutype.MuStruct):
+                    fixed_obj = fixed_obj._normalizedcontainer()
+                hgcl_obj = self.obj_hdl_map[fixed_obj]
+                huptr = self.ctx.get_addr(hgcl_obj)
+                self.ctx.store(self.rmu.MuMemOrd.NOT_ATOMIC, hgcl, huptr)
+
     def _init_heap_obj(self, obj, hiref=None):
         MuT = mutype.mutypeOf(obj)
         if isinstance(MuT, mutype.MuNumber):

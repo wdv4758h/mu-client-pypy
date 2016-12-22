@@ -248,30 +248,30 @@ class HeapObjectTracer:
         if not isinstance(MuT, mutype._MuMemArray):
             self.types.add(MuT)
 
-        if isinstance(obj, mutype._mugeneral_reference) and obj._is_null():
+        if isinstance(MuT, mutype.MuReferenceType) and obj._is_null():
             self.nullref_ts.add(mutype.mutypeOf(obj))
             return
 
-        if isinstance(obj, mutype._muobject_reference):
+        if isinstance(MuT, mutype.MuObjectRef):
             self.check_reference_assumptions(obj)
 
             refnt = obj._obj
-            if isinstance(refnt, mutype._mustruct):
+            if isinstance(mutype.mutypeOf(refnt), mutype.MuStruct):
                 refnt = refnt._normalizedcontainer()
 
-            if isinstance(obj, mutype._muuptr):
+            if isinstance(MuT, mutype.MuUPtr):
                 self.fixed_objs.add(refnt)
             else:
                 self.heap_objs.add(refnt)
 
             self.trace(refnt)
 
-        elif isinstance(obj, (mutype._mustruct, mutype._muhybrid)):
-            for fld in mutype.mutypeOf(obj)._flds:
+        elif isinstance(MuT, (mutype.MuStruct, mutype.MuHybrid)):
+            for fld in MuT._flds:
                 self.trace(getattr(obj, fld))
 
-        elif isinstance(obj, (mutype._mumemarray, mutype._muarray)):
-            if isinstance(mutype.mutypeOf(obj).OF, (mutype.MuContainerType, mutype.MuObjectRef)):
+        elif isinstance(MuT, (mutype._MuMemArray, mutype.MuArray)):
+            if isinstance(MuT.OF, (mutype.MuContainerType, mutype.MuObjectRef)):
                 for i in range(len(obj.items)):
                     itm = obj[i]
                     self.trace(itm)
