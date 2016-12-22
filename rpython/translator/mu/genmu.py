@@ -357,7 +357,8 @@ class MuBundleGen:
             flags = []
         types = self._ids_of(metainfo['types']) if 'types' in metainfo else []
         sigs = self._ids_of(metainfo['sigs']) if 'sigs' in metainfo else []
-        self.bdr.new_comminst(op_id, [self._id_of(op.result)],
+        results = [self._id_of(op.result)] if op.result.concretetype != mutype.MU_VOID else []
+        self.bdr.new_comminst(op_id, results,
                               getattr(self.rmu.MuCommInst, op.args[0].value),
                               flags, types, sigs,
                               self._ids_of(op.args[1:-1]))

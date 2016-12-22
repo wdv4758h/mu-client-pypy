@@ -972,7 +972,8 @@ class LL2MuMapper:
     def map_op_keepalive(self, llop):
         ref = llop.args[0]
         if isinstance(ref.concretetype, mutype.MuRef):
-            return [self.gen_mu_comminst('NATIVE_UNPIN', [ref], llop.result)]
+            assert llop.result.concretetype == mutype.MU_VOID
+            return [self.gen_mu_comminst('NATIVE_UNPIN', [ref], llop.result, types=[ref.concretetype])]
         else:
             return []
 
@@ -1066,7 +1067,7 @@ class LL2MuMapper:
         ops = []
         if isinstance(llop.args[0].concretetype, mutype.MuRef):
             ptr = varof(mutype.MuUPtr(llop.args[0].concretetype.TO), 'ptr')
-            ops.append(self.gen_mu_comminst('NATIVE_PIN', [llop.args[0]], ptr))
+            ops.append(self.gen_mu_comminst('NATIVE_PIN', [llop.args[0]], ptr, types=[llop.args[0].concretetype]))
         else:
             assert isinstance(llop.args[0].concretetype, mutype.MuUPtr)
             ptr = llop.args[0]
