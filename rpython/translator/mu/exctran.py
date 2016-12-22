@@ -236,7 +236,7 @@ class MuExceptionTransformer:
 
                 # recursively call on rest of the links
                 norm_args = _collect_normal_args(exclnks)
-                lnk_rest = _process_exception(exclnks, cases, norm_args)
+                lnk_rest = _process_exception(exclnks, cases, [vexc_t, vexc_v] + norm_args)
                 lnk_rest.prevblock = cmpblk
                 cmpblk.exits = (lnk_rest, exclnk)
 
