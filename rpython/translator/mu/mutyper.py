@@ -37,13 +37,12 @@ class MuTyper:
         if not hasattr(self, 'graphs'):
             raise AttributeError("don't have graphs. Run prepare_all() first.")
 
+        self.graphs.add(self.ll2mu.ll_identityhash_c.value.graph)
         processed = []
         while len(self.graphs) > 0:
             g = self.graphs.pop()
             self.specialise_graph(g)
             processed.append(g)
-            while len(self.ll2mu.helper_graphs) > 0:
-                self.graphs.add(self.ll2mu.helper_graphs.pop())
 
         self.tlc.graphs = self.graphs = processed
 

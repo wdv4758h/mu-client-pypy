@@ -34,7 +34,30 @@ class LL2MuMapper:
             self.mlha = MixLevelHelperAnnotator(rtyper)
         else:
             self.mlha = None
-        self.helper_graphs = []
+
+        if self.mlha:
+            self._translate_ll_identityhash()
+
+    def _translate_ll_identityhash(self):
+        # code taken from rpython/memory/gctransform/boehm.py
+        from rpython.rtyper.llannotation import lltype_to_annotation as l2a
+        HDR = lltype.Struct("header", ("hash", lltype.Signed))
+        HDRPTR = lltype.Ptr(HDR)
+
+        def ll_identityhash(addr):
+            obj = llmemory.cast_adr_to_ptr(addr, HDRPTR)
+            h = obj.hash
+            if h == 0:
+                obj.hash = h = llmemory.cast_adr_to_int(addr)
+            return h
+
+        callee_c = self.mlha.constfunc(ll_identityhash, [l2a(llmemory.Address)], l2a(lltype.Signed))
+        self.mlha.finish()
+        self.mlha.backend_optimize()
+        callee_c.value = self.map_value(callee_c.value)
+        callee_c.concretetype = mutype.mutypeOf(callee_c.value)
+
+        self.ll_identityhash_c = callee_c
 
     def _new_typename(self, name):
         if name not in self._name_cache:
@@ -1190,31 +1213,12 @@ class LL2MuMapper:
         return ops
 
     def map_op_gc_identityhash(self, llop):
-        def _ll_identityhash(obj):
-            from rpython.rlib.objectmodel import keepalive_until_here
-            from rpython.rtyper.rclass import OBJECT
-            from rpython.rtyper.lltypesystem.lloperation import llop
-
-            obj = lltype.cast_pointer(lltype.Ptr(OBJECT), obj)
-            h = llop.mu_getgcidhash(lltype.Signed, obj)
-            if h == 0:
-                addr = llmemory.cast_ptr_to_adr(obj)
-                addr_int = llmemory.cast_adr_to_int(addr)
-                h = addr_int
-                llop.mu_setgcidhash(lltype.Void, obj, h)
-                keepalive_until_here(obj)
-            return h
-
-        callee_c = self.mlha.constfunc(_ll_identityhash, [llop.args[0].annotation], llop.result.annotation)
-        self.mlha.finish()
-        self.mlha.backend_optimize()
-        callee_c.value = self.map_value(callee_c.value)
-        callee_c.concretetype = mutype.mutypeOf(callee_c.value)
-
-        self.helper_graphs.append(callee_c.value.graph)
-
-        llop.__init__('direct_call', [callee_c, llop.args[0]], llop.result)
-        return self.map_op(llop)
+        ops = []
+        adr = varof(mutype.MU_INT64)
+        ops.extend(self.map_op(SpaceOperation('cast_ptr_to_adr', [llop.args[0]], adr)))
+        ops.extend(self.map_op(SpaceOperation('direct_call', [self.ll_identityhash_c, adr], llop.result)))
+        ops.extend(self.map_op(SpaceOperation('keepalive', [llop.args[0]], varof(mutype.MU_VOID))))
+        return ops
 
     def map_op_mu_getgcidhash(self, llop):
         llop.__init__('getfield', [llop.args[0], Constant(self.GC_IDHASH_FIELD[0], mutype.MU_VOID)], llop.result)
