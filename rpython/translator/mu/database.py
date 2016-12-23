@@ -4,7 +4,7 @@ from rpython.translator.mu import mutype
 from rpython.translator.platform import platform
 from rpython.tool.udir import udir
 import ctypes, ctypes.util
-import os, sys, py
+import os, sys, py, re
 
 from rpython.tool.ansi_mandelbrot import Driver
 from rpython.tool.ansi_print import AnsiLogger
@@ -137,6 +137,11 @@ class MuDatabase:
         header_file_name = 'mu_common_header.h'
         header_file_dir_path = udir.strpath
 
+        macro_wrapper_regex = re.compile(r'RPY_EXTERN (?P<ret_t>.*) '
+                                         r'\*?pypy_macro_wrapper_(?P<macro_name>\w*)'
+                                         r'\((?P<arg_list>.*)\) '
+                                         r'\{ return (?P=macro_name)\(.*\); \}')
+
         # step 1: identify macros, functions defined in post_include_bits
         for c in self.extern_fncs:
             fnp = c.value
@@ -156,9 +161,14 @@ class MuDatabase:
                 eci = eci._with_ctypes
                 fnp.eci = eci   # reassign the eci
                 for src_str in eci.separate_module_sources:
-                    if fnp._name in src_str:    # is a macro
-                        fnp._name = 'pypy_macro_wrapper_' + fnp._name
-                        break
+                    m = re.match(macro_wrapper_regex, src_str)
+                    if m:
+                        d = m.groupdict()
+                        if fnp._name == d['macro_name']:    # is a macro
+                            fnp._name = 'pypy_macro_wrapper_' + fnp._name
+                            break
+                    else:
+                        print src_str
 
             if eci.post_include_bits or eci.separate_module_sources or eci.separate_module_files:
                 replace_ecis.append(fnp)
