@@ -164,8 +164,14 @@ MU_INT16 = MuIntType("MU_INT16", mu_int16)
 MU_INT32 = MuIntType("MU_INT32", mu_int32)
 MU_INT64 = MuIntType("MU_INT64", mu_int64)
 
-class mu_float(rffi.r_singlefloat): pass
-class mu_double(rarithmetic.r_longfloat): pass
+class mu_float(rffi.r_singlefloat):
+    def __hash__(self):
+        return hash(hex_repr(self))
+
+class mu_double(rarithmetic.r_longfloat):
+    def __hash__(self):
+        return hash(hex_repr(self))
+
 MU_FLOAT = MuFloatType("MU_FLOAT", mu_float, 32)
 mu_float._TYPE = MU_FLOAT
 MU_DOUBLE = MuFloatType("MU_DOUBLE", mu_double, 64)

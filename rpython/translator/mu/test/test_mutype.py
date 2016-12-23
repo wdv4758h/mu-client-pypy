@@ -376,6 +376,11 @@ def test_constant_hash():
     assert c1 != c2
     assert hash(c1) != hash(c2)
 
+    f1 = Constant(mu_double(1.0), MU_DOUBLE)
+    f2 = Constant(mu_double(1.0), MU_DOUBLE)
+    assert f1 == f2
+    assert hash(f1) == hash(f2)
+
 
 def test_objref_hash():
     # the hash of object reference types should base on the referent object
