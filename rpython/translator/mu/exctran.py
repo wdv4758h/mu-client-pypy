@@ -220,6 +220,8 @@ class MuExceptionTransformer:
                 inargs_cmpblk = _localise_args(inlnk_args, lvmap)
                 for lnk in exclnks:
                     lnk.args = _localise_args(lnk.args, lvmap)
+                    lnk.last_exception, lnk.last_exc_value = \
+                        _localise_args([lnk.last_exception, lnk.last_exc_value], lvmap)
                 # pickout things specific to this comparison
                 vexc_t, vexc_v = inargs_cmpblk[:2]
                 assert vexc_t.name.startswith('exc_t')
@@ -252,15 +254,16 @@ class MuExceptionTransformer:
 
             # replace the exception info vars with the unpacked vars
             for l in exclnks:
-                if isinstance(l.last_exception, Variable) and l.last_exception in l.args:
+                if isinstance(l.last_exception, Variable):
                     lvmap[l.last_exception] = vexc_t_catblk
-                if isinstance(l.last_exc_value, Variable) and l.last_exc_value in l.args:
+                if isinstance(l.last_exc_value, Variable):
                     lvmap[l.last_exc_value] = vexc_v_catblk
 
             # localise all link arguments
             for lnk in exclnks:
                 lnk.args = _localise_args(lnk.args, lvmap)
-
+                lnk.last_exception, lnk.last_exc_value = \
+                    _localise_args([lnk.last_exception, lnk.last_exc_value], lvmap)
             lnk_args = [vexc_t_catblk, vexc_v_catblk] + inargs_catblk
 
             lnk_proc = _process_exception(exclnks, cases, lnk_args)
