@@ -591,7 +591,8 @@ class TranslationDriver(SimpleTaskEngine):
 
     @taskdef(["mutype_mu"], "Mu backend optimisations.")
     def task_optimise_mu(self):
-        pass
+        from rpython.translator.mu.opt.all import mu_backend_optimisations
+        mu_backend_optimisations(self.translator)
 
     @taskdef(["optimise_mu"], "Collect global defs into a database.")
     def task_database_mu(self):
