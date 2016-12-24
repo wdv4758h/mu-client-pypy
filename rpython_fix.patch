@@ -1,0 +1,83 @@
+diff --git a/rpython/rlib/rposix.py b/rpython/rlib/rposix.py
+index f35e2b7..6aad4b8 100644
+--- a/rpython/rlib/rposix.py
++++ b/rpython/rlib/rposix.py
+@@ -1778,9 +1778,9 @@ def uname():
+         lltype.free(l_utsbuf, flavor='raw')
+ 
+ # These are actually macros on some/most systems
+-c_makedev = external('makedev', [rffi.INT, rffi.INT], rffi.INT)
+-c_major = external('major', [rffi.INT], rffi.INT)
+-c_minor = external('minor', [rffi.INT], rffi.INT)
++c_makedev = external('makedev', [rffi.INT, rffi.INT], rffi.INT, macro=_MACRO_ON_POSIX)
++c_major = external('major', [rffi.INT], rffi.INT, macro=_MACRO_ON_POSIX)
++c_minor = external('minor', [rffi.INT], rffi.INT, macro=_MACRO_ON_POSIX)
+ 
+ @replace_os_function('makedev')
+ @jit.dont_look_inside
+diff --git a/rpython/rlib/test/test_rposix.py b/rpython/rlib/test/test_rposix.py
+index b3bc6ed..4edfcaa 100644
+--- a/rpython/rlib/test/test_rposix.py
++++ b/rpython/rlib/test/test_rposix.py
+@@ -281,6 +281,10 @@ class TestPosixFunction:
+     def test_isatty(self):
+         assert rposix.isatty(-1) is False
+ 
++    def test_makedev(self):
++        dev = rposix.makedev(24, 7)
++        assert rposix.major(dev) == 24
++        assert rposix.minor(dev) == 7
+ 
+ @py.test.mark.skipif("not hasattr(os, 'ttyname')")
+ class TestOsExpect(ExpectTest):
+diff --git a/rpython/rtyper/lltypesystem/test/test_ll2ctypes.py b/rpython/rtyper/lltypesystem/test/test_ll2ctypes.py
+index b1e1f73..b07816b 100644
+--- a/rpython/rtyper/lltypesystem/test/test_ll2ctypes.py
++++ b/rpython/rtyper/lltypesystem/test/test_ll2ctypes.py
+@@ -1467,9 +1467,6 @@ class TestPlatform(object):
+ 
+     def test_prefix(self):
+ 
+-        if not sys.platform.startswith('linux'):
+-            py.test.skip("Not supported")
+-
+         from rpython.translator.platform import platform
+ 
+         tmpdir = udir.join('lib_on_libppaths_prefix')
+@@ -1482,7 +1479,7 @@ class TestPlatform(object):
+         eci = ExternalCompilationInfo(include_dirs=[cdir])
+         so = platform.compile([c_file], eci, standalone=False)
+         sopath = py.path.local(so)
+-        sopath.move(sopath.dirpath().join('libc_file.so'))
++        sopath.move(sopath.dirpath().join('libc_file.' + platform.so_ext))
+         eci = ExternalCompilationInfo(
+             libraries = ['c_file'],
+             library_dirs = [str(so.dirpath())]
+diff --git a/rpython/translator/platform/__init__.py b/rpython/translator/platform/__init__.py
+index 051668b..d44ed79 100644
+--- a/rpython/translator/platform/__init__.py
++++ b/rpython/translator/platform/__init__.py
+@@ -212,7 +212,10 @@ class Platform(object):
+ 
+     def _finish_linking(self, ofiles, eci, outputfilename, standalone):
+         if outputfilename is None:
+-            outputfilename = ofiles[0].purebasename
++            if standalone:
++                outputfilename = ofiles[0].purebasename
++            else:
++                outputfilename = self.so_prefixes[0] + ofiles[0].purebasename
+         if ofiles:
+             dirname = ofiles[0].dirpath()
+         else:
+diff --git a/rpython/translator/platform/posix.py b/rpython/translator/platform/posix.py
+index cafc9b1..a03109e 100644
+--- a/rpython/translator/platform/posix.py
++++ b/rpython/translator/platform/posix.py
+@@ -15,6 +15,7 @@ class BasePosix(Platform):
+ 
+     DEFAULT_CC = 'gcc'
+     rpath_flags = ['-Wl,-rpath=\'$$ORIGIN/\'']
++    so_prefixes = ('lib', '')
+ 
+     def __init__(self, cc=None):
+         self.cc = cc or os.environ.get('CC', self.DEFAULT_CC)

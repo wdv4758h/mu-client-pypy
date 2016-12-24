@@ -7,8 +7,6 @@
 *.swp
 *.swo
 
-*.patch
-
 *.pyc
 *.pyo
 *~
